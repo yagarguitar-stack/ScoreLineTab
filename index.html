@@ -873,7 +873,7 @@ body.playing .hit-mark{fill:transparent!important}
 body.runmode #bb-ctx{box-shadow:inset 0 3px 0 #c2410c}
 body.runmode .paper{box-shadow:inset 0 0 0 2px rgba(194,65,12,.28)}
 /* let ring の帯の終わりは、掴んで伸び縮みさせる的（tab-4.82） */
-.mhit[data-mk="ringEnd"],.mhit[data-mk="pmEnd"]{cursor:ew-resize}
+.mhit[data-mk="ringEnd"],.mhit[data-mk="pmEnd"],.mhit[data-mk="sbEnd"]{cursor:ew-resize}
 /* ══ 五線の中の掴み手は、事件を受け取らない（tab-4.91）══
    L様——「まだまだ重なってる」。
 
@@ -1365,6 +1365,78 @@ body.locked #paper::before{
 }
 @media print{ body.locked #paper::before{ display:none; } }
 </style>
+<!-- 共通の画面の部品（録音スタジオの卓・夜）。読み込めない時・古い版の時は、これまでの見た目のまま -->
+<link rel="stylesheet" href="https://yagarguitar-stack.github.io/design-system/v1/components.css">
+<script src="https://yagarguitar-stack.github.io/design-system/v1/components.js"></script>
+<style>
+/* ===== 共通の部品（版 1.2 以上）が読めた時だけ効く（body に sl-st と ds-studio が付く） ===== */
+body.sl-st{
+  --ink:var(--ds-paper);--ink2:#1f2024;--ink3:#2c2e33;--ink-line:#060607;--on-ink:var(--ds-ink);--on-ink-dim:var(--st-leg2);
+  --font-ui:"Zen Kaku Gothic New",-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  background-color:var(--ds-paper);
+}
+body.sl-st .paperwrap{background:transparent}
+body.sl-st #paper{box-shadow:0 0 0 1px rgba(0,0,0,.6),0 12px 34px rgba(0,0,0,.55)}
+/* 操作面の中だけ、選んだ色を琥珀の灯りにする（紙面の色は変えない） */
+body.sl-st .topbar,body.sl-st .modebar,body.sl-st .botbar,body.sl-st .sheet-ov,body.sl-st .toast,body.sl-st .phase,body.sl-st .tab-tip{--indigo:var(--st-lamp)}
+
+/* ── 上の棚 ── */
+body.sl-st .topbar{--topbar-h:40px;background:linear-gradient(#26282c,#1b1c1f);border-bottom:0;box-shadow:inset 0 -1px 0 rgba(0,0,0,.6),0 1px 0 var(--st-hl),0 4px 12px rgba(0,0,0,.35)}
+body.sl-st .tb-left{display:none}
+body.sl-st .topbar{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;column-gap:14px}
+body.sl-st .topbar > .tb-song{grid-column:1;grid-row:1;justify-content:flex-start;padding:4px 6px}
+body.sl-st #sl-bridge{grid-column:2;grid-row:1}
+body.sl-st .tb-tools{grid-column:3;grid-row:1}
+body.sl-st .tb-song .t{font-family:"Permanent Marker","Zen Kaku Gothic New",sans-serif;font-weight:400;font-size:17px;letter-spacing:.05em;color:#1e2a52;background:#efeada;padding:3px 14px 2px;transform:rotate(-1.4deg);box-shadow:0 1px 1.5px rgba(0,0,0,.55);clip-path:polygon(1% 4%,99% 0,100% 94%,0 100%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw}
+body.sl-st .tb-song:hover{background:transparent}
+body.sl-st .tb-song .car{color:var(--st-silk)}
+body.sl-st #sl-bridge{min-width:0}
+body.sl-st .tb-meta{font:500 12.5px "IBM Plex Mono",monospace;color:var(--st-disp);text-shadow:0 0 6px var(--st-dispglow);background:var(--st-dispbg);padding:6px 10px;border-radius:4px;box-shadow:inset 0 1px 4px rgba(0,0,0,.9),0 1px 0 var(--st-hl)}
+/* ボタン共通：枠と押し面。押すと沈み、選ぶと灯る */
+body.sl-st .tb-btn,body.sl-st .bb-btn,body.sl-st .pen-btn,body.sl-st .topbar .btn,body.sl-st .modebar .btn,body.sl-st .botbar .btn,body.sl-st .sheet-ov .btn,body.sl-st .toast .btn,body.sl-st .topbar .t-btn,body.sl-st .modebar .t-btn,body.sl-st .botbar .t-btn,body.sl-st .sheet-ov .t-btn,body.sl-st .toast .t-btn,body.sl-st .vc-segb{
+  border:0;background:var(--st-cap);color:var(--ds-ink);border-radius:6px;
+  box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),inset 0 -2px 0 rgba(0,0,0,.28),0 3px 0 var(--st-bezel),0 4px 6px rgba(0,0,0,.3);
+  transition:transform .09s cubic-bezier(.2,.8,.2,1),box-shadow .09s,background .18s,color .18s,text-shadow .18s}
+body.sl-st .tb-btn:hover,body.sl-st .bb-btn:hover,body.sl-st .topbar .btn:hover,body.sl-st .modebar .btn:hover,body.sl-st .botbar .btn:hover,body.sl-st .sheet-ov .btn:hover,body.sl-st .toast .btn:hover,body.sl-st .topbar .t-btn:hover,body.sl-st .modebar .t-btn:hover,body.sl-st .botbar .t-btn:hover,body.sl-st .sheet-ov .t-btn:hover,body.sl-st .toast .t-btn:hover{background:linear-gradient(#43464d,#31343a);color:var(--ds-ink)}
+body.sl-st .tb-btn:active,body.sl-st .bb-btn:active,body.sl-st .pen-btn:active,body.sl-st .topbar .btn:active,body.sl-st .modebar .btn:active,body.sl-st .botbar .btn:active,body.sl-st .sheet-ov .btn:active,body.sl-st .toast .btn:active,body.sl-st .topbar .t-btn:active,body.sl-st .modebar .t-btn:active,body.sl-st .botbar .t-btn:active,body.sl-st .sheet-ov .t-btn:active,body.sl-st .toast .t-btn:active,body.sl-st .mode-btn:active,body.sl-st .vc-segb:active{transform:translateY(2px);box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),0 1px 0 var(--st-bezel)}
+body.sl-st .tb-btn.on,body.sl-st .bb-btn.on,body.sl-st .pen-btn.on,body.sl-st .topbar .btn.pri,body.sl-st .modebar .btn.pri,body.sl-st .botbar .btn.pri,body.sl-st .sheet-ov .btn.pri,body.sl-st .toast .btn.pri,body.sl-st .mode-btn.on,body.sl-st .vc-segb.on{
+  background:var(--st-lit);color:var(--st-litleg);text-shadow:0 0 8px var(--st-glow);border-color:transparent;
+  box-shadow:0 0 0 1px var(--st-bezel),inset 0 0 14px var(--st-glowin),inset 0 1px 0 rgba(255,255,255,.25),0 3px 0 var(--st-bezel),0 0 16px var(--st-spill)}
+body.sl-st .topbar .btn.pri:hover,body.sl-st .modebar .btn.pri:hover,body.sl-st .botbar .btn.pri:hover,body.sl-st .sheet-ov .btn.pri:hover,body.sl-st .toast .btn.pri:hover{background:linear-gradient(#6c552d,#4a3a21);color:var(--st-litleg)}
+/* 再生中・録音中は赤、リズムは緑に灯る */
+body.sl-st .bb-btn.go.on,body.sl-st .mode-btn.play.on{background:linear-gradient(#b32a22,#7a1812);color:#fff;text-shadow:none;box-shadow:0 0 0 1px var(--st-bezel),inset 0 0 14px rgba(255,80,60,.7),0 3px 0 var(--st-bezel),0 0 18px rgba(255,60,40,.45)}
+body.sl-st .bb-btn.rec-on{color:#fff;background:linear-gradient(#b32a22,#7a1812);animation:sl-rec 1.2s ease-in-out infinite}
+@keyframes sl-rec{50%{filter:brightness(.72)}}
+body.sl-st .mode-btn.on.md-rhythm{background:linear-gradient(#1f5a3a,#133a26);color:#b8ffd2;text-shadow:0 0 8px rgba(115,240,160,.8)}
+body.sl-st .topbar .btn.dgr,body.sl-st .modebar .btn.dgr,body.sl-st .botbar .btn.dgr,body.sl-st .sheet-ov .btn.dgr,body.sl-st .toast .btn.dgr,body.sl-st .topbar .t-btn.dgr,body.sl-st .modebar .t-btn.dgr,body.sl-st .botbar .t-btn.dgr,body.sl-st .sheet-ov .t-btn.dgr,body.sl-st .toast .t-btn.dgr,body.sl-st .bb-btn.dgr{color:var(--ds-accent)}
+body.sl-st .bb-btn:disabled,body.sl-st .t-btn:disabled{box-shadow:0 0 0 1px var(--st-bezel);opacity:.45}
+/* ── モードの帯 ── */
+body.sl-st .modebar{background:var(--st-deck);border-bottom:0;box-shadow:inset 0 1px 0 var(--st-hl),0 1px 0 rgba(0,0,0,.7)}
+body.sl-st .mode-grp,body.sl-st .bb-grp,body.sl-st .vc-seg{gap:4px;padding:4px;border:0;border-radius:8px;background:var(--st-well);box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 1px 0 var(--st-hl)}
+body.sl-st .mode-btn{background:var(--st-cap);color:var(--ds-ink);border-radius:6px;box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),0 2px 0 var(--st-bezel);transition:transform .09s,box-shadow .09s,background .18s}
+/* ── 下の卓 ── */
+body.sl-st .botbar{background:var(--st-deck);border-top:0;box-shadow:inset 0 1px 0 var(--st-hl),0 -1px 0 rgba(0,0,0,.8),0 -10px 22px rgba(0,0,0,.4)}
+body.sl-st .bb-div{background:rgba(0,0,0,.6);box-shadow:1px 0 0 var(--st-hl)}
+body.sl-st .bb-lab,body.sl-st .bb-hint,body.sl-st .bb-lab2{color:var(--st-silk)}
+body.sl-st .bb-bpm-grp{border:0;background:var(--st-well);box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 1px 0 var(--st-hl)}
+body.sl-st .bb-bpm-display{font:500 15px "IBM Plex Mono",monospace;color:var(--st-disp);text-shadow:0 0 7px var(--st-dispglow);background:var(--st-dispbg);padding:5px 8px;border-radius:4px;box-shadow:inset 0 1px 4px rgba(0,0,0,.9)}
+body.sl-st .bb-bpm-slider{height:8px;background:#040404;border-radius:4px;box-shadow:inset 0 1px 2px #000,0 1px 0 var(--st-hl)}
+body.sl-st .bb-bpm-slider::-webkit-slider-thumb{width:18px;height:30px;border-radius:3px;border:0;background:linear-gradient(90deg,#8e8e8e,#f0f0f0 40%,#1e1e1e 47%,#1e1e1e 53%,#f0f0f0 60%,#8a8a8a);box-shadow:0 3px 5px rgba(0,0,0,.7)}
+body.sl-st .bb-bpm-slider::-moz-range-thumb{width:18px;height:30px;border-radius:3px;border:0;background:#ddd}
+body.sl-st .bb-sel,body.sl-st select{background-color:var(--st-dispbg);color:var(--st-disp);border:0;box-shadow:inset 0 1px 4px rgba(0,0,0,.9),0 1px 0 var(--st-hl);font-family:"IBM Plex Mono","Zen Kaku Gothic New",monospace}
+body.sl-st .bb-note{background:var(--st-dispbg);border:0;box-shadow:inset 0 1px 4px rgba(0,0,0,.9)}
+/* ── 引き出し（ラック）・お知らせ（表示窓） ── */
+body.sl-st .sheet{background:radial-gradient(circle at 14px 14px,#bbb 0 2.5px,#444 3.5px,transparent 4.5px),radial-gradient(circle at calc(100% - 14px) 14px,#bbb 0 2.5px,#444 3.5px,transparent 4.5px),linear-gradient(#2c2e33,#232428);border:0;box-shadow:0 0 0 1px #000,inset 0 1px 0 var(--st-hl),0 -12px 30px rgba(0,0,0,.5)}
+body.sl-st .toast{background:var(--st-dispbg);color:var(--st-disp);border:0;text-shadow:0 0 7px var(--st-dispglow);font-family:"IBM Plex Mono","Zen Kaku Gothic New",monospace;box-shadow:0 0 0 1px #000,0 8px 20px rgba(0,0,0,.5)}
+body.sl-st .song-row.picked,body.sl-st .song-row.cur{background:rgba(255,179,64,.10)}
+body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
+/* ── 幅の狭い画面（スマホの縦向き）では中央の表示を出さない ── */
+@media (max-width:700px){
+  body.sl-st #sl-bridge{display:none}
+  body.sl-st .topbar{grid-template-columns:minmax(0,1fr) auto}
+  body.sl-st .tb-song .t{max-width:46vw;font-size:15px}
+}
+</style>
 </head>
 <body>
 
@@ -1408,12 +1480,14 @@ body.locked #paper::before{
       <button class="btn dgr" id="btn-purgegen" title="道具が作った曲（名前を変えていないもの）をまとめて消します">🗑 作った曲を片づける</button>
       <button class="btn" id="btn-checksong" title="挙動を確かめる36小節">✓ たしかめ帳</button>
       <button class="btn" id="btn-checksong2" title="はねる設定で挙動を確かめる20小節">✓ たしかめ帳 弐</button>
+      <button class="btn" id="btn-checksong-sb" title="スライドバーを確かめる8小節">✓ スライドバーの帳</button>
       <button class="btn" data-close="ov-songs">閉じる</button>
     </div>
     <div class="sh-body" id="song-list"></div>
     <div class="sh-foot">
       <button class="btn grow" id="btn-bundle">🎁 一枚にまとめて渡す</button>
       <button class="btn grow" id="btn-export-one">⤓ この曲を書き出す</button>
+      <button class="btn grow" id="btn-export-midi">♪ MIDI で書き出す</button>
       <button class="btn grow" id="btn-export-all">⤓ 全曲</button>
       <button class="btn grow" id="btn-import">⤒ 読み込む</button>
     </div>
@@ -1481,7 +1555,7 @@ body.locked #paper::before{
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.14', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.19', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -1831,7 +1905,23 @@ function normChordAt(o){
    （実測 bpm120・8分はねる：3連8分が 167/167/167 のはずが 222/167/111）。 */
 function isEvenBeat(bar,beat,s){
   if(bar&&bar.evenAt&&bar.evenAt[beat]===true) return true;
-  if(isTripletDiv(snapDivAt(bar,beat,s))) return true;
+  /* ══ 曲ぜんたいの刻みで、音楽を決めない（tab-6.19）══
+     L様——「ハネる設定なのにハネなくなった」「元々この設定でハネてた」。
+
+     ここは「刻みが3連の拍には、はねを掛けない」という決まりである（tab-2.12）。
+     3連で書いた音にさらにはねを掛ければ二重に歪むので、決まり自体は正しい。
+
+     だが判定が**曲ぜんたいの既定の刻み**まで見ていた。
+     曲の刻みは**入力の時にカーソルが吸い付く先**であって、音楽の指定ではない。
+     3連を書くために既定を3連へ変えれば、それだけで**曲じゅうのはねが黙って消える。**
+
+     > **入力の都合で決めた値で、鳴り方を決めない。**
+
+     見るのは二つだけ——
+       ① その拍・その小節に**3連の刻みを明示**してある（既定と違う値を置いた）
+       ② その拍に**3連が実際に書いてある**
+     どちらでもなければ、はねる。 */
+  if(hasOwnSnapAt(bar,beat,s)&&isTripletDiv(snapDivAt(bar,beat,s))) return true;
   return beatHasTuplet(s,bar,beat);
 }
 /* ══ その拍に、連符が書いてあるか（tab-2.12）══
@@ -2007,14 +2097,14 @@ function bendStyle(s){
 const SYM_TXT={
   jp:{ pm:'M',    arp:'Arp.', armDn:'Arm. Down', armUp:'Arm. Up',
        harmN:'Harm.', harmA:'A.H.', harmP:'P.H.',
-       slide:'s', gliss:'g', port:'Port.', bracket:false },
+       slide:'s', gliss:'g', port:'Port.', bracket:false, sb:'Bottleneck' },
   /* 別表記。ミュート・ハーモニクス・アルペジオは標準と同じ字（元から大文字） */
   yg:{ pm:'M',    arp:'Arp.', armDn:'Arm. Down', armUp:'Arm. Up',
        harmN:'Harm.', harmA:'A.H.', harmP:'P.H.',
-       slide:'S', gliss:'gliss', port:'Port.', bracket:false },
+       slide:'S', gliss:'gliss', port:'Port.', bracket:false, sb:'Bottleneck' },
   en:{ pm:'P.M.', arp:'',     armDn:'w/bar ↓',  armUp:'w/bar ↑',
        harmN:'',      harmA:'',     harmP:'',
-       slide:'',  gliss:'',  port:'grad.', bracket:true },
+       slide:'',  gliss:'',  port:'grad.', bracket:true, sb:'Bottleneck' },
 };
 function symTxt(s,k){ return (SYM_TXT[bendStyle(s)]||SYM_TXT.jp)[k]; }
 const BEND_TBL={jp:BEND_TXT_JP,yg:BEND_TXT_YG,en:BEND_TXT_EN};
@@ -2082,6 +2172,37 @@ const TIE_CROSS_DEP=7;     /* 小節をまたぐ弧の深さ。両側で揃え�
    数字の板は上下6px。以前は 8px 上に置いており、板の縁まで2pxしかなかった。
    触れるほど近いと、弧と数字が一つの塊に見える。 */
 const TIE_Y_OFF=9.5;
+/* ══ 弧と波を、離す（tab-6.16-5）══
+   L様——「スラーの弧とビブラートが重なってる」。
+
+   実測すると、弧の土台が 39.9、波が 35.6——**波は弧より上に居る。**
+   弧は土台から上へ膨らむので、その頂が波を突き抜けていた。
+
+   > **正しく描いてあっても、読み違えられるなら直す。**（tab-3.60 の筋）
+
+   動かすのは**波の方**である。弧は前後二つの音符を結ぶ長い線で、
+   上げれば行き先まで動く。波は一つの押さえに属する短い線——
+   **重なりを直す時は、二つのうち身軽な方を動かす。**
+
+   弧の掛かる押さえだけ、波を一段（弦の間ひとつ）上へ。
+   掛かっていない所は元のまま——要らぬ所まで持ち上げれば、譜面が間延びする。 */
+/* 波が下にいる区間は、弧を深くしない（tab-6.16-5）。
+   チョーキングの字を避ける `TIE_CAP_BEND` と同じ仕掛けである——
+   **同じ悩みには、同じ道具を使う。** */
+const TIE_CAP_VIB=11;
+function vibCap(a,b){
+  const has=(a&&a.t&&a.t.vib)||(b&&b.t&&b.t.vib);
+  return has?TIE_CAP_VIB:null;
+}
+function capMin(a,b){
+  if(a==null) return (b==null?null:b);
+  if(b==null) return a;
+  return Math.min(a,b);
+}
+function vibSlot(t){
+  /* 弧（タイ・スラー）がこの押さえに掛かるなら、波を一段上へ */
+  return (t&&(t.tie||(t.link&&t.link!=='none')))?1:0;
+}
 const baseY=54, TAB_LS=9.2, TAB_TOP=baseY-TAB_LS*2.5, TAB_BOT=baseY+TAB_LS*2.5;
 const strY=si=>TAB_BOT-si*TAB_LS;
 /* ══ 記号は「線と線の間」へ置く（tab-1.99）══
@@ -4036,7 +4157,14 @@ function holdMarkSVG(s,t,cx,y,rowY,prevHold,place,span){
   if(t.vib){
     /* 幅に応じて波線の姿も変える（tab-4.28）。線に乗らないよう間へ（tab-1.99） */
     const vx=_at(t.vibAt,0);                       /* 書いた所から（tab-4.96） */
-    const vy=gapY(y,0), vp=vibPathD(t.vib,vx,vy);
+    /* 伸びてきた押さえの波も、同じ帳面へ（tab-6.17）。
+       `place` が渡っていれば席を取り、無ければ従来どおり間へ置く */
+    let vy=gapY(y,vibSlot(t));
+    let vp=vibPathD(t.vib,vx,vy);
+    if(place&&(vy<TAB_TOP||vy>TAB_BOT)){
+      vy=place(vx+vp.w/2, vp.w+3, 9, 0)+((vy<TAB_TOP)?vp.amp:0);
+      vp=vibPathD(t.vib,vx,vy);
+    }
     mk+=`<path d="${vp.d}" fill="none" stroke="${INK}" stroke-width="1.1"/>`;
   }
   if(t.slOut){
@@ -4759,6 +4887,7 @@ function engrave(s,bar,o){
            コード名と同じ ci（＝元の番号）を持たせておく */
         src:ci,
         pmn:!!(!(i===0&&tiedFrom)&&n.sym&&n.sym.pm),
+        sbn:!!(n.sym&&n.sym.sb),
         /* ══ let ring は「伸ばす」印なので、伸びてきた符にも載る（tab-4.81）══
            P.M. は**弾く時**の記号なので伸びてきた符には出さない（tab-1.57）が、
            let ring は**鳴らし続ける**という指図である。伸びている最中こそ効いている。 */
@@ -5452,6 +5581,14 @@ function engrave(s,bar,o){
     g+=`<line x1="${o.pmIn?padL:(padL+(bendStyle(s)==='en'?26:14))}" y1="${PY}" x2="${xe}" y2="${PY}" stroke="#6d28d9" stroke-width="1" stroke-dasharray="3 2"/>`;
     if(!o.pmNext) g+=`<line x1="${xe}" y1="${PY}" x2="${xe}" y2="${PY-4.5}" stroke="#6d28d9" stroke-width="1"/>`;
   }
+  if(mk.sb){
+    /* 筒を当てる帯（tab-6.16）。P.M. と同じ姿・同じ手つき。
+       両方掛かっている譜面では、重ならぬよう一段下げる */
+    const SY=belowY+4+((mk.pm)?11:0), xe=o.sbNext?(W-padR):(W-padR-4);
+    if(!o.sbIn) g+=`<text x="${padL}" y="${SY+4}" font-size="10" font-weight="800" fill="#b45309">${symTxt(s,'sb')}</text>`;
+    g+=`<line x1="${o.sbIn?padL:(padL+measureText(symTxt(s,'sb'),10)+4)}" y1="${SY}" x2="${xe}" y2="${SY}" stroke="#b45309" stroke-width="1" stroke-dasharray="3 2"/>`;
+    if(!o.sbNext) g+=`<line x1="${xe}" y1="${SY}" x2="${xe}" y2="${SY-4.5}" stroke="#b45309" stroke-width="1"/>`;
+  }
   if(mk.fermata){
     const fx=W/2, fy=baseY-22;
     g+=`<path d="M ${fx-11} ${fy+6} A 11 9 0 0 1 ${fx+11} ${fy+6}" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
@@ -5964,7 +6101,11 @@ function engrave(s,bar,o){
          見積もりが 2 割ほど細く出て、**ぎりぎりの所で重なっていた。**
          > **測れないものは、広めに見ておく。**
          幅を一割二分ふくらませ、左右に 1.5px ずつ余白を置く。 */
-      const w=Math.max(8,measureText(String(txt||''),size||9)*1.12+3);
+      /* 字ではなく**幅そのもの**を渡せる（tab-6.17）。
+         波線のように measureText の効かぬ物も、同じ帳面に載せるため */
+      const w=(typeof txt==='number')
+        ? Math.max(8,txt)
+        : Math.max(8,measureText(String(txt||''),size||9)*1.12+3);
       return symRowY(symPlace(cx0-w/2,cx0+w/2,k||0));
     };
 
@@ -6126,7 +6267,26 @@ function engrave(s,bar,o){
           /* 付けた所から描く（tab-4.95）。数字と重ならぬよう、右端で頭打ち */
           const _vf=(typeof t.vibAt==='number')?Math.max(0,Math.min(0.92,t.vibAt)):0;
           const _vx=(_vf>0)?Math.max(cx+5,Math.min(timeX(n.start+n.u)-6,timeX(n.start+n.u*_vf))):(cx+5);
-          const vy=gapY(y,0), x0=_vx, vp=vibPathD(t.vib,x0,vy);
+          /* ══ 波も席を取る（tab-6.17）══
+             L様——「4小節目重なってる」。曲げた音の波と `bend` の字が触れていた。
+
+             この譜面には**席の帳面**がある（`symPlace`）。字は置く前に空きを数え、
+             埋まっていれば一段外へ逃げる。ところが**波はその帳面に載っていなかった。**
+             字どうしは避け合うのに、波は我関せずで引かれていた——
+             弧の時（tab-6.16-5）も、字の時も、根はこれである。
+
+             > **同じ場所を使う物は、同じ帳面に。**（tab-4.97 の筋）
+
+             六線の内側の間に収まる波は、これまでどおり間へ置く。
+             **六線の外まで出る波だけ**、字と同じ帳面で席を取る——
+             先に来た方が席を保ち、後から来た方が一段逃げる。 */
+          let vy=gapY(y,vibSlot(t));
+          const x0=_vx;
+          let vp=vibPathD(t.vib,x0,vy);
+          if(arcUp?(vy<TAB_TOP):(vy>TAB_BOT)){
+            vy=symY(x0+vp.w/2, vp.w+3, 9, 0)+(arcUp?vp.amp:0);
+            vp=vibPathD(t.vib,x0,vy);
+          }
           mk+=`<path d="${vp.d}" fill="none" stroke="${INK}" stroke-width="1.1"/>`;
           pushMark('vib',x0,x0+vp.w,vy-6-vp.amp,vy+6,o.s,'r');
         }
@@ -6432,7 +6592,7 @@ function engrave(s,bar,o){
                    チョークダウンのタイだけ少し濃い、という妙な譜面になっていた。
                    寸法を決める場所は一つでなければならない。 */
                 const pb2=(prevStops||[]).some(q=>q.s===o.s&&q.t&&q.t.bend);
-                mk+=tieArc(px+(pb2?7:5),cx-5,ay,false,arcUp,pb2?TIE_CAP_BEND:null);
+                mk+=tieArc(px+(pb2?7:5),cx-5,ay,false,arcUp,capMin(pb2?TIE_CAP_BEND:null,vibCap(o,prev)));
               } else {
                 /* ══ スラーも `tieArc` を通す（tab-3.65）══
                    同じ音ならタイ、違う音ならスラー——**意味は違うが、弧は弧である。**
@@ -6443,7 +6603,7 @@ function engrave(s,bar,o){
                    tab-1.51 で「タイを描く道は一本に」と決め、
                    「**寸法を決める場所は一つでなければならない**」と書いてある。
                    その決まりが、隣の `else` へは渡っていなかった。 */
-                mk+=tieArc(px+5,cx-5,ay,false,arcUp,null);
+                mk+=tieArc(px+5,cx-5,ay,false,arcUp,vibCap(o,prev));
               }
               /* ══ 弧も席を取る（tab-4.97）══
                  L様——「奏法とスラーなど描写位置が被ってることが多すぎる」。
@@ -6631,7 +6791,9 @@ function engrave(s,bar,o){
         const pb=bendAt(flat[i-1],si);
         const x0=xs[i-1]+(pb?Math.max(7,tieGap(flat[i-1])):tieGap(flat[i-1]));
         const x1=cx-tieGap(n);
-        g+=tieArc(x0,x1,tieY(si),false,arcUp,pb?TIE_CAP_BEND:null);
+        const _sAt=(f,st)=>((f&&f.stops)||[]).find(q=>q&&q.s===st)||null;
+        g+=tieArc(x0,x1,tieY(si),false,arcUp,
+                  capMin(pb?TIE_CAP_BEND:null,vibCap(_sAt(n,si),_sAt(flat[i-1],si))));
         /* ══ タイの弧も席を取る（tab-4.97）══
            繋がりの弧は控えるようにしたが、**タイの弧は別の枝で引かれる**ので
            控えから漏れていた。上げ幅の字がその上へ乗っていたのはこれである。
@@ -6838,6 +7000,44 @@ function engrave(s,bar,o){
     }
   }
   if(mk.pm&&o.pmNext) pmOut=true;
+
+  /* ══ 筒を当てる帯（tab-6.16）══
+     L様のお指図——「ブリッジミュートと同じように破線で指定し範囲内の音を変える」。
+     ゆえに P.M. と同じ造りにする——**同じ姿の物は、同じ手つきで扱えねばならない。**
+     叩けば帯ごと外れ、終わりの返しを掴めば伸び縮みする。 */
+  let sbOut=false;
+  if(!sim&&!mk.sb){
+    const SY=belowY+4+((mk.pm||flat.some(f=>f.pmn))?11:0);
+    let i=0, first=true;
+    while(i<flat.length){
+      if(flat[i].rest||!flat[i].sbn){ i++; continue; }
+      let j=i;
+      while(j+1<flat.length&&!flat[j+1].rest&&flat[j+1].sbn) j++;
+      const toEnd=(j===flat.length-1)&&!!o.sbNext;
+      const cont=(first&&i===0&&!!o.sbIn);
+      const x0=xs[i]-4;
+      const x1=toEnd?(W-padR):(xs[j]+5);
+      const mt=symTxt(s,'sb');
+      const tx0=cont?x0:(x0+measureText(mt,10)+4);
+      if(!cont) g+=`<text x="${x0.toFixed(2)}" y="${(SY+4).toFixed(2)}" font-size="10" font-weight="800" fill="#b45309">${mt}</text>`;
+      if(wantLinkHits&&!cont&&flat[i].src>=0)
+        markHits.push({kind:'sb',x0:x0-2,x1:Math.max(x0+measureText(mt,10)+4,x1-8),
+          y0:SY-7,y1:SY+9,src:flat[i].src,str:null,
+          t0:flat[i].start,t1:flat[j].start+flat[j].u});
+      /* 字が長いので、短い範囲では破線の居場所が無くなる（tab-6.16）。
+         **帯である以上、線が一本も引かれぬのは姿として誤り**——最低限の丈は残す */
+      const xe2=toEnd?x1:Math.max(x1,tx0+10);
+      if(xe2>tx0) g+=`<line x1="${tx0.toFixed(2)}" y1="${SY}" x2="${xe2.toFixed(2)}" y2="${SY}" stroke="#b45309" stroke-width="1" stroke-dasharray="3 2"/>`;
+      if(!toEnd) g+=`<line x1="${xe2.toFixed(2)}" y1="${SY}" x2="${xe2.toFixed(2)}" y2="${(SY-4.5)}" stroke="#b45309" stroke-width="1"/>`;
+      if(wantLinkHits&&!toEnd&&flat[i].src>=0)
+        markHits.push({kind:'sbEnd',x0:xe2-7,x1:xe2+7,y0:SY-8,y1:SY+8,
+          src:flat[i].src,str:null,t0:flat[i].start,t1:flat[j].start+flat[j].u});
+      if(toEnd) sbOut=true;
+      first=false;
+      i=j+1;
+    }
+  }
+  if(mk.sb&&o.sbNext) sbOut=true;
 
   /* ══ let ring の帯（tab-4.81）══
      L様——「範囲をつけたい」。
@@ -7640,7 +7840,7 @@ function engrave(s,bar,o){
          道が二つに分かれる所では、両方に同じ物を置くこと。 */
       g+=extraHitsSVG();
       g+=`</svg>`;
-      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,ringOut,vbTop,vbBot};
+      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot};
     }
     const _cells=[];
     list.forEach(e=>{
@@ -7665,7 +7865,7 @@ function engrave(s,bar,o){
   }
 
   g+=`</svg>`;
-  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,ringOut,vbTop,vbBot};
+  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot};
 }
 
 /* 文字幅の実測（コード名の重なり判定用） */
@@ -8693,7 +8893,7 @@ function scrWhyNot(n){ return scrDir(n&&n.sym)?'ピックスクラッチの音�
 function symHeld(sy){
   if(!sy) return sy;
   const o=Object.assign({},sy);
-  o.pm=false; o.trem=false; o.rake=false; o.tap=false;
+  o.pm=false; o.sb=false; o.trem=false; o.rake=false; o.tap=false;
   o.arp=false; o.rasg=false; o.scratch=null;
   return o;
 }
@@ -8881,6 +9081,13 @@ function autoLinkFor(s,bar,idx,str){
   /* 先に鳴る音（装飾音符があればそちら）との差で判ずる（tab-4.39） */
   const d=tieHeadF(o)-p.f;
   if(d===0) return null;                       /* 同じ数字は繋がりではない（弾き直し） */
+  /* ══ 筒を当てている間は、すべて滑り（tab-6.16-4）══
+     L様——「自動で同じ弦はスラーつけて」。
+     筒で押さえた弦は**叩くことも引っ掛けることもできない。**
+     H も P も物理として起こらず、動けば必ず滑る。
+     ゆえに帯の中では、幅を問わず `sl` を書く。
+     > **物理として起こらぬ手つきを、筆が書いてはならない。** */
+  if(n.sym&&n.sym.sb&&Number(o.f)>0&&Number(p.f)>0) return 'sl';
   if(Math.abs(d)>=legatoSlideAt(s)) return 'sl';
   return d>0?'h':'p';
 }
@@ -8899,6 +9106,28 @@ function autoLinkFor(s,bar,idx,str){
    共通の道具（`prevPlayable`／`nextPlayable`）で隣を取り、
    前・現・次の三つを塗る。手で付けた繋がり（`auto` の印が無いもの）は
    `refreshAutoLink` が元より守る——筆は勝手に塗らない（原則6）。 */
+/* ══ 帯を掛けたら、繋がりも引き直す（tab-6.16-4）══
+   筒を当てた弦は弾き直さない。ゆえに帯を掛けた時点で、
+   **同じ弦の続きには滑りが要る**——L様に一つずつ書かせるものではない。
+
+   引くのは`筆`（`refreshAutoAround`）にそのまま任せる。あちらは
+   **手で書いた繋がりには触れない**（印の無い `link` は守る）ので、
+   L様が意図して外されたもの・書かれたものは残る。
+   帯を外した時は、ふだんの筆の設定（レガートの筆）に従って引き直す——
+   帯のために付いた滑りは、帯と共に引き上げる。
+
+   > **筆が書いたものは筆が直す。手が書いたものには触れない。** */
+function sbRelink(s,bar,idx){
+  const n=bar&&bar.notes&&bar.notes[idx];
+  if(!n||n.kind==='rest') return;
+  const on=sbOn(n.sym)||!!(typeof tabLegato!=='undefined'&&tabLegato);
+  (n.stops||[]).forEach(o=>{ if(o&&typeof o.f==='number') refreshAutoAround(s,bar,idx,o.s,on); });
+}
+/* 小節ぜんぶ、あるいは範囲の音符を引き直す */
+function sbRelinkBar(s,bar){
+  if(!bar) return;
+  (bar.notes||[]).forEach((n,i)=>sbRelink(s,bar,i));
+}
 function refreshAutoAround(s,bar,idx,str,on){
   refreshAutoLink(s,bar,idx,str,on);
   const nx=nextPlayable(s,bar,idx,str);
@@ -10137,7 +10366,7 @@ function makeRest(bar,idx){
      とりわけピックスクラッチは**音符そのもの**を置き換える記号なので、
      残せば「休符なのにスクラッチが書いてある」という姿になり、
      音符へ戻した途端によみがえる（tab-1.31 と同じ形）。 */
-  if(n.sym){ n.sym.pm=false; n.sym.tap=false; n.sym.scratch=null;
+  if(n.sym){ n.sym.pm=false; n.sym.sb=false; n.sym.tap=false; n.sym.scratch=null;
              n.sym.arp=false; n.sym.rake=false; n.sym.trem=false; }
   breakIncomingTie(bar,idx);        /* 前から伸びてきていたタイを切る */
   sanitizeBarLinks(song,bar);       /* 相手を失った繋がりを外す */
@@ -12696,6 +12925,13 @@ function openTabTech(barId,idx,str,atTick){
         else { sy.pm=true; sy.pmKind='loose'; } });
       pmSay(on0?null:'loose',first); re(); });
   pbtn(ng,'let ring',!!sy.ring,()=>{ tx('let ring',()=>{ sy.ring=!sy.ring; }); re(); });
+  /* 筒を当てて弾く（tab-6.16）。P.M. と同じく帯で掛かる */
+  pbtnW(ng,heldN,symTxt(song,'sb')+' スライドバー（筒を当てて弾く）',!!sy.sb,
+    ()=>{ tx('スライドバー',()=>{ sy.sb=!sy.sb; sbRelink(song,bar,idx); }); re(); });
+  /* 開放弦には筒が当たらない。掛けられはするが、**その弦だけ素の音で鳴る**（tab-6.16-3） */
+  if(sy.sb&&(n.stops||[]).some(o=>o&&o.f===0))
+    pnote(ng,'この音符には開放弦がございます。**筒は開放弦に当たりませぬ**ので、'
+      +'0フレットの弦だけは素の音で鳴ります');
   pbtnW(ng,heldN,'› アクセント',!!n.accent,()=>{ tx('アクセント',()=>{ n.accent=!n.accent; }); re(); });
   pbtnW(ng,heldN,'• スタッカート',!!n.staccato,()=>{ tx('スタッカート',()=>{ n.staccato=!n.staccato; }); re(); });
   /* ピックスクラッチの音符は押さえを鳴らさないので、弾き方の記号は成り立たない（tab-2.26） */
@@ -15206,6 +15442,9 @@ function openBarMenu(barId,si,pos){
     tx('記号を切り替える',()=>{
       if(val===undefined) mk[key]=!mk[key];
       else mk[key]=(mk[key]===val)?null:val;
+      /* 筒の帯は、繋がりも一緒に引き直す（tab-6.16-4） */
+      if(key==='sb'){ (bar.notes||[]).forEach((nt,i)=>{
+        nt.sym=nt.sym||{}; nt.sym.sb=!!mk.sb; sbRelink(song,bar,i); }); }
     },(REP_KEYS.indexOf(key)>=0)?FREE:null); re();
   });
 
@@ -15232,6 +15471,7 @@ function openBarMenu(barId,si,pos){
     if(mk.nav&&NAV_L[mk.nav]) ch(NAV_L[mk.nav],()=>{mk.nav=null;},mk.nav);
     if(mk.nc)      ch((mk.nc==='mute')?'N.C.（ミュート）':'N.C.（休む）',()=>{mk.nc=false;});
     if(mk.pm)      ch('P.M.',()=>{mk.pm=false;});
+    if(mk.sb)      ch('スライドバー',()=>{mk.sb=false;});
     if(mk.ring)    ch('let ring',()=>{mk.ring=false;});
     if(mk.fermata) ch('フェルマータ',()=>{mk.fermata=false;},'fermata');
     if(mk.simile)  ch('シミレ',()=>{mk.simile=false;},'simile');
@@ -15262,6 +15502,7 @@ function openBarMenu(barId,si,pos){
     const r4=pgrp(pop,'演奏指示');
     T(r4,'N.C.（休む）','nc',true); T(r4,'N.C.（ミュートで刻む）','nc','mute');
     T(r4,'P.M.','pm'); T(r4,'let ring','ring');
+    T(r4,'スライドバー','sb');   /* 小節まるごと筒を当てる（tab-6.16） */
     pbIco(T(r4,'フェルマータ','fermata'),'fermata');
     pbIco(T(r4,'シミレ（前と同じリズム）','simile'),'simile');
     const r5=pgrp(pop,'速度の変化');
@@ -17188,6 +17429,70 @@ function pmTone(tn,pm){
   _pmCache.set(key,o);
   return o;
 }
+/* ══════════════════════════════════════════════════════════════
+   スライドバー（ボトルネック）（tab-6.16）
+   ══════════════════════════════════════════════════════════════
+   L様のお指図——**① 当たりを丸め ② 伸びを長くし ⑤ 擦れる音を足す。**
+   滑りと揺れは書いた所だけ（スライド記号・ビブラート記号のまま）。
+
+   金属やガラスの筒を弦に当てて弾くと、弦は三つ変わる——
+
+     ① **当たりが丸い**……フレットに当たらないので、あの硬い頭が出ない
+     ② **長く伸びる**……筒が弦を押さえ切らず、振動が死なない
+     ⑤ **擦れる音がする**……筒が弦の巻きを撫でる、ごく短い雑音
+
+   ブリッジミュート（`pmTone`）と同じ形で音色に掛ける。
+   あちらが**締める**のに対し、こちらは**緩めて伸ばす**——向きが逆である。 */
+/* ══ 効き幅（tab-6.16-2 で強めた）══
+   L様——「違いがわからない」。控えめに過ぎた。
+   筒を当てた弦は、**同じギターの別の楽器**と言ってよいほど変わる。
+   遠慮して掛ければ、掛けた意味が無い。 */
+const SB={ t60:2.2, pick:0.26, attack:4.2, lp:0.82, vol:0.94, noise:0.13 };
+const _sbCache=new Map();
+function sbTone(tn){
+  if(!tn) return tn;
+  const key=tn.id+'|sb';
+  if(_sbCache.has(key)) return _sbCache.get(key);
+  const o=Object.assign({},tn);
+  o.id=key;
+  o.t60=[tn.t60[0]*SB.t60, tn.t60[1]*SB.t60];              /* ② 長く伸びる */
+  if(tn.pick) o.pick=[Math.max(420,tn.pick[0]*SB.pick),    /* ① 当たりが丸い */
+                      tn.pick[1], tn.pick[2]*SB.attack, tn.pick[3]*0.58];
+  /* 筒は爪や撥ほど高い所を立てない。てっぺんだけ少し下ろす */
+  if(tn.lp) o.lp=[tn.lp[0], tn.lp[1], Math.max(2600,tn.lp[2]*SB.lp)];
+  _sbCache.set(key,o);
+  return o;
+}
+/* ⑤ 筒が弦を撫でる音。`fingerHit` と同じ作りで、**高く・長く・薄く**。
+   これが無いと「柔らかいギター」に聞こえるだけで、筒を当てた感じが出ない */
+function slideHit(at,vol){
+  if(!AC) return;
+  const sr=AC.sampleRate, dur=0.055, len=Math.max(8,Math.round(sr*dur));
+  const buf=AC.createBuffer(1,len,sr), o=buf.getChannelData(0);
+  for(let i=0;i<len;i++){
+    const p=i/len, e=Math.sin(Math.PI*Math.min(1,p*1.6))*(1-p);
+    o[i]=(Math.random()*2-1)*e*e;
+  }
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const bq=AC.createBiquadFilter(); bq.type='bandpass';
+  bq.frequency.value=3200; bq.Q.value=1.4;
+  const g=AC.createGain(); g.gain.value=Math.max(0.0001,vol*SB.noise);
+  src.connect(bq); bq.connect(g); g.connect(guitarBus()||MASTER);
+  src.start(at); src.stop(at+dur+0.02);
+}
+function sbOn(sym){ return !!(sym&&sym.sb); }
+/* ══ 筒は、開放弦には当たらない（tab-6.16-3）══
+   L様——「どうやって０フレットからスライドすんだよ」。**仰るとおりであった。**
+   筒を弦に当てれば、それは押さえた状態である。0フレット——開放弦——には
+   当てようがない。**筒を当てた開放弦という音は、この世に無い。**
+
+   とはいえ、開放弦を混ぜて弾くのがボトルネックの常道でもある——
+   「5弦は筒、6弦は開放」は、実際に鳴らされる形である。
+   ゆえに**帯ごと禁じるのではなく、弦ごとに見る**。
+   帯の中でも、0フレットの弦だけは素の音で鳴る。
+
+   > **記号は音符に掛かるが、弦の物理は弦ごとに決まる。** */
+function sbAt(sym,fret){ return sbOn(sym)&&Number(fret)>0; }
 function ksBuffer(N,tn){
   tn=tn||tone();
   const sr=AC.sampleRate, key=N+'|'+tn.id;
@@ -17404,6 +17709,7 @@ function pluck(at,midi,vol,cut,opt){
   opt=opt||{};
   let tn=strTone(tone(),(opt.str==null?-1:opt.str));
   if(opt.pm) tn=pmTone(tn,opt.pm);              /* 掌の締め（tab-5.95） */
+  if(opt.sb) tn=sbTone(tn);                     /* 筒を当てて弾く（tab-6.16） */
   const out=guitarBus()||MASTER;
   if(opt.harm){
     /* ══ ハーモニクスも「同じ弦を弾けば前の音は止まる」（tab-1.47）══
@@ -18461,7 +18767,7 @@ function strumTab(s,at,note,secPerTick,bar,idx){
     }
     const t=n.t||{};
     /* 掌の締めは、この符のぜんぶの道へ通す（tab-5.95） */
-  const opt={str:n.str, pm:_pm};
+  const opt={str:n.str, pm:_pm, sb:sbAt(sym,n.fret)};
     const t0=at+offs[k];
     let midiOut=n.midi;
     /* dur を渡すのは、揺れを音符の丈に収めるため（tab-1.47） */
@@ -18918,6 +19224,8 @@ function strumTab(s,at,note,secPerTick,bar,idx){
     });
   }
   if(sym.tap) scrape(at,0.26,false);
+  /* 筒の擦れは、**押さえている弦があってこそ**。開放弦だけの音符では鳴らさない */
+  if(sbOn(sym)&&list.some(o=>!o.mute&&Number(o.fret)>0)) slideHit(at,0.30);
 
 }
 
@@ -18955,6 +19263,7 @@ function strum(s,at,note,chord,secPerTick){
     /* ボディヒットは箱を叩く音。和音を一つも持たないので、
        コードが無くても（N.C. の小節でも）鳴らねばならない */
     if(sym.tap) scrape(at,0.26,false);
+    if(k===0&&sbOn(sym)&&seq.some(q=>!q.mute&&Number(q.fret)>0)) slideHit(t0,0.30);
     return;
   }
   const list=voicingMidi(s,Object.assign({},note,{chord}));
@@ -18997,7 +19306,7 @@ function strum(s,at,note,chord,secPerTick){
                  : (up?(0.85+0.03*k):(1.12-0.045*k));
     /* コード名からの再生も弦ごとの手触りに乗せる。
        ここだけ揃えないと、同じ和音が TAB と別物に聞こえる */
-    pluck(t0+k*spread,n.midi,vol*w,cut,{str:n.str,pm:_pm});
+    pluck(t0+k*spread,n.midi,vol*w,cut,{str:n.str,pm:_pm,sb:sbAt(sym,n.fret)});
   });
   if(sym.tap) scrape(at,0.26,false);
 }
@@ -19818,6 +20127,7 @@ function clearLoopRange(){
 }
 /* 帯を塗り直す。render() を通さないので、ドラッグ中でも軽い */
 function paintLoopBand(){
+  if(window.SL_TAB_SYNC) setTimeout(window.SL_TAB_SYNC,0);   /* くり返しの範囲が変わったら、上の棚の表示も直す */
   /* ⟳ が切なら帯は出さない。範囲そのものは控えたままなので、
      もう一度入れれば同じ所が戻る */
   const r=TP.loop?loopIdx():null;
@@ -20120,6 +20430,7 @@ function sndForBar(barId){
 }
 function clearSndCache(){ _secSndCache.clear(); }
 function fireEvent(e,at){
+  if(e&&e.kind==='beat'&&window.SL_TAB_BEAT){ try{ window.SL_TAB_BEAT(at,e.barId,e.beat); }catch(_){} }   /* 上の棚の位置の表示へ、拍を知らせる */
   /* 音に関わる出来事だけ差し替える。メトロノームやドラムは曲の設定のまま */
   const needSnd=(e.kind==='note'||e.kind==='mute');
   const prevSnd=_sndNow;
@@ -20463,6 +20774,12 @@ function scrollHost(){
   }
   return null;
 }
+/* 上の棚の位置の表示（共通の画面の部品）に、曲と再生の様子を渡す窓口。部品が読めない時は使われない */
+window.SL_TAB={
+  now:()=>AC?AC.currentTime:0, playing:()=>TP.playing, disp:()=>_disp, song:()=>song,
+  loop:()=>{ try{ return TP.loop?loopIdx():null; }catch(_){ return null; } },
+  follow:(el)=>{ try{ followBar(el,true); }catch(_){ el.scrollIntoView({block:'center'}); } }
+};
 function setPlayhead(barId){
   if(TP.curBar===barId) return;
   TP.curBar=barId;
@@ -23867,6 +24184,96 @@ const HELP=[
       +'**イヤホンのまま、ふつうに録音していただくだけ**で継ぎ目が測れます。'
       +'録音を止めた札に「カウントのずれ 30 30 30 30／曲頭のずれ 90 ミリ秒'
       +'　→ **継ぎ目で ＋60 ミリ秒**」のように出ます'],
+    ['★ はねる設定が、また効くようになりました','L様——'
+      +'「ハネる設定なのにハネなくなった」（tab-6.19）。'
+      +'器には「刻みが3連の拍には、はねを掛けない」という決まりがございます——'
+      +'3連で書いた音にさらにはねを掛ければ二重に歪みますゆえ、これ自体は正しうございます。'
+      +'　ですがその判定が、**曲ぜんたいの既定の刻み**まで見ておりました。'
+      +'曲の刻みは**入力の時にカーソルが吸い付く先**であって、音楽の指定ではございませぬ。'
+      +'3連を書くために既定を3連へ変えれば、それだけで'
+      +'**曲じゅうのはねが黙って消えて**おりました。'
+      +'**入力の都合で決めた値で、鳴り方を決めない。**'
+      +'　いま見るのは二つだけでございます——'
+      +'① その拍・その小節に**3連の刻みを明示**してある（既定と違う値を置いた）、'
+      +'② その拍に**3連が実際に書いてある**。'
+      +'どちらでもなければ、はねます。'
+      +'3連と16分が混じった譜面でも、**3連の拍だけが平ら**で、ほかは跳ねます'],
+    ['★ ループの範囲を、行をまたいで引けるようになりました','L様——'
+      +'「ループのドラッグがうまくいかない」（tab-6.18）。'
+      +'原因は**縦へ引くと手を離す**作りでございました。'
+      +'あれは**指で紙を送るため**の譲りでございます——'
+      +'指で縦になぞった時に紙が巻けねば困りますゆえ。'
+      +'ですがマウスは縦に引いても紙は巻けませぬので、**譲る相手がおりません。**'
+      +'それでも譲っていたため、**行をまたいで範囲を広げる道まで塞いで**おりました。'
+      +'1行2小節の譜面では、それが唯一の広げ方でございます。'
+      +'　いまはマウスの時だけ、縦へ引いても範囲が広がります。'
+      +'指でなぞった時は、これまで通り紙が巻けます。'
+      +'　あわせて、**小節の外へ出ても、いちばん近い小節へ届く**ようにいたしました。'
+      +'行の右端を越えた所や行と行の間で、広がりが止まらなくなります——'
+      +'**紙の上で指が外れただけで、意思まで外れたことにしない**ためでございます'],
+    ['★ ビブラートの波が、ほかの記号を避けるようになりました','L様——'
+      +'「4小節目重なってる」（tab-6.17）。'
+      +'曲げた音のビブラートの波と、`bend` の字が**1ミリも離れておりませんでした**。'
+      +'　この譜面には**席の帳面**がございます——'
+      +'字は置く前に空きを数え、埋まっていれば一段外へ逃げる仕掛けでございます。'
+      +'ところが**波はその帳面に載っておりませんでした。**'
+      +'字どうしは避け合うのに、波だけが我関せずで引かれていた次第です。'
+      +'スラーの弧と当たった時も、字と当たった時も、根は同じでございました。'
+      +'**同じ場所を使う物は、同じ帳面に。**'
+      +'　六線の内側に収まる波は、これまでどおり弦の間へ。'
+      +'**外まで出る波だけ**、字と同じ帳面で席を取ります——'
+      +'先に来た方が席を保ち、後から来た方が一段逃げます'],
+    ['★ スライドバー（ボトルネック）を入れました','L様——'
+      +'筒を弦に当てて弾く音を、**ブリッジミュートと同じ破線の帯**で指定できます（tab-6.16）。'
+      +'奏法パネルの〈この音符ぜんぶに〉、または小節メニューの〈演奏指示〉から。'
+      +'　帯の中の音は三つ変わります——'
+      +'**当たりが丸く**（フレットに当たる硬い頭が出ません）、'
+      +'**長く伸び**（筒が弦を押さえ切らないためでございます）、'
+      +'**擦れる音**が薄く乗ります（筒が弦の巻きを撫でる音）。'
+      +'和音でも擦れる音は一度だけ——弦ごとに出すと濁りますゆえ。'
+      +'　**滑りと揺れは書いた所だけ**でございます。'
+      +'自動では滑りません——速い音がすべて繋がると、かえって野暮になりますゆえ、'
+      +'スライド記号・ビブラート記号を書いた所だけが動きます。'
+      +'　帯の扱いは P.M. と同じでございます。小節をまたいで続き、'
+      +'**帯のどこを叩いても外れ**、終わりの返しを掴めば伸び縮みします。'
+      +'両方掛かった小節では、重ならぬよう一段下げて描きます。'
+      +'　**筒は開放弦には当たりませぬ。**帯を掛けても、'
+      +'0フレットの弦だけは素の音で鳴ります——'
+      +'「5弦は筒、6弦は開放」というボトルネックの常道が、そのまま書けます。'
+      +'記号は音符に掛かりますが、弦の物理は弦ごとに決まりますゆえ。'
+      +'（確かめの帳面には開放弦を使っておりませぬ——'
+      +'筒の当たらない弦が混じっていては、筒の音を確かめられませんので）'
+      +'　**帯の中は、同じ弦の続きに滑りが自動で付きます。**'
+      +'筒で押さえた弦は叩くことも引っ掛けることもできませんので、'
+      +'動けば必ず滑ります——幅が狭くてもハンマリングにはなりませぬ。'
+      +'思っていた形と違う時は、**その繋がりを外していただければそのまま残ります**'
+      +'（手で触れたものに筆は手を出しません）。'
+      +'帯を外せば、筆が付けた滑りも一緒に引き上がります。'
+      +'　**滑りの繋がりは、受ける側の音符に書きます**（前の音ではございません）——'
+      +'出発側に書くと、繋がらずに弾き直しになります。'
+      +'　確かめの帳面を8小節ご用意しました——'
+      +'曲の一覧の〈**✓ スライドバーの帳**〉でございます。'
+      +'オープンGで、筒を当てない音・当てた音を並べてありますので、'
+      +'**同じ譜面がどう変わるか**を聴き比べていただけます。'
+      +'筒は弦を押さえ分けられませぬので、'
+      +'**同じフレットの弦を一本ずつ鳴らし、鳴らしたまま重ねてゆく**'
+      +'——実際の弾き方で書いてございます'],
+    ['★ MIDI で書き出せるようになりました（ギターのみ）','L様——'
+      +'曲の一覧の下に〈**♪ MIDI で書き出す**〉を置きました（tab-6.15）。'
+      +'ギターの音だけを書き出します——ドラムと伴奏は入りません。'
+      +'　▶ で鳴らす時に組み立てているものを、'
+      +'**音を出す代わりにファイルへ書き写す**だけでございますので、'
+      +'鳴るものと書き出したものは同じになります——'
+      +'繰り返しは展開され、はねも rit. もフェルマータも、そのまま入ります。'
+      +'　**チョーキングはピッチベンド**で書きますので、実際に音程が上がります。'
+      +'**カポは鳴る通りの高さ**でございます（カポ2の開放弦は「レ」）。'
+      +'　一つだけご承知おきを——**弦ごとに口（チャンネル）を6つに分けております。**'
+      +'ピッチベンドは口ごとにしか掛からず、'
+      +'一つにまとめると1弦のチョーキングが6本すべてに掛かってしまうためでございます。'
+      +'受け取る側では6つ並びますが、いずれも同じギターの音でございます。'
+      +'　なお MIDI は音の高さしか持ちませんので、'
+      +'**何弦の何フレットかは残りません**（音は同じでも、押さえ方は失われます）。'
+      +'ミュートの ✕ は音がございませんので省いております'],
     ['★ 譜面の辻褄を、その場で点検できます','L様——'
       +'⚙ →〈点検〉→〈**この曲を点検する**〉を置きました（tab-6.14）。'
       +'譜面のデータを一巡し、辻褄の合わない所だけを並べます——'
@@ -29678,6 +30085,8 @@ function bindPaper(){
     fermata: {s:'note',n:'フェルマータ', d:n=>{ if(n.sym) n.sym.fermata=false; }},
     /* let ring も範囲を持つようになった（tab-4.81。帯ごと外す） */
     ring:    {s:'span',n:'let ring',     d:n=>{ if(n.sym) n.sym.ring=false; }},
+    /* 筒を当てる帯も、P.M. と同じく帯ごと外す（tab-6.16） */
+    sb:      {s:'span',n:'スライドバー', d:n=>{ if(n.sym) n.sym.sb=false; }, relink:true},
     arp:     {s:'note',n:'アルペジオ',   d:n=>{ if(n.sym) n.sym.arp=false; }},
     rake:    {s:'note',n:'レイキング',   d:n=>{ if(n.sym) n.sym.rake=false; }},
     trem:    {s:'note',n:'トレモロ',     d:n=>{ if(n.sym) n.sym.trem=false; }},
@@ -29700,6 +30109,8 @@ function bindPaper(){
             if(n.start<h.t0||n.start>=h.t1) return;
             d.d(n);
           });
+          /* 帯のために筆が引いた繋がりは、帯と共に引き上げる（tab-6.16-4） */
+          if(d.relink) (b.notes||[]).forEach((n,i)=>sbRelink(song,b,i));
         });
         toast(d.n+'を外しました');
         return;
@@ -29890,7 +30301,7 @@ function bindPaper(){
           break;
         }
       } }
-    const _spanMk={ringEnd:'ring',pmEnd:'pm'}[arc&&arc.getAttribute&&arc.getAttribute('data-mk')];
+    const _spanMk={ringEnd:'ring',pmEnd:'pm',sbEnd:'sb'}[arc&&arc.getAttribute&&arc.getAttribute('data-mk')];
     if(_spanMk){
       const ai0=info(arc);
       if(ai0){
@@ -30320,8 +30731,10 @@ function bindPaper(){
     try{ paper.releasePointerCapture(e&&e.pointerId); }catch(_){}
     if(!d.on){ if(d.snap&&histFresh(d.snapAt)){ song=d.snap; render(); } return; }
     if(d.snap&&histFresh(d.snapAt)) song=d.snap;
-    tx((d.key==='pm'?'P.M.':'let ring')+' の範囲',
-       ()=>{ ringPaint(d.key,d.barId,d.t0,d.endBarId||d.barId,d.end); });
+    tx(({pm:'P.M.',sb:'スライドバー'}[d.key]||'let ring')+' の範囲',
+       ()=>{ ringPaint(d.key,d.barId,d.t0,d.endBarId||d.barId,d.end);
+             /* 筒の帯を伸び縮みさせたら、繋がりも引き直す（tab-6.16-4） */
+             if(d.key==='sb') (song.bars||[]).forEach(b=>sbRelinkBar(song,b)); });
   };
   const cancelSpan=()=>{
     if(!sdrag) return;
@@ -31137,6 +31550,30 @@ function bindPaper(){
     const el=document.elementFromPoint(x,y);
     return (el&&el.closest)?el.closest('#paper .mwrap'):null;
   };
+  /* ══ 小節の外へ出ても、いちばん近い小節へ届かせる（tab-6.18）══
+     L様——「ループのドラッグがうまくいかない」。
+
+     範囲を広げる手は「指の下にある小節」だけを見ていた。
+     ゆえに**行の右端を越えた所・行と行の間**では、指の下に小節が無く、
+     そこで広がりが止まる。1行2小節の譜面では右へ引く余地がほとんど無く、
+     行の最後の小節から始めれば**一つも広がらない。**
+
+     > **紙の上で指が外れただけで、意思まで外れたことにしない。**
+
+     外れた時は、いちばん近い小節を選ぶ。行をまたいだ縦の動きも拾えるよう、
+     縦のずれを重く見る（同じ行にある小節を先に選ぶ）。 */
+  const wrapNear=(x,y)=>{
+    let best=null, bd=Infinity;
+    document.querySelectorAll('#paper .mwrap').forEach(el=>{
+      const r=el.getBoundingClientRect();
+      if(!(r.width>0||r.height>0)) return;
+      const dx=(x<r.left)?(r.left-x):((x>r.right)?(x-r.right):0);
+      const dy=(y<r.top)?(r.top-y):((y>r.bottom)?(y-r.bottom):0);
+      const d=dy*4+dx;                    /* 縦のずれを重く——行をまたぐのは大きな移動 */
+      if(d<bd){ bd=d; best=el; }
+    });
+    return best;
+  };
   const dispOf=w=>w?{si:+w.getAttribute('data-si'),pos:+w.getAttribute('data-pos')}:null;
 
   /* 小節番号の的（tab-2.82）。どのモードでも効くので、いちばん先に見る */
@@ -31264,15 +31701,25 @@ function bindPaper(){
     if(!lpDrag) return;
     if(!lpDrag.on){
       const dx=e.clientX-lpDrag.x, dy=e.clientY-lpDrag.y;
-      /* 縦が勝てば紙を巻く。こちらは手を引く（範囲は叩いた1小節のまま） */
-      if(Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){ lpDrag=null; return; }
+      /* ══ 縦が勝てば紙を巻く。ただし指の時だけ（tab-6.18）══
+         この譲りは**指で紙を送るため**のものである。
+         マウスは縦に引いても紙は巻けぬので、譲る相手がいない——
+         譲れば、行をまたいで範囲を広げる道まで塞いでしまう。
+         1行2小節の譜面では、それが唯一の広げ方である。 */
+      if(e.pointerType!=='mouse'&&Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){ lpDrag=null; return; }
+      if(e.pointerType==='mouse'&&Math.abs(dx)<10&&Math.abs(dy)>=10){
+        lpDrag.on=true;                        /* 縦だけでも引き始めたと見る */
+        try{ paper.setPointerCapture(e.pointerId); }catch(_){}
+        document.body.classList.add('lp-drag');
+      }
       if(Math.abs(dx)<10) return;               /* まだどちらとも決まらない */
       lpDrag.on=true;
       try{ paper.setPointerCapture(e.pointerId); }catch(_){}
       document.body.classList.add('lp-drag');
     }
     e.preventDefault();
-    const w=wrapAt(e.clientX,e.clientY); if(!w) return;
+    /* 指の下に小節が無ければ、いちばん近い小節で広げる（tab-6.18） */
+    const w=wrapAt(e.clientX,e.clientY)||wrapNear(e.clientX,e.clientY); if(!w) return;
     const b=dispOf(w);
     if(b.si===lpDrag.b.si&&b.pos===lpDrag.b.pos) return;
     lpDrag.b=b; setLoopRange(lpDrag.a,b,true);   /* 途中の姿は控えない（tab-5.11） */
@@ -32129,7 +32576,7 @@ function render(){
   const arrIdx=new Map();
   arr.forEach((it,i)=>{ const k=it.si+'_'+it.pos; if(it.rep===0&&!arrIdx.has(k)) arrIdx.set(k,i); });
 
-  const ctx={ no:0, prevKey:null, prevChord:null, prevTS:null, prevTieOut:false, prevPM:false, prevRing:false, first:true };
+  const ctx={ no:0, prevKey:null, prevChord:null, prevTS:null, prevTieOut:false, prevPM:false, prevSB:false, prevRing:false, first:true };
 
   song.sections.forEach((sec,si)=>{
     paper.appendChild(renderSection(sec,si,ctx,chordMap,arrIdx));
@@ -32474,6 +32921,7 @@ function fillMeasures(){
     const _nb=_nx?findBar(song,_nx.barId):null;
     const _nf=_nb?((_nb.notes||[]).slice().sort((a,b)=>a.start-b.start)[0]):null;
     const pmNext=!!(_nb&&((_nb.marks&&_nb.marks.pm)||(_nf&&_nf.kind!=='rest'&&_nf.sym&&_nf.sym.pm)));
+    const sbNext=!!(_nb&&((_nb.marks&&_nb.marks.sb)||(_nf&&_nf.kind!=='rest'&&_nf.sym&&_nf.sym.sb)));
     /* let ring も次の小節へ続くかを先に見る（tab-4.81。続かないならここで閉じる） */
     const ringNext=!!(_nb&&((_nb.marks&&_nb.marks.ring)||(_nf&&_nf.kind!=='rest'&&_nf.sym&&_nf.sym.ring)));
     const w=p.wrap.clientWidth||210;
@@ -32513,7 +32961,7 @@ function fillMeasures(){
       isRowStart:p.isRowStart, isRowEnd:p.isRowEnd,
       isSongEnd:p.isSongEnd, isSectionEnd:p.isSectionEnd,
       autoATempo:_autoATempo.has(p.barId),
-      showTS, chords, freeChords, rowHeadChord, carryChord:p.ctx.prevChord||null, prevChordKey:prevKey, tieIn:p.ctx.prevTieOut, pmIn:p.ctx.prevPM, pmNext, ringIn:p.ctx.prevRing, ringNext,
+      showTS, chords, freeChords, rowHeadChord, carryChord:p.ctx.prevChord||null, prevChordKey:prevKey, tieIn:p.ctx.prevTieOut, pmIn:p.ctx.prevPM, pmNext, sbIn:p.ctx.prevSB, sbNext, ringIn:p.ctx.prevRing, ringNext,
       /* ══ 〈選ぶ〉では段の的も要る（tab-1.83）══
          `hits` は音符の的と**段の的を一緒に**出している。ここが false だと
          段の的も出ないので、コードネームを叩いても何も起きなかった。 */
@@ -32561,7 +33009,7 @@ function fillMeasures(){
     try{ r=engrave(song,bar,Object.assign({width:w},opts)); }
     /* 落ちた小節は白紙になる。白紙のまま黙っていると、消えたのか描けなかったのか
        区別が付かない。一度だけ札を出す（描画は何度も走るので、そのつど鳴らさない） */
-    catch(e){ console.error('engrave',e); r={svg:'',lastChordKey:null,lastChord:null,pmOut:false,ringOut:false};
+    catch(e){ console.error('engrave',e); r={svg:'',lastChordKey:null,lastChord:null,pmOut:false,sbOut:false,ringOut:false};
               if(!_engraveWarned){ _engraveWarned=true;
                 setTimeout(()=>{ toast(barNoText(song,bar)+'が描けませんでした。中身は残っております'); },0); } }
     /* ══ 五線譜を並べる（tab-6.06）══
@@ -32596,6 +33044,7 @@ function fillMeasures(){
        控えが引き直されていない時でも、またぐタイが伝わるように（tab-1.33） */
     p.ctx.prevTieOut=noteTieOut(last)&&tieOutHasPartner(song,bar,_nb);
     p.ctx.prevPM=!!r.pmOut;
+    p.ctx.prevSB=!!r.sbOut;
     p.ctx.prevRing=!!r.ringOut;
   });
   /* ══ 段の中で桁を揃える（tab-6.05）══
@@ -35075,6 +35524,154 @@ function download(name,text){
     setTimeout(()=>URL.revokeObjectURL(u),1500);
   }catch(e){ toast('書き出せませんでした'); }
 }
+/* ══════════════════════════════════════════════════════════════
+   MIDI で書き出す（tab-6.15）
+
+   ギターの音だけを一つの MIDI ファイルにいたします。ドラムと伴奏は入れません。
+
+   ── 何を書くか ──
+   鳴らす時に組み立てている出来事（`buildTimeline`）を、
+   **音を出す代わりにファイルへ書き写す**だけでございます。
+   ゆえに ▶ で鳴るものと、書き出したものは同じになります——
+   繰り返しは展開され、はねも rit. もフェルマータも、そのまま時刻に入ります。
+
+   ── 三つの決め事（L様のお指図）──
+   ① チョーキングは**ピッチベンド**で書く（実際に音程が上がる）
+   ② カポは**鳴る通りの高さ**で書く（カポ2の開放弦は「レ」）
+   ③ 繰り返しは**展開して**書く
+
+   ── 弦ごとに口を分ける ──
+   MIDI のピッチベンドは**口（チャンネル）ごと**にしか掛かりません。
+   1弦だけを上げて他は据え置く、という当たり前のことが、
+   一つの口では書けないのでございます。
+   ゆえに**6本の弦に口を一つずつ**割り当てます（0〜5番）。
+   受け取る側では6つの音色が並びますが、いずれも同じギターの音でございます。
+
+   ── 上げ幅の申し合わせ ──
+   ピッチベンドの既定の幅は上下2半音でして、1音半のチョーキングが書けません。
+   ゆえに頭で**12半音**に広げる指示（RPN 0）を各口へ送ります。
+   ══════════════════════════════════════════════════════════════ */
+const MIDI_PPQ=480;
+function midiVLQ(v){                       /* 可変長の数（MIDI の刻みの書き方） */
+  v=Math.max(0,Math.round(v));
+  const out=[v&0x7f]; v>>=7;
+  while(v>0){ out.unshift((v&0x7f)|0x80); v>>=7; }
+  return out;
+}
+function midiStr(t){ const o=[]; for(let i=0;i<t.length;i++) o.push(t.charCodeAt(i)&0x7f); return o; }
+function midiBend(semi){                   /* 半音 → ピッチベンドの値（幅12半音として） */
+  const v=Math.max(-1,Math.min(1,semi/12));
+  const n=Math.max(0,Math.min(16383,Math.round(8192+v*8191)));
+  return [n&0x7f,(n>>7)&0x7f];
+}
+function buildMidi(s){
+  const tl=buildTimeline(s);
+  if(!tl||!tl.ev||!tl.ev.length) return null;
+  const bpm=Math.max(20,Math.min(300,(s.play&&s.play.bpm)||96));
+  const tps=MIDI_PPQ*bpm/60;               /* 1秒あたりの刻み */
+  const tu=tuningOf(s), capo=Math.max(0,s.meta.capo||0);
+  /* 数え込みの分だけ頭が空くので、最初の音を 0 に寄せる */
+  let t0=Infinity;
+  tl.ev.forEach(e=>{ if(e.kind==='note'&&e.note&&e.note.kind!=='rest') t0=Math.min(t0,e.t); });
+  if(!isFinite(t0)) return null;
+  const at=sec=>Math.max(0,Math.round((sec-t0)*tps));
+
+  const evs=[];                            /* {tick, ord, data:[…]} */
+  const put=(tick,ord,data)=>evs.push({tick,ord,data});
+  /* 頭：曲名・速さ・拍子・上げ幅 */
+  put(0,0,[0xff,0x03].concat(midiVLQ(midiStr(s.meta.title||'ScoreLine TAB').length),
+                             midiStr(s.meta.title||'ScoreLine TAB')));
+  const usPerQ=Math.round(60000000/bpm);
+  put(0,0,[0xff,0x51,0x03,(usPerQ>>16)&0xff,(usPerQ>>8)&0xff,usPerQ&0xff]);
+  const ts0=s.meta.timeSig||{n:4,d:4};
+  const den=Math.round(Math.log2(ts0.d||4));
+  put(0,0,[0xff,0x58,0x04,ts0.n||4,den,24,8]);
+  for(let ch=0;ch<6;ch++){
+    /* **一つずつ別の出来事として書く。**MIDI は出来事ごとに刻みの差を要るので、
+       まとめて並べると、次の合図が刻みの差として読まれ、その先が全部ずれる */
+    put(0,0,[0xb0|ch,101,0]); put(0,0,[0xb0|ch,100,0]);
+    put(0,0,[0xb0|ch,6,12]);  put(0,0,[0xb0|ch,38,0]);   /* 上げ幅12半音 */
+    put(0,0,[0xc0|ch,25]);                 /* 音色：スチール弦のギター */
+    put(0,1,[0xe0|ch].concat(midiBend(0)));
+  }
+
+  /* 音符 */
+  const VEL=96;
+  tl.ev.forEach(e=>{
+    if(e.kind!=='note'||!e.note) return;
+    const nt=e.note;
+    if(nt.kind==='rest') return;
+    const spt=(typeof e.spt==='number'&&isFinite(e.spt))?e.spt:0;
+    const durSec=Math.max(0.05,(nt.len||0)*spt);
+    (nt.stops||[]).forEach(o=>{
+      if(!o||typeof o.f!=='number') return;             /* ✕（ミュート）は音がないので省く */
+      const str=o.s;
+      if(!(str>=0&&str<6)) return;
+      const ch=str;                                     /* 弦ごとに口を分ける */
+      const base=(tu.midi[str]|0)+capo+o.f;             /* ② 鳴る通りの高さ */
+      if(!(base>=0&&base<=127)) return;
+      const on=at(e.t), off=Math.max(on+1,at(e.t+durSec));
+      const t=o.t||{};
+      const bend=(t.bend&&t.bend.amt>0)?t.bend:null;
+      const semi=bend?bend.amt*2:0;                     /* 「1音」＝2半音 */
+      if(nt._hold){
+        /* 弾き直さずに動かす音（タイの先のチョーキング）。音は既に鳴っている */
+        if(bend) rampBend(put,ch,on,off,0,semi);
+        return;
+      }
+      if(bend&&bend.pre){
+        put(on,1,[0xe0|ch].concat(midiBend(semi)));     /* 上げた状態で弾く */
+      }else if(bend){
+        put(on,1,[0xe0|ch].concat(midiBend(0)));
+        rampBend(put,ch,on,off,0,semi);                 /* ① 上げてゆく */
+      }else{
+        put(on,1,[0xe0|ch].concat(midiBend(0)));        /* 前の音の上げを戻す */
+      }
+      put(on,4,[0x90|ch,base,VEL]);
+      put(off,2,[0x80|ch,base,0]);
+    });
+  });
+  if(evs.length<=10) return null;                       /* 音が一つも無い */
+
+  /* 並べ、刻みの差に直して書き出す */
+  evs.sort((a,b)=>a.tick-b.tick||a.ord-b.ord);
+  const body=[]; let prev=0;
+  evs.forEach(e=>{
+    body.push(...midiVLQ(e.tick-prev)); prev=e.tick;
+    body.push(...e.data);
+  });
+  body.push(...midiVLQ(0),0xff,0x2f,0x00);              /* 終わり */
+  const head=[0x4d,0x54,0x68,0x64,0,0,0,6, 0,0, 0,1, (MIDI_PPQ>>8)&0xff,MIDI_PPQ&0xff];
+  const len=body.length;
+  const trk=[0x4d,0x54,0x72,0x6b,(len>>24)&0xff,(len>>16)&0xff,(len>>8)&0xff,len&0xff].concat(body);
+  return new Uint8Array(head.concat(trk));
+}
+/* 上げてゆく途中を刻む。**一息に飛ばさず、聴こえる形で上げる** */
+function rampBend(put,ch,on,off,from,to){
+  const span=Math.max(1,off-on), start=on+Math.round(span*0.15), end=on+Math.round(span*0.65);
+  const N=12;
+  for(let i=0;i<=N;i++){
+    const p=i/N, tick=Math.round(start+(end-start)*p);
+    put(tick,3,[0xe0|ch].concat(midiBend(from+(to-from)*p)));
+  }
+}
+function exportMidi(){
+  let data=null;
+  try{ data=buildMidi(song); }
+  catch(e){ console.error('[MIDI]',e); toast('書き出せませんでした（'+e.message+'）'); return; }
+  if(!data){ toast('音符がありませんので、書き出せませんでした'); return; }
+  try{
+    const b=new Blob([data],{type:'audio/midi'});
+    const u=URL.createObjectURL(b);
+    const a=document.createElement('a'); a.href=u;
+    a.download=((song.meta.title||'無題の曲').replace(/[\\/:*?"<>|]/g,'_'))+'.mid';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),1500);
+    toast('MIDI で書き出しました（ギターのみ・'+(data.length/1024).toFixed(1)+' KB）。'
+         +'弦ごとに口を分けておりますので、受け取る側では6つ並びます',null,null,8000);
+  }catch(e){ console.error('[MIDI]',e); toast('保存できませんでした'); }
+}
+
 /* ══ 一枚にまとめて渡す（tab-3.16）══
    いま開いている HTML そのものを読み直し、埋め込みの札へ曲を差し込んで
    落とす。**受け取った方は開くだけ**で譜面が出て、音も鳴る。
@@ -37113,16 +37710,111 @@ function checkSong2(){
   return s;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   スライドバーのたしかめ帳（tab-6.16）
+   ══════════════════════════════════════════════════════════════
+   8小節。**筒を当てた音と、当てない音を並べて聴き比べる**ための帳面である。
+   オープンG（D-G-D-G-B-D）——ボトルネックの定番の調弦で書く。
+   筒は弦を押さえ分けられないので、**同じフレットを揃えて押さえる**のが実際の姿。
+   ゆえに和音はすべて同じ数字で並べてある。 */
+function checkSongSB(){
+  const s=mkSong({meta:{title:CHECK3_TITLE,composer:'挙動の確認用（スライドバー）',
+                        key:{root:7,qual:'maj'},perLine:2,tuning:'openg',diagram:'none'},
+                  play:{bpm:72,tone:'steel'}});
+  const K=TICK_SCALE_V1;
+  const N=(o)=>{ const n=mkNote(Object.assign({},o,{
+    start:Math.round((o&&o.start||0)*K), len:Math.round((o&&o.len||0)*K)}));
+    if(o&&o.sym) n.sym=Object.assign({fermata:false,tempo:null,hair:null,pm:false,arp:false,
+      ring:false,sb:false,text:null,arm:null,scratch:null,rake:false,trem:false},o.sym);
+    return n; };
+  const P=(st,fr,t)=>[{s:st,f:fr,t:t||{}}];
+  const G={root:7,type:'maj'}, C={root:0,type:'maj'}, D={root:2,type:'maj'};
+  const add=(sec,tip,notes,marks)=>{
+    const mk=Object.assign({},marks||{});
+    if(tip) mk.text={t:tip,pos:'down'};
+    const b=mkBar({marks:mk});
+    b.notes=notes; s.bars.push(b);
+    sec.items.push({barId:b.id,link:false});
+    return b;
+  };
+  /* ══ 筒を当てた弾き方は、こう書く（tab-6.16-2）══
+     L様——「もっと違う弦同士の重なりがないとやってる意味ない」。仰るとおりであった。
+
+     筒は弦を押さえ分けられない。ゆえにボトルネックの弾き方は、
+     **同じフレットの弦を一本ずつ鳴らし、鳴らしたまま重ねてゆく**のが実際の姿である。
+     和音を一度に鳴らして切ってしまえば、筒を当てる意味が無い——
+     重なって濁りながら伸びてゆく所こそが、あの音である。
+
+     ゆえにこの帳面では、**一本ずつ・伸ばしたまま**（`ring`）書く。 */
+  const SB ={sb:true, ring:true};
+  const PL ={ring:true};
+  /* 同じフレットを一本ずつ転がし、**そこまで伸ばしたままにする**。
+     終わりを揃えるので、小節からはみ出さず、同じ弦も重ならない */
+  const roll=(t0,fr,strs,u,end,sym,chord,lastT)=>strs.map((st,i)=>
+    N({start:t0+i*u, len:end-(t0+i*u),
+       stops:P(st,fr,(lastT&&i===strs.length-1)?lastT:null), sym:sym,
+       chord:(i===0&&chord)?chord:null}));
+
+  const s1=mkSection({name:'① 同じ譜面で聴き比べる'});
+  /* 開放弦は一本も使わない。**筒が当たらない弦を混ぜれば、確かめにならない** */
+  add(s1,'①筒なし。四本を一本ずつ鳴らし、鳴らしたまま重ねております',
+    roll(0,5,[3,2,1,0],24,192,PL,C));
+  add(s1,'②同じ譜面に Bottleneck。当たりが丸く、長く伸び、重なりが濃くなります',
+    roll(0,5,[3,2,1,0],24,192,SB,C));
+
+  const s2=mkSection({name:'② 滑らせる（繋がりは受ける音符に書きます）'});
+  add(s2,'③5→12フレット。弾き直さず、音程だけが動きます',
+    [N({start:0, len:96,stops:P(3,5),chord:C,sym:SB}),
+     N({start:96,len:96,stops:P(3,12,{link:'sl'}),sym:SB})]);
+  /* 二本まとめて滑らせる。**受ける弦の前の音が揃っていること**——
+     揃っていないと繋がる相手が無く、弾き直しになる（自己点検が拾う） */
+  add(s2,'④二本まとめて滑らせます。筒は弦を押さえ分けませんゆえ、これが実際の姿です',
+    [N({start:0,  len:96,stops:[{s:3,f:5,t:{}},{s:2,f:5,t:{}}],chord:C,sym:SB}),
+     N({start:96, len:96,stops:[{s:3,f:12,t:{link:'sl'}},{s:2,f:12,t:{link:'sl'}}],sym:SB})]);
+  add(s2,'⑤上がって下りて、また上がる。滑りを続けて書けます',
+    [N({start:0,  len:48,stops:P(2,5),chord:G,sym:SB}),
+     N({start:48, len:48,stops:P(2,7,{link:'sl'}),sym:SB}),
+     N({start:96, len:48,stops:P(2,5,{link:'sl'}),sym:SB}),
+     N({start:144,len:48,stops:P(2,12,{link:'sl'}),sym:SB})]);
+  /* 滑って入った先で揺らす——**弧と波が同じ押さえに乗る**形。
+     ここが重なっていないかを見ていただく所（tab-6.16-5） */
+  add(s2,'⑥滑った先で揺らします。弧と波が重なっていないかご覧くださいませ',
+    [N({start:0,  len:48,stops:P(3,7),chord:D,sym:SB}),
+     N({start:48, len:144,stops:P(3,12,{link:'sl',vib:'normal'}),sym:SB}),
+     N({start:72, len:120,stops:P(2,12),sym:SB}),
+     N({start:96, len:96,stops:P(1,12,{vib:'wide'}),sym:SB})]);
+
+  const s3=mkSection({name:'③ 混ぜて書く'});
+  add(s3,'⑦帯の外へ出れば、ふつうの音に戻ります（後ろ半分は筒なし）',
+    [N({start:0, len:48,stops:P(3,5),chord:C,sym:SB}),
+     N({start:48,len:48,stops:P(3,7,{link:'sl'}),sym:SB}),
+     N({start:96,len:48,stops:P(3,5),sym:PL}),
+     N({start:144,len:48,stops:P(3,7,{link:'sl'}),sym:PL})]);
+  add(s3,'⑧P.M. と両方書いた小節。帯が重ならず、下へ一段ずれれば合っております',
+    [N({start:0, len:48,stops:P(3,3),chord:G,sym:{pm:true,pmKind:'tight'}}),
+     N({start:48,len:48,stops:P(3,3),sym:{pm:true,pmKind:'tight'}}),
+     N({start:96,len:96,stops:P(3,5),sym:SB}),
+     N({start:120,len:72,stops:P(2,5),sym:SB})]);
+
+  s.sections=[s1,s2,s3];
+  s.meta.checkBuild=APP.build;
+  s.id=CHECK3_ID;
+  return s;
+}
+
 /* たしかめ帳を開く。既にあればそちらへ移り、無ければ作る（同じ題名で二つ作らない） */
 const CHECK_ID='utadori-tab-checksheet';
 const CHECK_TITLE='ScoreLine TAB たしかめ帳';
 const CHECK2_ID='utadori-tab-checksheet2';
 const CHECK2_TITLE='ScoreLine TAB たしかめ帳 弐';
+const CHECK3_ID='utadori-tab-checksheet-sb';
+const CHECK3_TITLE='ScoreLine TAB スライドバーの帳';
 /* ══ 帳面の一覧（tab-2.34）══
    **判じ所は一つ**（tab-2.16）。冊数が増えても、
    古さの見分けと開く道を冊ごとに書いてはならない。 */
 const SHEETS=[{id:CHECK_ID,title:CHECK_TITLE,mk:()=>checkSong()},
-              {id:CHECK2_ID,title:CHECK2_TITLE,mk:()=>checkSong2()}];
+              {id:CHECK2_ID,title:CHECK2_TITLE,mk:()=>checkSong2()},
+              {id:CHECK3_ID,title:CHECK3_TITLE,mk:()=>checkSongSB()}];
 function sheetOf(id){ return SHEETS.find(x=>x.id===id)||null; }
 /* 古い帳面（題名で作った、id のばらばらな写し）を一度だけ片づける。
    **帳面らしさを確かめてから消す**——題名だけで消せば、
@@ -37487,8 +38179,10 @@ window.addEventListener('keydown',e=>{
   { const pb=$('btn-purgegen'); if(pb) pb.onclick=purgeGenerated; }
   $('btn-checksong').onclick=()=>openCheckSong(CHECK_ID);
   { const b2=$('btn-checksong2'); if(b2) b2.onclick=()=>openCheckSong(CHECK2_ID); }
+  { const b3=$('btn-checksong-sb'); if(b3) b3.onclick=()=>openCheckSong(CHECK3_ID); }
   $('btn-bundle').onclick=exportBundle;
   $('btn-export-one').onclick=exportOne;
+  $('btn-export-midi').onclick=exportMidi;
   $('btn-export-all').onclick=exportAll;
   $('btn-import').onclick=()=>$('file-in').click();
   $('file-in').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) importFile(f); e.target.value=''; };
@@ -37642,7 +38336,8 @@ window.UTADORI={
   get mode(){ return mode; }, set mode(v){ mode=v; },
 
   /* ── 銘板・定数 ── */
-  APP, T, TONE_DEF, TONES, TUPLET_VALS, SHEETS, CHECK_ID, CHECK2_ID,
+  APP, T, TONE_DEF, TONES, TUPLET_VALS, SHEETS, CHECK_ID, CHECK2_ID, CHECK3_ID,
+  checkSongSB, sbTone, sbOn, sbAt, sbRelink, sbRelinkBar, autoLinkFor,
   FERMATA_X,   /* フェルマータの伸び幅（tab-3.46）。点検はこの数を参照する */
   SNAP_DIV_MAX, REST_LINE,
 
@@ -37719,7 +38414,7 @@ window.UTADORI={
   snapLabel, snapLabelAt, songSnap, hasOwnSnap, hasOwnSnapAt, setSnapAt,
   gridDivsOf, dragTicks, isTripletSnap, bulkSnap,
   beatCount, beatOfTick, beatTicks, barTS, barTicks,
-  setEvenAt, hasEvenAt, isEvenBeat, mixPair, swingOn,
+  setEvenAt, hasEvenAt, isEvenBeat, beatHasTuplet, hasOwnSnapAt, mixPair, swingOn,
 
   /* ── 並び（構成）── */
   playOrder, arrangement, gcBars,
@@ -37779,6 +38474,7 @@ window.UTADORI={
   recSongHeadSec, recFirstOnset, recSyncNone, recJointReport, anchorFromCounts,
   recSnapToggle, recRecue,
   selfCheck, openSelfCheck,
+  buildMidi, exportMidi,
   gridFit, micRecMark, markStats, MICREC, calGrid,
   /* 追いかけ方（tab-3.54）。**次の段が見えているか**を機械で確かめられるよう */
   setPlayhead, followBar, scrollHost, scrollToTarget, FOLLOW_TOP, viewBand, nextStageOf,
@@ -37793,6 +38489,45 @@ else boot();
 
 })();
 
+</script>
+<script>/* 共通の画面の部品（版 1.2 以上）が読めた時だけ、録音スタジオの卓（夜）にする */
+(function(){
+  if(!(window.DS&&DS.ui&&parseFloat(DS.ui.version)>=1.2&&DS.ui.bridge))return;
+  var T=window.SL_TAB;if(!T)return;
+  var b=document.body;b.classList.add('ds-studio','sl-st');b.setAttribute('data-ds-finish','night');b.setAttribute('data-ds-enter','off');
+  DS.ui.init(b);
+  var tools=document.querySelector('.topbar .tb-tools');if(!tools)return;
+  var el=document.createElement('div');el.id='sl-bridge';tools.parentNode.insertBefore(el,tools);
+  /* 表示順の小節を、中央の表示の 1,2,3… に写す */
+  function idxOf(si,pos){var D=T.disp();for(var i=0;i<D.length;i++){if(D[i].si===si&&D[i].pos===pos)return i;}return -1;}
+  function idxOfBar(barId){var w=document.querySelector('#paper .mwrap[data-bar="'+barId+'"]');if(!w)return -1;return idxOf(+w.getAttribute('data-si'),+w.getAttribute('data-pos'));}
+  var br=DS.ui.bridge(el,{bars:1,beats:4,onJump:function(k){
+    var d=T.disp()[k-1];if(!d)return;var w=document.querySelector('#paper .mwrap[data-si="'+d.si+'"][data-pos="'+d.pos+'"]');if(w)T.follow(w);}});
+  /* 曲の形：区切りの名前と小節の数、くり返しの範囲、拍子 */
+  var last='';
+  function sync(){
+    var D=T.disp(),S=T.song();if(!D||!D.length)return;
+    var secs=[],cur=null;
+    D.forEach(function(d,i){if(!cur||cur.si!==d.si){var nm='';try{nm=(S.sections[d.si]||{}).name||'';}catch(e){}cur={si:d.si,name:nm,from:i+1,to:i+1};secs.push(cur);}else cur.to=i+1;});
+    var r=T.loop(),lp=r?[r[0]+1,r[1]+1]:null;
+    var ts=4;try{var t=(S.meta&&S.meta.timeSig)||S.timeSig;if(t&&t.n)ts=t.n;}catch(e){}
+    var shape={sections:secs.map(function(x){return {name:x.name,from:x.from,to:x.to};}),bars:D.length,loop:lp,beats:ts};
+    var k=JSON.stringify(shape);if(k!==last){last=k;br.set(shape);}
+  }
+  window.SL_TAB_SYNC=sync;
+  new MutationObserver(function(){clearTimeout(sync._t);sync._t=setTimeout(sync,60);}).observe(document.getElementById('paper'),{childList:true});
+  /* 再生：拍の予定を控え、聞こえる時刻になったら位置と拍を進める */
+  var q=[],shown=false,bar=1,raf=null;
+  window.SL_TAB_BEAT=function(at,barId,beat){q.push({at:at,barId:barId,beat:beat});if(!raf)raf=requestAnimationFrame(loop);};
+  function loop(){
+    raf=null;var now=T.now(),hit=null;
+    while(q.length&&q[0].at<=now){hit=q.shift();}
+    if(hit){var i=idxOfBar(hit.barId);if(i>=0){bar=i+1;br.pos(bar,hit.beat,true);shown=true;}}
+    if(T.playing()){raf=requestAnimationFrame(loop);}
+    else{q=[];if(shown){br.pos(bar,0,false);shown=false;}}
+  }
+  setTimeout(sync,0);window.addEventListener('load',function(){setTimeout(sync,50);});
+})();
 </script>
 </body>
 </html>
