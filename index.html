@@ -1509,7 +1509,7 @@ body.locked #paper::before{
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.28', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.29', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2658,9 +2658,25 @@ function barNoText(s,bar){
 }
 
 /* 深い複製（構造化クローン。無い環境では JSON で代替） */
-const clone=(typeof structuredClone==='function')
+const _rawClone=(typeof structuredClone==='function')
   ? (o)=>structuredClone(o)
   : (o)=>JSON.parse(JSON.stringify(o));
+/* ══ 複製したら、窓を開け直す（tab-6.29）══
+   `bar.notes` は `np` を指す窓で、保存に載らないよう enumerable:false にしてある
+   （tab-6.25）。**複製も同じ理屈で窓を落とす**——`structuredClone` も
+   JSON も、見えない性質は写さない。
+
+   写した先で `bar.notes` が無い値になれば、譜面は真っ白になる。
+   なぞりの下描き（`drag.base`）はここを通るので、**見つけにくい所で壊れる。**
+
+   > **窓を開ける所と、窓が要る所を、別々に覚えていてはいけない。**
+   複製の口を一つに絞り、そこで必ず開け直す。 */
+function clone(o){
+  const c=_rawClone(o);
+  /* 曲の形（小節の並びを持つ物）なら、窓を開け直す */
+  if(c&&typeof c==='object'&&Array.isArray(c.bars)) bindSong(c);
+  return c;
+}
 
 /* ══════════════════════════════════════════
    STORE — 一覧と曲本体を別キーに分ける
@@ -8882,9 +8898,25 @@ const TYPE_LIST=[
 /* ══════════════════════════════════════════
    音符メニュー（長押し）
    ══════════════════════════════════════════ */
-const VAL_STRAIGHT=[['16分',12],['8分',24],['付点8分',36],['4分',48],
-                    ['付点4分',72],['2分',96],['付点2分',144],['全音符',192]];
-const VAL_TRIPLET =[['3連16分',8],['3連8分',16],['3連4分',32]];
+/* ══ 音価の表は、いまの目盛から引く（tab-6.29）══
+   ここだけ**1拍＝48 の頃の数**が残っていた。tab-1.68 で 1拍を 1680 にした折の
+   取りこぼしで、どこからも直されていない。
+
+   使い道は〈音符を長押し〉の音価の札ひとつ。そこで「4分」を押すと
+   4分音符（1680）ではなく **48 tick ＝ 1拍の35分の1**が入っていた。
+
+   > **数は一箇所で持つ。** `T` から引けば、目盛を変えてもここは狂わない。
+
+   付点は 1.5 倍、全音符は 4 拍——書き下さず、式のまま置く。 */
+const VAL_STRAIGHT=[['16分',T.SIXTEENTH],['8分',T.EIGHTH],['付点8分',T.EIGHTH*1.5],
+                    ['4分',T.QUARTER],['付点4分',T.QUARTER*1.5],['2分',T.QUARTER*2],
+                    ['付点2分',T.QUARTER*3],['全音符',T.QUARTER*4]];
+const VAL_TRIPLET =[['3連16分',T.TRIP16],['3連8分',T.TRIP8],['3連4分',T.TRIP4]];
+/* 刻みから名を引く。まとめて変えた時の報せに使う */
+function valLabel(u){
+  const hit=VAL_STRAIGHT.concat(VAL_TRIPLET).find(([,v])=>Math.abs(v-u)<0.5);
+  return hit?hit[0]:(u+'刻み');
+}
 /* ══════════════════════════════════════════
    TAB — 押さえの入力
    弦を選んでフレットを押す、の二手。和音は弦を変えて足すだけ。
@@ -22784,6 +22816,168 @@ function nselUnjoin(){
    〈コピー〉も残す（写した範囲が見えていた方がよい）。
    外す時は弦の絞りも一緒に落とす（選びの無い絞りは、次の選びに黙って掛かる）。 */
 function nselDone(){ nsel.clear(); nselStr=null; }
+/* ══════════════════════════════════════════
+   選んだ音を、まとめて同じ音価にする（tab-6.29）
+
+   L様——「複数の音で音価を変えられない」
+         「選んだ音が小節をまたいでいる場合はつなげないの？」
+
+   一音のなぞりは `setLen`／`setLenAcross` が受け持つ。あちらは
+   **相手の小節の頭が休符である**ことを前提にした一音ずつの道で、
+   まとめて敷く時はその前提が頻繁に崩れる——次の小節の頭も、
+   これから書き換わる範囲の中だからである。ゆえに別の道として書く。
+   **同じ名前で二つのことをさせない。**
+
+   ── 考え方 ──
+   選んだ範囲を**小節の切れ目を忘れた一本の時間**として扱う。
+   頭から指定の音価で敷き詰め、小節線に掛かった音はそこで割り、タイで繋ぐ。
+
+     選んだ範囲 ───────────┼───────────
+     指定：付点4分          小節線
+       ♩.      ♩.      ♩( ⌢ )♩
+
+   ── 決めごと（L様のご指定）──
+     余り   … 休符にする。最後の音を伸ばしたり水増ししたりしない
+     あふれ … 捨てる。何音捨てたかは必ず申し上げる
+     範囲の外は動かさない——驚きがいちばん少ない
+
+   ── 区切りの作り方 ──
+   選びは小節ごとの区間（`nselSpansIn`）で持っている。
+   隣り合う小節の区間は、**前が小節の尻まで届き、後が頭から始まる**時にだけ
+   一本に繋ぐ。飛び地を無理に繋げば、選んでいない所を書き換えてしまう。 */
+function nselRegions(){
+  /* ══ 測るのはマスではなく、音符の丈（tab-6.29）══
+     選びは**マス**で持っている（`nselSpansIn`）。マスは刻み一つぶんなので、
+     4分音符の頭を選んでも区間は16分ぶんしかない。
+     それを区切りにすると、音符の胴が区切りの外へはみ出す——
+     **敷き直す場所が、動かしたい音符より短くなる。**
+
+     欲しいのは「選ばれた音符たちが占めている時間」である。
+     ゆえに `nselNotes`（選びに掛かった音符）から、その丈で組み直す。 */
+  const regs=[];
+  nselNotes().forEach(o=>{
+    const lo=o.n.start, hi=o.n.start+Math.max(1,o.n.len);
+    const tot=barTicks(song,o.bar);
+    const last=regs[regs.length-1];
+    const tail=last&&last[last.length-1];
+    /* 同じ小節で続いているなら、尻を伸ばすだけ */
+    if(tail&&tail.barId===o.barId&&lo<=tail.hi+1e-9){
+      tail.hi=Math.max(tail.hi,hi); return;
+    }
+    /* 小節をまたいで続いているか——前が尻まで、後が頭から、かつ隣り合う小節 */
+    const nb=tail?nextBarOf(song,tail.barId):null;
+    const joins=tail&&tail.barId!==o.barId&&tail.hi>=tail.tot-1e-9&&lo<=1e-9
+                 &&nb&&nb.id===o.barId;
+    const cell={barId:o.barId,bar:o.bar,lo,hi,tot};
+    if(joins) last.push(cell); else regs.push([cell]);
+  });
+  return regs;
+}
+/* 区切りの中の音符を、頭から順に拾う（休符は数に入れない） */
+function regNotes(reg){
+  const out=[];
+  reg.forEach(sp=>{
+    (sp.bar.notes||[]).slice().sort((a,b)=>a.start-b.start).forEach(n=>{
+      if(n.kind==='rest') return;
+      const a0=n.start, a1=n.start+Math.max(1,n.len);
+      if(sp.lo<a1&&sp.hi>a0) out.push(n);
+    });
+  });
+  return out;
+}
+/* 音符の姿だけを写す（場所と長さは敷く側が決める） */
+function noteSeed(n){
+  return { kind:n.kind||'chord',
+    stops:(n.stops||[]).map(o=>({s:o.s,f:o.f,t:Object.assign({},o.t||{})})),
+    chord:n.chord||null, voicing:n.voicing||null, stroke:n.stroke||null,
+    stem:n.stem||null, accent:!!n.accent, staccato:!!n.staccato,
+    sym:Object.assign({},n.sym||{}), lyric:n.lyric||null,
+    grace:n.grace?Object.assign({},n.grace):null };
+}
+/* ══ 一つの区切りへ、指定の音価で敷き詰める ══
+   返すのは {put, dropped} — 置けた数と、入りきらず捨てた数。 */
+function layRegion(reg,len){
+  const seeds=regNotes(reg).map(noteSeed);
+  if(!seeds.length) return {put:0,dropped:0};
+  /* 範囲を一本の物差しにする。区切りの各小節は [lo,hi) だけを使う */
+  const seg=reg.map(sp=>({bar:sp.bar,barId:sp.barId,lo:sp.lo,hi:sp.hi,w:sp.hi-sp.lo}));
+  const span=seg.reduce((a,s)=>a+s.w,0);
+  /* まず範囲を休符で空ける。ここから先は置くだけ */
+  seg.forEach(s=>makeRestOver(song,s.bar,s.lo,s.w));
+  /* 物差しの位置を、小節と tick へ戻す */
+  const atOf=u=>{
+    let acc=0;
+    for(const s of seg){
+      if(u<acc+s.w-1e-9) return {seg:s,st:s.lo+(u-acc)};
+      acc+=s.w;
+    }
+    return null;
+  };
+  let u=0, put=0, dropped=0;
+  for(const sd of seeds){
+    if(u+len>span+1e-9){ dropped++; continue; }
+    /* 小節線で割る。割れた先は同じ押さえをタイで受ける */
+    let left=len, first=true, prevBar=null;
+    while(left>0.5){
+      const p=atOf(u); if(!p) break;
+      const room=p.seg.hi-p.st;
+      const take=Math.min(left,room);
+      const data=noteSeed({stops:sd.stops,kind:sd.kind,chord:first?sd.chord:null,
+        voicing:first?sd.voicing:null,stroke:first?sd.stroke:null,stem:sd.stem,
+        accent:first?sd.accent:false,staccato:(left-take<=0.5)?sd.staccato:false,
+        sym:first?sd.sym:{},lyric:first?sd.lyric:null,grace:first?sd.grace:null});
+      /* ══ 丈は、こちらが決める（tab-6.29）══
+         `insertNote` は「次の音符まで」で丈を決める。空けた直後は
+         次の音符が無いので、**置いた一つが範囲の端まで伸びてしまう。**
+         敷き詰めは丈が先に決まっているのだから、置いた後に言い渡す。 */
+      const ix=insertNote(song,p.seg.bar,Math.round(p.st),data);
+      if(ix>=0) setLen(song,p.seg.bar,ix,Math.round(take));
+      if(prevBar){
+        /* 手前の切れ端から、いまの切れ端へタイを張る */
+        const pi=noteIdxIn(prevBar.bar,Math.round(prevBar.st));
+        const pn=pi>=0?prevBar.bar.notes[pi]:null;
+        if(pn) (pn.stops||[]).forEach(o=>{ o.t=o.t||{}; o.t.tie=true; });
+        syncTieOut(prevBar.bar);
+      }
+      left-=take; u+=take;
+      prevBar=(left>0.5)?{bar:p.seg.bar,st:p.st}:null;
+      first=false;
+    }
+    put++;
+  }
+  /* ══ 余りは休符（tab-6.29・L様のご指定）══
+     `normalizeBar` は重なりを解くだけで、**隙間は埋めない。**
+     譜面として正しいのは「そこは休む」であって「無」ではないので、
+     敷き終えた後に空いている所を休符で埋める。
+     埋めるのは**区切りの中だけ**——範囲の外は動かさない。 */
+  seg.forEach(s=>{
+    normalizeBar(song,s.bar);
+    const inReg=(s.bar.notes||[])
+      .filter(n=>n.start<s.hi-1e-9&&n.start+n.len>s.lo+1e-9)
+      .sort((a,b)=>a.start-b.start);
+    let cur=s.lo;
+    const holes=[];
+    inReg.forEach(n=>{
+      if(n.start>cur+0.5) holes.push([cur,n.start]);
+      cur=Math.max(cur,n.start+n.len);
+    });
+    if(cur<s.hi-0.5) holes.push([cur,s.hi]);
+    holes.forEach(([a,b])=>s.bar.notes.push(
+      mkNote({start:Math.round(a),len:Math.round(b-a),kind:'rest',stops:null})));
+    normalizeBar(song,s.bar);
+    sanitizeBarLinks(song,s.bar);
+  });
+  return {put,dropped};
+}
+/* 選んだ音をまとめて、指定の音価にする。戻りは {put,dropped,regions} */
+function nselSetLen(len){
+  const regs=nselRegions();
+  if(!regs.length) return null;
+  let put=0, dropped=0;
+  regs.forEach(r=>{ const o=layRegion(r,len); put+=o.put; dropped+=o.dropped; });
+  try{ sanitizeTiesAcross(song); }catch(_){}
+  return {put,dropped,regions:regs.length};
+}
 function nselApply(label,fn,keepSel){
   const list=nselNotes();
   if(!list.length){ toast('音符を選んでください'); return 0; }
@@ -22815,6 +23009,27 @@ function openNoteTech(){
   const pop=popup('選んだ音にまとめて',nselNotes().length+'音'
     +(nselStrLabel()?('／'+nselStrLabel()):''));
   const done=()=>{ closePop(); };
+
+  /* ══ 音価も、まとめて（tab-6.29）══
+     なぞりでも効くが、板からも選べるようにしておく——
+     なぞりは指で測る道、札は数で決める道であり、用途が違う。 */
+  {
+    const put=(u)=>{
+      let r=null;
+      tx('選んだ音の音価を変える',()=>{ r=nselSetLen(u); });
+      closePop(); render();
+      if(r) toast(r.put+'音を'+valLabel(u)+'にしました'
+        +(r.regions>1?('（'+r.regions+'か所）'):'')
+        +(r.dropped?('。入りきらない'+r.dropped+'音は消えました'):''),
+        null,null,r.dropped?6000:3000);
+    };
+    const v1=pgrp(pop,'音価をそろえる');
+    VAL_STRAIGHT.forEach(([lbl,u])=>pbtn(v1,lbl,false,()=>put(u)));
+    const v2=pgrp(pop,'3連符にそろえる');
+    VAL_TRIPLET.forEach(([lbl,u])=>pbtn(v2,lbl,false,()=>put(u)));
+    pnote(v1,'選んだ所の頭から敷き直します。小節線に掛かる音は割ってタイで繋ぎ、'
+            +'余りは休符、入りきらない音は消えます。選んだ範囲の外は動きません');
+  }
 
   /* 符尾の向きを、選んだ音符へまとめて（tab-1.87） */
   {
@@ -23796,6 +24011,8 @@ const HELP=[
     ['道具はぜんぶ、画面の下','**〈入力〉〈コード〉〈選択〉の三枚は下の帯のいちばん左**、**取り消し・やり直しといま何ができるかの案内は右端**にございます（tab-2.86／2.89 で上から降ろしました）。上の帯は畳んでございますので、譜面が一段ぶん広くお使いいただけます。取り消しは ⌘Z、やり直しは ⌘⇧Z でも効きます'],
     ['弦の線に触れて縦になぞる','触れた線が弦。上へ引けばフレットが上がります。音符の無い所から始めれば、その場に音符が生まれます'],
     ['横になぞる','その音符の長さを変えます。縦と横は先に動いた向きで決まり、一度決まれば指を離すまで入れ替わりません'],
+    ['選んだ音を掴めば、まとめて変わります','**選びが掛かっている音を横になぞると、選んだ音すべての音価が変わります。**選んだ所の頭から敷き直し、小節線に掛かる音は割ってタイで繋ぎます。余りは休符になり、入りきらない音は消えます（何音消えたかはお伝えします）。**選びの外の音を掴んだときは、これまで通りその一音だけ**でございます'],
+    ['数で決めたいときは','選んだ音の板（〈選んだ音にまとめて〉）に【音価をそろえる】【3連符にそろえる】がございます。なぞりは指で測る道、札は数で決める道でございます'],
     ['★ 左へ引けば、頭が前へ伸びます','**右へ引けば末尾が動き、左へ引けば頭が動きます**（tab-4.59）。'
       +'頭より左へ指が出ますと、**末尾は掴んだ所に留めたまま、頭が指の先まで伸びます**。'
       +'間にあるものは飲み込みます——**丸ごと入っていた音符は消え、跨がれた音符は指の先で切られます**。'
@@ -32473,6 +32690,17 @@ function bindPaper(){
       return;                               /* 空白では音符メニューを開かない */
     }
     drag={ ...i, src, on:false, bar, barId:i.barId };
+    /* ══ 選んだ音を掴んだら、まとめて効かせる（tab-6.29）══
+       L様——「複数の音で音価を変えられない」。
+
+       なぞりは触れた一音しか見ていなかった。選びが掛かっていても
+       素通しである。**掴んだ音が選びの中にあるなら、選び全部へ効かせる。**
+
+       選びの**外**を掴んだ時は、これまで通りその一音だけ——
+       選びを掛けたまま別の所を直したい、ということは起こる。 */
+    { const n0=bar.notes[src];
+      drag.bulk=!!(n0&&n0.kind!=='rest'&&nsel&&nsel.size
+                   &&nselNotes().some(o=>o.barId===i.barId&&o.n===n0)); }
     /* 音程モードの長押しは輪のもの。こちらは名乗り出ない */
     if(mode==='tab') return;
     lp=setTimeout(()=>{
@@ -32604,6 +32832,19 @@ function bindPaper(){
       }
     }
     let len=Math.round((t-n.start)/snap)*snap;
+    /* ══ 選びを掴んでいるなら、選び全部へ（tab-6.29）══
+       指が動くたびに、掴んだ姿から引き直して敷き直す。
+       下描きのたびに取り消しへ積まない作法は、頭を引く枝（tab-4.59）と同じ。 */
+    if(drag.bulk&&drag.base){
+      const want=Math.max(snap,len);
+      if(want===drag.bulkLen) return;
+      drag.bulkLen=want;
+      song=clone(drag.base);
+      const r=nselSetLen(want);
+      drag.bulkDrop=r?r.dropped:0;
+      render();
+      return;
+    }
     const total=barTicks(song,bar);
     const room=total-n.start;
     /* 小節線を越えた分は次の小節へ回す（タイ） */
@@ -32678,6 +32919,20 @@ function bindPaper(){
       document.body.classList.remove('dragging');
       try{ paper.releasePointerCapture(e.pointerId); }catch(_){}
       suppressClick=true; setTimeout(()=>{ suppressClick=false; },400);
+      /* まとめて敷いていたなら、そちらの始末（tab-6.29） */
+      if(drag.bulk&&drag.base&&drag.bulkLen!=null){
+        const want=drag.bulkLen;
+        song=drag.base;
+        let r=null;
+        tx('選んだ音の音価を変える',()=>{ r=nselSetLen(want); });
+        if(r){
+          toast(r.put+'音を'+(valLabel?valLabel(want):'')+'にしました'
+            +(r.regions>1?('（'+r.regions+'か所）'):'')
+            +(r.dropped?('。入りきらない'+r.dropped+'音は消えました'):''),
+            null,null,r.dropped?6000:3000);
+        }
+        drag=null; return;
+      }
       /* 頭を引いていたなら、そちらの始末（tab-4.59） */
       if(drag.headSt!=null&&drag.base){
         const st0=drag.headSt, id0=drag.barId, i0=drag.src;
@@ -39064,7 +39319,10 @@ window.UTADORI={
   mkPart, mkBarMark, bindBar, bindSong, partCount, curPart, alignParts, setPart, partLabel,
   renderPartBar, switchPart, addPart, openPartMenu, openPartSound, openSoundSheet,
   mergeOtherParts, sndForBar, clearSndCache, vkOf, get VK_BASE(){ return VK_BASE; },
-  midiPartsOf, printAllParts, beginPrintLayout, endPrintLayout,   /* saveLibrary は下の library の節に一つだけ置く */
+  midiPartsOf, printAllParts, beginPrintLayout, endPrintLayout,
+  /* 選んだ音の音価（tab-6.29） */
+  nselRegions, regNotes, layRegion, nselSetLen, valLabel, VAL_STRAIGHT, VAL_TRIPLET,
+  clone, nkey, newBar, mkNote, barTicks, get nsel(){ return nsel; },   /* saveLibrary は下の library の節に一つだけ置く */
   checkSong, checkSong2, openCheckSong, staleCheckSheet,
 
   /* ── 描く ── */
