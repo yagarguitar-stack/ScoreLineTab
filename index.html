@@ -120,6 +120,22 @@ body{
 /* 道具立ては右端へ束ねる。左は空の枠（釣り合いは grid が取る） */
 .tb-tools{ grid-column:3; justify-self:end; display:flex; align-items:center; gap:8px }
 .tb-left{ grid-column:1 }
+/* ══ パートの切り替え（tab-6.25）══
+   左の枠は空いていた（釣り合いは grid が取るので錘が要らない）。
+   譜面に属する物なので、道具立て（右）ではなく**曲名の隣**へ置く。 */
+.tb-parts{display:flex;align-items:center;gap:4px;min-width:0}
+.pt-btn{
+  flex:0 1 auto;height:30px;max-width:150px;padding:0 11px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;color:var(--on-ink-dim);
+  border:1px solid var(--ink-line);border-radius:8px;
+  font-family:var(--font-ui);font-size:12px;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pt-btn:hover{background:var(--ink3);color:var(--on-ink)}
+.pt-btn.on{background:var(--indigo);border-color:var(--indigo);color:#fff;font-weight:600}
+.pt-add{min-width:30px;padding:0 8px;font-size:14px;line-height:1}
+@media (max-width:760px){ .pt-btn{max-width:92px;padding:0 8px} }
 @media (max-width:520px){ .tb-meta{display:none} }
 .tb-song:hover{background:var(--ink3)}
 .tb-song .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1151,6 +1167,8 @@ body.dragging .mwrap{cursor:ew-resize}
 .vc-segb.on{background:#fff;color:var(--ink-strong);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .vc-row .btn{flex:1 1 auto;min-height:40px}
 .printhead,.printfoot{display:none}
+/* パートの見出しは紙にだけ出る（tab-6.25）。画面は一度に一本しか出さない */
+.pt-head{display:none}
 
 /* ══════════════════════════════════════════
    下の帯（再生と筆）
@@ -1318,6 +1336,14 @@ body.lp-drag,body.lp-drag .mwrap{cursor:ew-resize}
   .ph-meta{font-family:var(--font-ui);font-size:9.5pt;color:#444;margin-top:2.5mm}
   .printfoot{display:block;margin-top:8mm;padding-top:2mm;border-top:.4pt solid #bbb;
     font-family:var(--font-ui);font-size:8pt;color:#666;text-align:right}
+  /* ══ パートの見出し（tab-6.25）══
+     二本目から改ページ。パートの途中で紙が変わるのは読みにくいが、
+     **一本目の前で改ページしては白紙が一枚出る。** */
+  .pt-head{display:block;font-family:var(--font-ui);font-size:13pt;font-weight:800;
+    color:#000;margin:0 0 4mm;padding-bottom:1.5mm;border-bottom:.8pt solid #333;
+    break-after:avoid}
+  .pt-sheet{break-before:page}
+  .pt-sheet:first-child{break-before:auto}
   .sec-in{font-weight:800!important;font-size:12pt!important;padding-left:0!important}
   .sec-in::placeholder{color:transparent!important}
   .ui-only{display:none!important}
@@ -1365,83 +1391,11 @@ body.locked #paper::before{
 }
 @media print{ body.locked #paper::before{ display:none; } }
 </style>
-<!-- 共通の画面の部品（録音スタジオの卓・夜）。読み込めない時・古い版の時は、これまでの見た目のまま -->
-<link rel="stylesheet" href="https://yagarguitar-stack.github.io/design-system/v1/components.css">
-<script src="https://yagarguitar-stack.github.io/design-system/v1/components.js"></script>
-<style>
-/* ===== 共通の部品（版 1.2 以上）が読めた時だけ効く（body に sl-st と ds-studio が付く） ===== */
-body.sl-st{
-  --ink:var(--ds-paper);--ink2:#1f2024;--ink3:#2c2e33;--ink-line:#060607;--on-ink:var(--ds-ink);--on-ink-dim:var(--st-leg2);
-  --font-ui:"Zen Kaku Gothic New",-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
-  background-color:var(--ds-paper);
-}
-body.sl-st .paperwrap{background:transparent}
-body.sl-st #paper{box-shadow:0 0 0 1px rgba(0,0,0,.6),0 12px 34px rgba(0,0,0,.55)}
-/* 操作面の中だけ、選んだ色を琥珀の灯りにする（紙面の色は変えない） */
-body.sl-st .topbar,body.sl-st .modebar,body.sl-st .botbar,body.sl-st .sheet-ov,body.sl-st .toast,body.sl-st .phase,body.sl-st .tab-tip{--indigo:var(--st-lamp)}
-
-/* ── 上の棚 ── */
-body.sl-st .topbar{--topbar-h:40px;background:linear-gradient(#26282c,#1b1c1f);border-bottom:0;box-shadow:inset 0 -1px 0 rgba(0,0,0,.6),0 1px 0 var(--st-hl),0 4px 12px rgba(0,0,0,.35)}
-body.sl-st .tb-left{display:none}
-body.sl-st .topbar{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;column-gap:14px}
-body.sl-st .topbar > .tb-song{grid-column:1;grid-row:1;justify-content:flex-start;padding:4px 6px}
-body.sl-st #sl-bridge{grid-column:2;grid-row:1}
-body.sl-st .tb-tools{grid-column:3;grid-row:1}
-body.sl-st .tb-song .t{font-family:"Permanent Marker","Zen Kaku Gothic New",sans-serif;font-weight:400;font-size:17px;letter-spacing:.05em;color:#1e2a52;background:#efeada;padding:3px 14px 2px;transform:rotate(-1.4deg);box-shadow:0 1px 1.5px rgba(0,0,0,.55);clip-path:polygon(1% 4%,99% 0,100% 94%,0 100%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw}
-body.sl-st .tb-song:hover{background:transparent}
-body.sl-st .tb-song .car{color:var(--st-silk)}
-body.sl-st #sl-bridge{min-width:0}
-body.sl-st .tb-meta{font:500 12.5px "IBM Plex Mono",monospace;color:var(--st-disp);text-shadow:0 0 6px var(--st-dispglow);background:var(--st-dispbg);padding:6px 10px;border-radius:4px;box-shadow:inset 0 1px 4px rgba(0,0,0,.9),0 1px 0 var(--st-hl)}
-/* ボタン共通：枠と押し面。押すと沈み、選ぶと灯る */
-body.sl-st .tb-btn,body.sl-st .bb-btn,body.sl-st .pen-btn,body.sl-st .topbar .btn,body.sl-st .modebar .btn,body.sl-st .botbar .btn,body.sl-st .sheet-ov .btn,body.sl-st .toast .btn,body.sl-st .topbar .t-btn,body.sl-st .modebar .t-btn,body.sl-st .botbar .t-btn,body.sl-st .sheet-ov .t-btn,body.sl-st .toast .t-btn,body.sl-st .vc-segb{
-  border:0;background:var(--st-cap);color:var(--ds-ink);border-radius:6px;
-  box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),inset 0 -2px 0 rgba(0,0,0,.28),0 3px 0 var(--st-bezel),0 4px 6px rgba(0,0,0,.3);
-  transition:transform .09s cubic-bezier(.2,.8,.2,1),box-shadow .09s,background .18s,color .18s,text-shadow .18s}
-body.sl-st .tb-btn:hover,body.sl-st .bb-btn:hover,body.sl-st .topbar .btn:hover,body.sl-st .modebar .btn:hover,body.sl-st .botbar .btn:hover,body.sl-st .sheet-ov .btn:hover,body.sl-st .toast .btn:hover,body.sl-st .topbar .t-btn:hover,body.sl-st .modebar .t-btn:hover,body.sl-st .botbar .t-btn:hover,body.sl-st .sheet-ov .t-btn:hover,body.sl-st .toast .t-btn:hover{background:linear-gradient(#43464d,#31343a);color:var(--ds-ink)}
-body.sl-st .tb-btn:active,body.sl-st .bb-btn:active,body.sl-st .pen-btn:active,body.sl-st .topbar .btn:active,body.sl-st .modebar .btn:active,body.sl-st .botbar .btn:active,body.sl-st .sheet-ov .btn:active,body.sl-st .toast .btn:active,body.sl-st .topbar .t-btn:active,body.sl-st .modebar .t-btn:active,body.sl-st .botbar .t-btn:active,body.sl-st .sheet-ov .t-btn:active,body.sl-st .toast .t-btn:active,body.sl-st .mode-btn:active,body.sl-st .vc-segb:active{transform:translateY(2px);box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),0 1px 0 var(--st-bezel)}
-body.sl-st .tb-btn.on,body.sl-st .bb-btn.on,body.sl-st .pen-btn.on,body.sl-st .topbar .btn.pri,body.sl-st .modebar .btn.pri,body.sl-st .botbar .btn.pri,body.sl-st .sheet-ov .btn.pri,body.sl-st .toast .btn.pri,body.sl-st .mode-btn.on,body.sl-st .vc-segb.on{
-  background:var(--st-lit);color:var(--st-litleg);text-shadow:0 0 8px var(--st-glow);border-color:transparent;
-  box-shadow:0 0 0 1px var(--st-bezel),inset 0 0 14px var(--st-glowin),inset 0 1px 0 rgba(255,255,255,.25),0 3px 0 var(--st-bezel),0 0 16px var(--st-spill)}
-body.sl-st .topbar .btn.pri:hover,body.sl-st .modebar .btn.pri:hover,body.sl-st .botbar .btn.pri:hover,body.sl-st .sheet-ov .btn.pri:hover,body.sl-st .toast .btn.pri:hover{background:linear-gradient(#6c552d,#4a3a21);color:var(--st-litleg)}
-/* 再生中・録音中は赤、リズムは緑に灯る */
-body.sl-st .bb-btn.go.on,body.sl-st .mode-btn.play.on{background:linear-gradient(#b32a22,#7a1812);color:#fff;text-shadow:none;box-shadow:0 0 0 1px var(--st-bezel),inset 0 0 14px rgba(255,80,60,.7),0 3px 0 var(--st-bezel),0 0 18px rgba(255,60,40,.45)}
-body.sl-st .bb-btn.rec-on{color:#fff;background:linear-gradient(#b32a22,#7a1812);animation:sl-rec 1.2s ease-in-out infinite}
-@keyframes sl-rec{50%{filter:brightness(.72)}}
-body.sl-st .mode-btn.on.md-rhythm{background:linear-gradient(#1f5a3a,#133a26);color:#b8ffd2;text-shadow:0 0 8px rgba(115,240,160,.8)}
-body.sl-st .topbar .btn.dgr,body.sl-st .modebar .btn.dgr,body.sl-st .botbar .btn.dgr,body.sl-st .sheet-ov .btn.dgr,body.sl-st .toast .btn.dgr,body.sl-st .topbar .t-btn.dgr,body.sl-st .modebar .t-btn.dgr,body.sl-st .botbar .t-btn.dgr,body.sl-st .sheet-ov .t-btn.dgr,body.sl-st .toast .t-btn.dgr,body.sl-st .bb-btn.dgr{color:var(--ds-accent)}
-body.sl-st .bb-btn:disabled,body.sl-st .t-btn:disabled{box-shadow:0 0 0 1px var(--st-bezel);opacity:.45}
-/* ── モードの帯 ── */
-body.sl-st .modebar{background:var(--st-deck);border-bottom:0;box-shadow:inset 0 1px 0 var(--st-hl),0 1px 0 rgba(0,0,0,.7)}
-body.sl-st .mode-grp,body.sl-st .bb-grp,body.sl-st .vc-seg{gap:4px;padding:4px;border:0;border-radius:8px;background:var(--st-well);box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 1px 0 var(--st-hl)}
-body.sl-st .mode-btn{background:var(--st-cap);color:var(--ds-ink);border-radius:6px;box-shadow:0 0 0 1px var(--st-bezel),inset 0 1px 0 var(--st-caphl),0 2px 0 var(--st-bezel);transition:transform .09s,box-shadow .09s,background .18s}
-/* ── 下の卓 ── */
-body.sl-st .botbar{background:var(--st-deck);border-top:0;box-shadow:inset 0 1px 0 var(--st-hl),0 -1px 0 rgba(0,0,0,.8),0 -10px 22px rgba(0,0,0,.4)}
-body.sl-st .bb-div{background:rgba(0,0,0,.6);box-shadow:1px 0 0 var(--st-hl)}
-body.sl-st .bb-lab,body.sl-st .bb-hint,body.sl-st .bb-lab2{color:var(--st-silk)}
-body.sl-st .bb-bpm-grp{border:0;background:var(--st-well);box-shadow:inset 0 1px 3px rgba(0,0,0,.6),0 1px 0 var(--st-hl)}
-body.sl-st .bb-bpm-display{font:500 15px "IBM Plex Mono",monospace;color:var(--st-disp);text-shadow:0 0 7px var(--st-dispglow);background:var(--st-dispbg);padding:5px 8px;border-radius:4px;box-shadow:inset 0 1px 4px rgba(0,0,0,.9)}
-body.sl-st .bb-bpm-slider{height:8px;background:#040404;border-radius:4px;box-shadow:inset 0 1px 2px #000,0 1px 0 var(--st-hl)}
-body.sl-st .bb-bpm-slider::-webkit-slider-thumb{width:18px;height:30px;border-radius:3px;border:0;background:linear-gradient(90deg,#8e8e8e,#f0f0f0 40%,#1e1e1e 47%,#1e1e1e 53%,#f0f0f0 60%,#8a8a8a);box-shadow:0 3px 5px rgba(0,0,0,.7)}
-body.sl-st .bb-bpm-slider::-moz-range-thumb{width:18px;height:30px;border-radius:3px;border:0;background:#ddd}
-body.sl-st .bb-sel,body.sl-st select{background-color:var(--st-dispbg);color:var(--st-disp);border:0;box-shadow:inset 0 1px 4px rgba(0,0,0,.9),0 1px 0 var(--st-hl);font-family:"IBM Plex Mono","Zen Kaku Gothic New",monospace}
-body.sl-st .bb-note{background:var(--st-dispbg);border:0;box-shadow:inset 0 1px 4px rgba(0,0,0,.9)}
-/* ── 引き出し（ラック）・お知らせ（表示窓） ── */
-body.sl-st .sheet{background:radial-gradient(circle at 14px 14px,#bbb 0 2.5px,#444 3.5px,transparent 4.5px),radial-gradient(circle at calc(100% - 14px) 14px,#bbb 0 2.5px,#444 3.5px,transparent 4.5px),linear-gradient(#2c2e33,#232428);border:0;box-shadow:0 0 0 1px #000,inset 0 1px 0 var(--st-hl),0 -12px 30px rgba(0,0,0,.5)}
-body.sl-st .toast{background:var(--st-dispbg);color:var(--st-disp);border:0;text-shadow:0 0 7px var(--st-dispglow);font-family:"IBM Plex Mono","Zen Kaku Gothic New",monospace;box-shadow:0 0 0 1px #000,0 8px 20px rgba(0,0,0,.5)}
-body.sl-st .song-row.picked,body.sl-st .song-row.cur{background:rgba(255,179,64,.10)}
-body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
-/* ── 幅の狭い画面（スマホの縦向き）では中央の表示を出さない ── */
-@media (max-width:700px){
-  body.sl-st #sl-bridge{display:none}
-  body.sl-st .topbar{grid-template-columns:minmax(0,1fr) auto}
-  body.sl-st .tb-song .t{max-width:46vw;font-size:15px}
-}
-</style>
 </head>
 <body>
 
 <div class="topbar">
-  <span class="tb-left"></span>
+  <span class="tb-left"><span class="tb-parts" id="tb-parts"></span></span>
   <button class="tb-song" id="tb-song" title="曲を切り替える">
     <span class="t" id="tb-song-t">ScoreLine TAB</span><span class="car">▼</span>
   </button>
@@ -1555,7 +1509,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.19', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.28', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -1578,6 +1532,10 @@ const ICONS={
   drum:'<ellipse cx="10" cy="6.3" rx="6.4" ry="2.7"/>'
       +'<path d="M3.6 6.3v6.8c0 1.5 2.9 2.7 6.4 2.7s6.4-1.2 6.4-2.7V6.3"/>'
       +'<path d="M4.6 8.9 8 12.1M15.4 8.9 12 12.1M10 9v3.4"/>',
+  /* 全パートを鳴らす（tab-6.27）。譜面が二枚重なっている姿 */
+  parts:'<rect x="2.6" y="5.4" width="10.6" height="11.2" rx="1.4"/>'
+      +'<path d="M6.8 3.4h10.6v11.2"/>'
+      +'<path d="M5.2 9.2h6M5.2 12.4h6"/>',
   undo:'<path d="M7.4 5.2 3.9 8.6l3.5 3.4"/>'
       +'<path d="M3.9 8.6h7.4a4.4 4.4 0 0 1 0 8.8H8"/>',
   redo:'<path d="M12.6 5.2l3.5 3.4-3.5 3.4"/>'
@@ -2205,6 +2163,29 @@ function vibSlot(t){
 }
 const baseY=54, TAB_LS=9.2, TAB_TOP=baseY-TAB_LS*2.5, TAB_BOT=baseY+TAB_LS*2.5;
 const strY=si=>TAB_BOT-si*TAB_LS;
+/* ══ 連桁の寸法は一箇所で持つ（tab-6.22）══
+   L様——「32分音符の描写が綺麗じゃない」。
+
+   32分の桁は三本。一本目を符尾の先端に引き、二本目・三本目は
+   **数字の側へ降りてくる。** ところが符尾の長さは一本目しか
+   勘定に入れていなかった——4弦の32分では、
+
+     符尾の先端（一本目） y=42.4
+     二本目               y=48.4
+     三本目               y=54.4
+     数字の上端           y≒53.6   ← 三本目が 0.8px 食い込む
+
+   **桁が増えたのに、符尾が伸びていない。**
+   五線譜でも、桁が増えれば符尾はそのぶん伸ばす。
+
+   > **束が厚くなるなら、その厚みは符尾が負う。**
+
+   合わせて、太さが一本目だけ 3.2、二本目以降 2.8 とばらついていた。
+   同じ束の中で太さが違う道理は無いので揃える。
+   間隔も 6.0 から詰め、三本束ねても六線に収まる厚みにする。 */
+const BEAM_W=3.0;        /* 桁の太さ（すべて同じ） */
+const BEAM_PITCH=5.4;    /* 桁どうしの間隔（中心から中心へ） */
+const FLAG_PITCH=7;      /* 旗どうしの間隔。`flagsUpSVG`／`flagsDownSVG` と揃える */
 /* ══ 記号は「線と線の間」へ置く（tab-1.99）══
    六線は 9.2px 間隔。記号を線の上に置くと、線と重なって読めない。
    **間（スペース）の中心へ収める。**
@@ -2332,9 +2313,89 @@ function mkMarks(o){
   m.count=Math.max(0,Math.min(8,Math.round(Number(m.count)||0)));
   return m;
 }
+/* ══════════════════════════════════════════
+   パート（tab-6.25）
+
+   L様——「同じ曲でパート別の譜面に切り替えできるボタンが欲しい、
+   可能であれば同時再生も」「テンポ、拍子は連動が当たり前。
+   表示を切り替えするだけで同時再生に影響ないようにできないの？」
+
+   ── 何を分け、何を分けないか ──
+   連動を手作業の写しで保つと、いつか必ずずれる。
+   **ずれようのない持ち方**にする——分けないものは、最初から一つしか置かない。
+
+     小節（拍子・反復・記号・区切り・小節数）… 全パート共通。一つしかない
+     テンポ・調・カポ・チューニング          … 曲が持つ。一つしかない
+     音符                                    … **ここだけ**パートごと
+     音色                                    … パートごとに持てる（書かねば曲に従う）
+
+   「連動させる」のではない。**連動させる対象が存在しない。**
+
+   ── 小節の持ち方 ──
+   小節は音符の束を**パートの数だけ**持つ（`np`）。
+   `bar.notes` はそのうち一つを指す窓で、`bar._pi` が「いまどれを指すか」。
+
+   窓は `defineProperty` で開けてある。ゆえに、
+
+     ・`bar.notes` を読み書きする既存の処理は**一行も変えずに動く**
+     ・`enumerable:false` なので保存には載らない（載るのは `np` だけ）。
+       同じ音符を二重に書き出さず、開き直しても食い違わない
+     ・`_pi` は小節が各々持つ。**どの曲を開いていても取り違えない**
+       （大域の「いまのパート」に頼ると、裏で別の曲を読んだ時に崩れる）
+
+   > **表示の切り替えとは、窓を向け替えることである。**
+   > 音符そのものは動かないので、鳴っている音には何も起こらない。 */
+function mkPart(o){
+  o=o||{};
+  return { id:o.id||uid('pt'), name:o.name||'', sound:normSound(o.sound) };
+}
+/* 小節に「いまのパートの音符」という窓を開ける。
+   既に開いていれば何もしない（二度呼ばれても壊れない） */
+function mkBarMark(o){
+  o=o||{};
+  return { rhythm:o.rhythm||null, noAutoStroke:!!o.noAutoStroke };
+}
+function bindBar(bar){
+  if(!bar||typeof bar!=='object') return bar;
+  const d=Object.getOwnPropertyDescriptor(bar,'notes');
+  if(d&&d.get) return bar;                       /* もう開いている */
+  const init=(d?bar.notes:null)||[];
+  if(!Array.isArray(bar.np)||!bar.np.length) bar.np=[init];
+  /* ══ 印もパートごと（tab-6.26）══
+     L様のご指摘どおり、`rhythm`（定型で置いた印）と `noAutoStroke`
+     （自動の矢印を止める印）は「**その小節の音符がどう作られたか**」を指す。
+     音符がパートごとに違うのだから、印もパートごとでなければ辻褄が合わない。
+
+     1本目を定型で置き、2本目を手で書いた時——共通では、2本目にも
+     「定型で置いた」印が立ち、手で書いた向きが出なくなっていた。
+
+     拍子・反復・区切りとは別物である。あちらは**小節そのもの**の性質ゆえ
+     共通でよい。こちらは**中身**の性質ゆえ、中身と一緒に分かれる。 */
+  if(!Array.isArray(bar.pm)||!bar.pm.length)
+    bar.pm=[mkBarMark({rhythm:bar.rhythm,noAutoStroke:bar.noAutoStroke})];
+  delete bar.notes; delete bar.rhythm; delete bar.noAutoStroke;
+  Object.defineProperty(bar,'_pi',{value:0,writable:true,enumerable:false,configurable:true});
+  Object.defineProperty(bar,'notes',{
+    enumerable:false, configurable:true,
+    get(){ const i=this._pi||0; return this.np[i]||(this.np[i]=[]); },
+    set(v){ this.np[this._pi||0]=v||[]; }
+  });
+  const mk=b=>{ const i=b._pi||0; return b.pm[i]||(b.pm[i]=mkBarMark()); };
+  Object.defineProperty(bar,'rhythm',{
+    enumerable:false, configurable:true,
+    get(){ return mk(this).rhythm; },
+    set(v){ mk(this).rhythm=v||null; }
+  });
+  Object.defineProperty(bar,'noAutoStroke',{
+    enumerable:false, configurable:true,
+    get(){ return mk(this).noAutoStroke; },
+    set(v){ mk(this).noAutoStroke=!!v; }
+  });
+  return bar;
+}
 function mkBar(o){
   o=o||{};
-  return {
+  return bindBar({
     id:o.id||uid('b'),
     timeSig:o.timeSig||null,          // null = meta を継承
     /* 刻みは**書いてなければ曲に合わせる**（tab-1.69）。
@@ -2350,12 +2411,17 @@ function mkBar(o){
       (typeof v==='number'&&v>=1&&v<=SNAP_DIV_MAX)?Math.round(v):null),
     /* この拍は、はねない（イーブン）。はねる曲の中のストレートな刻み用 */
     evenAt:normBeatMap(o.evenAt,v=>(v===true||v===1)?true:null),
-    rhythm:o.rhythm||null,
-    /* 定型で置いた小節（tab-6.05）。自動のピッキング記号を効かせない印。
+    /* ══ 小節の印はパートごと（tab-6.26）══
+       `rhythm`（定型で置いた印）と `noAutoStroke`（自動の矢印を止める印）は
+       `pm` が束で持ち、`bar.rhythm`・`bar.noAutoStroke` はその窓。
        保存に載せる——**画面では消えたのに開き直すと矢印が戻る**のは、
-       いちばんたちの悪い形である（上の `snapAt` と同じ理屈）。 */
-    noAutoStroke:!!o.noAutoStroke,
-    notes:o.notes||[],
+       いちばんたちの悪い形である（上の `snapAt` と同じ理屈）。
+       古い曲は `pm` を持たないので、`bindBar` が今の印を一本目として受ける */
+    pm:(Array.isArray(o.pm)&&o.pm.length)?o.pm.map(mkBarMark)
+      :[mkBarMark({rhythm:o.rhythm,noAutoStroke:o.noAutoStroke})],
+    /* 音符はパートの数だけ持つ（tab-6.25）。`notes` は窓なので保存に載らない。
+       古い曲は `np` を持たないので、今ある音符を一本目のパートとして受ける */
+    np:(Array.isArray(o.np)&&o.np.length)?o.np.map(a=>Array.isArray(a)?a:[]):[o.notes||[]],
     /* ══ 音符に載らないコード（tab-2.97）══
        L様——「空きにはコードが入れられないって出る。入れたい」。
 
@@ -2370,7 +2436,7 @@ function mkBar(o){
     chordAt:normChordAt(o.chordAt),
     marks:mkMarks(o.marks),
     lyrics:o.lyrics||null,            // 将来用の枠
-  };
+  });
 }
 function mkSection(o){
   o=o||{};
@@ -2446,11 +2512,17 @@ function mkSong(o){
       arpWidth:'normal',    // アルペジオの広がり（総幅）'narrow' 40ms / 'normal' 120ms / 'wide' 280ms
       defaultRhythm:null,   // 新しい小節に最初から入れる刻み
     },o.meta||{}),
-    play:normSwing(normDrum(Object.assign({ bpm:96, metro:true, chord:true, drum:null, countIn:1, ramp:0, backing:'off', swapEvery:'off', bend:'normal', swing:null, tone:TONE_DEF, body:BODY_DEF, sustain:SUSTAIN_DEF,
+    play:normSwing(normDrum(Object.assign({ bpm:96, metro:true, chord:true, allParts:true, drum:null, countIn:1, ramp:0, backing:'off', swapEvery:'off', bend:'normal', swing:null, tone:TONE_DEF, body:BODY_DEF, sustain:SUSTAIN_DEF,
       /* エフェクトの摘み（tab-2.99）。**既定は空**——既にある曲を開いた時に、
          勝手に音が変わってはならない */
       preview:true, ring:RING_DEF, fx:normFx(o.play&&o.play.fx) },o.play||{}))),   /* 置いた音をその場で鳴らす（tab-1.74） */
     voicings:o.voicings||{},
+    /* ══ パート（tab-6.25）══
+       最低一本。古い曲は `parts` を持たないので、名無しの一本として受ける。
+       `part` は**いま画面に出しているパート**の位置。保存に載るので、
+       次に開いた時も同じパートが出る */
+    parts:(Array.isArray(o.parts)&&o.parts.length)?o.parts.map(mkPart):[mkPart({name:'パート1'})],
+    part:Math.max(0,(+o.part)||0),
     bars:o.bars||[],
     sections:o.sections||[mkSection({})],
     updatedAt:o.updatedAt||Date.now(),
@@ -2515,6 +2587,54 @@ function newBar(song,opt){
   return b;
 }
 function findBar(song,id){ return song.bars.find(b=>b.id===id)||null; }
+/* ══ パートの出し入れ（tab-6.25）══
+   曲とすべての小節の辻褄を、ここ一箇所で合わせる。
+   小節が持つ音符の束の数は、**常にパートの本数と同じ**でなければならない——
+   足りなければ空で埋め、余れば捨てる。 */
+function partCount(s){ return (s&&s.parts&&s.parts.length)||1; }
+function curPart(s){ return (s&&s.parts&&s.parts[s.part])||null; }
+function alignParts(s){
+  if(!s) return s;
+  if(!Array.isArray(s.parts)||!s.parts.length) s.parts=[mkPart({name:'パート1'})];
+  const n=s.parts.length;
+  s.part=Math.min(Math.max(0,(+s.part)||0),n-1);
+  (s.bars||[]).forEach(b=>{
+    bindBar(b);
+    if(!Array.isArray(b.np)) b.np=[[]];
+    /* ══ 足りない束は、空ではなく休符で埋める（tab-6.25）══
+       空の配列のままでは、その小節は**何も書かれていない**ことになる。
+       譜面として正しいのは「まるごと休み」であって「無」ではない。
+
+       `fillRest` を使わないのは、あれが小節の印（`noAutoStroke`・`rhythm`）
+       まで戻すため。印は**小節が持つ＝全パート共通**の物であり、
+       パートを足しただけで既にあるパートの印を落としてはならぬ。 */
+    while(b.np.length<n){
+      let r=[];
+      try{ r=[{...mkNote({start:0,len:barTicks(s,b),kind:'rest'})}]; }catch(_){ r=[]; }
+      b.np.push(r);
+    }
+    if(b.np.length>n) b.np.length=n;
+    /* 印の束も同じ数だけ（tab-6.26）。足したパートの印は素のまま */
+    if(!Array.isArray(b.pm)||!b.pm.length) b.pm=[mkBarMark()];
+    while(b.pm.length<n) b.pm.push(mkBarMark());
+    if(b.pm.length>n) b.pm.length=n;
+    b._pi=s.part;
+  });
+  return s;
+}
+/* 表示を向け替えるだけ。音符は一つも動かないので、鳴っている音は途切れない */
+function setPart(s,i){
+  if(!s) return;
+  s.part=Math.min(Math.max(0,i|0),partCount(s)-1);
+  (s.bars||[]).forEach(b=>{ bindBar(b); b._pi=s.part; });
+}
+/* 生の JSON から起こした曲に、窓を開け直す（取り消し・読み込みの後） */
+function bindSong(s){ if(s) alignParts(s); return s; }
+/* パートの表示名。名無しなら番号で呼ぶ */
+function partLabel(s,i){
+  const p=s&&s.parts&&s.parts[i];
+  return (p&&p.name)?p.name:('パート'+(i+1));
+}
 
 /* ══ 譜面に出ている小節番号 ══
    `song.bars` の並び順でも、節の中の位置（`pos`）でもない。
@@ -2761,12 +2881,26 @@ function migrate(o){
   if(wasV<2) o=scaleTicksV1(o);
   if(wasV<3) o=snapToDivV2(o);
   const s=mkSong(o);
+  /* ══ パートの数だけ音符を起こす（tab-6.25）══
+     古い曲は `np` を持たず `notes` だけがある——それを一本目として受ける。
+     **束の数はパートの本数に合わせる**。`alignParts` が最後に揃えるが、
+     ここで起こしておかねば中身が素の物（`mkNote` を通っていない）になる */
+  const npN=Math.max(1,(Array.isArray(o.parts)&&o.parts.length)?o.parts.length:1);
+  const mkN=n=>{
+    const nn=mkNote(n); nn.sym=Object.assign({fermata:false,tempo:null,hair:null,pm:false},n.sym||{});
+    return nn;
+  };
   s.bars=(o.bars||[]).map(b=>{
     const nb=mkBar(b);
-    nb.notes=(b.notes||[]).map(n=>{
-      const nn=mkNote(n); nn.sym=Object.assign({fermata:false,tempo:null,hair:null,pm:false},n.sym||{});
-      return nn;
-    });
+    const src=(Array.isArray(b.np)&&b.np.length)?b.np:[b.notes||[]];
+    nb.np=[];
+    for(let i=0;i<npN;i++) nb.np.push((src[i]||[]).map(mkN));
+    /* 印の束も同じ数だけ起こす（tab-6.26）。
+       古い曲は束を持たないので、小節に書いてある印を一本目として受ける */
+    const pms=(Array.isArray(b.pm)&&b.pm.length)?b.pm
+             :[{rhythm:b.rhythm,noAutoStroke:b.noAutoStroke}];
+    nb.pm=[];
+    for(let i=0;i<npN;i++) nb.pm.push(mkBarMark(pms[i]));
     return nb;
   });
   s.sections=(o.sections&&o.sections.length?o.sections:[{}]).map(x=>mkSection(x));
@@ -2790,15 +2924,21 @@ function migrate(o){
     if(n.sym&&n.sym.scratch===true) n.sym.scratch='down';
   }));
 
-  try{ sanitizeTiesAcross(s); }catch(e){}
-
-  /* ══ 開いた時に、あり得ない繋がりを正す ══
-     向きの取り違えは以前の版でも起き得た。ここで直しておかないと、
-     その音符に触れるまで譜面に嘘が残り続ける。
-     直すのは向きだけなので、音そのものは一切変わらない */
-  s.bars.forEach(b=>sanitizeBarLinks(s,b));
+  /* ══ 整えは、全パートに掛ける（tab-6.25）══
+     窓は一本ぶんしか見ていない。向きの取り違えや跨ぐタイの綻びは
+     どのパートにもあり得るので、窓を順に向け替えて全部に掛ける。
+     最後に `alignParts` が本来のパートへ戻す */
+  alignParts(s);
+  for(let pi=0;pi<partCount(s);pi++){
+    setPart(s,pi);
+    try{ sanitizeTiesAcross(s); }catch(e){}
+    s.bars.forEach(b=>sanitizeBarLinks(s,b));
+  }
+  s.part=Math.min(Math.max(0,(+o.part)||0),partCount(s)-1);
+  alignParts(s);
   return s;
 }
+
 
 /* 保存はデバウンス。文字入力のたびに全曲を書き出さない。
    ただし**待つのは一瞬でよい**（tab-4.63）——頁が捨てられるのは前触れなく起こる */
@@ -2848,7 +2988,9 @@ function histFresh(m){
   return m.u===hist.undo.length && m.id===((song&&song.id)||null);
 }
 function snapNow(){ return JSON.stringify(song); }
-function snapBack(s){ return JSON.parse(s); }
+/* 取り消しの控えは生の JSON。起こしたら窓を開け直す（tab-6.25）——
+   開け直さねば `bar.notes` がただの無い値になり、譜面が真っ白になる */
+function snapBack(s){ return bindSong(JSON.parse(s)); }
 function trimHist(){
   while(hist.undo.length>HIST_MAX) hist.undo.shift();
   let tot=0;
@@ -3750,7 +3892,7 @@ function restSVG(name,cx,baseY,dot){
 /* 下向きの符尾に付く旗 */
 function flagsDownSVG(name,stemX,stemBot){
   const n=noteFlags(name); let s='';
-  for(let f=0;f<n;f++){ const y=stemBot-f*7;
+  for(let f=0;f<n;f++){ const y=stemBot-f*FLAG_PITCH;
     s+=`<path d="M ${stemX} ${y} C ${stemX+10} ${y-3} ${stemX+11} ${y-10} ${stemX+6} ${y-16} C ${stemX+11} ${y-9} ${stemX+9} ${y-4} ${stemX} ${y-5} Z" fill="${INK}"/>`; }
   return s;
 }
@@ -3758,7 +3900,7 @@ function flagsDownSVG(name,stemX,stemBot){
    下向きの形を、符尾の先を軸に上下へ裏返す。**別々に描くと形が食い違う。** */
 function flagsUpSVG(name,stemX,stemTop){
   const n=noteFlags(name); let s='';
-  for(let f=0;f<n;f++){ const y=stemTop+f*7;
+  for(let f=0;f<n;f++){ const y=stemTop+f*FLAG_PITCH;
     s+=`<path d="M ${stemX} ${y} C ${stemX+10} ${y+3} ${stemX+11} ${y+10} ${stemX+6} ${y+16} C ${stemX+11} ${y+9} ${stemX+9} ${y+4} ${stemX} ${y+5} Z" fill="${INK}"/>`; }
   return s;
 }
@@ -4682,6 +4824,23 @@ function engrave(s,bar,o){
     return up?Math.min(stemUpTopY,foot-STEM_MIN)
              :Math.max(stemTopY,foot+STEM_MIN);
   }
+  /* ══ 束の厚みは符尾が負う（tab-6.22）══
+     `stemTipOf` が約束しているのは**一本目の桁（または一枚目の旗）**の場所だけ。
+     二本目から先は数字の側へ降りてくるので、束が厚いほど数字に近づく。
+
+     ここで束のぶんだけ先端を向こうへ押し出す。**いちばん内側の一本が、
+     これまで一本目が居た場所に来る**——16分も32分も、数字との間合いは
+     8分と同じになる。
+
+     連桁に入った音は `beamTip`（まとまり側で既に押し出してある）を使う。
+     入らなかった音は旗なので、旗の枚数で数える。 */
+  function tipOfNote(n,up){
+    if(n.beamTip!=null) return n.beamTip;
+    const t=stemTipOf(n.stemStrs,up,n.boxLong);
+    const fl=n.rest?0:noteFlags(n.name);
+    const ex=FLAG_PITCH*Math.max(0,fl-1);
+    return up?(t-ex):(t+ex);
+  }
   const timeX=u=>padL+(u/total)*innerW;
 
   /* 音符を印刷可能な音価へ分解して平坦化 */
@@ -4988,12 +5147,18 @@ function engrave(s,bar,o){
         }
         grp.forEach(k=>{ if(!flat[k].rest) flat[k].up=dir; });
         /* まとまりの先端は、いちばん外側の音が決める（tab-1.93）。
-           そこへ全員の符尾を届かせれば、連桁は一本の水平線になる */
+           そこへ全員の符尾を届かせれば、連桁は一本の水平線になる。
+           さらに**桁の束の厚みぶん**を外へ押し出す（tab-6.22）——
+           いちばん内側の桁が、束の無い時の先端と同じ高さに来る */
+        const lvG=k=>flat[k].rest?flagsOfName(flat[k].name):noteFlags(flat[k].name);
+        const deep=Math.max(1,...grp.map(lvG));
+        const stack=BEAM_PITCH*(deep-1);
         let tip=dir?Infinity:-Infinity;
         notes.forEach(k=>{
           const t2=stemTipOf(flat[k].stemStrs,dir,flat[k].boxLong);
           tip=dir?Math.min(tip,t2):Math.max(tip,t2);
         });
+        tip=dir?(tip-stack):(tip+stack);
         grp.forEach(k=>{ if(!flat[k].rest) flat[k].beamTip=tip; });
       }
       i=grp[grp.length-1]+1;
@@ -5088,7 +5253,7 @@ function engrave(s,bar,o){
   let upTopY=stemUpTopY;
   flat.forEach(n=>{
     if(n.rest||!n.up||!noteHasStem(n.name)) return;
-    const tp=(n.beamTip!=null)?n.beamTip:stemTipOf(n.stemStrs,true,n.boxLong);
+    const tp=tipOfNote(n,true);
     if(tp<upTopY) upTopY=tp;
   });
   /* 文字の y は**下端**なので、足が符尾の先より上へ来るには
@@ -5274,7 +5439,20 @@ function engrave(s,bar,o){
      その丈を積む。積む順は、六線に近い方から——符尾／アクセント／技の文字／連符。 */
   const hasDownStem=flat.some(n=>!n.rest&&!n.up&&noteHasStem(n.name));
   const belowAcc=flat.some(n=>n.accent&&n.head&&!n.brush&&n.up);
-  const stemPad=hasDownStem?16:4;
+  /* ══ 空ける量は、いちばん深い符尾で測る（tab-6.22）══
+     16px の決め打ちであった。桁の束のぶん符尾が伸びるようにした以上、
+     32分を下向きに書けばそこを超える——**決め打ちは実測に負ける。**
+     いちばん下まで届いている符尾の先を見て、桁の太さぶんを足す。
+     16px は今まで通りの下限として残す（今までの見え方を変えないため）。 */
+  let deepStem=TAB_BOT;
+  flat.forEach(n=>{
+    if(n.rest||n.up||!noteHasStem(n.name)) return;
+    const tp=tipOfNote(n,false);
+    if(tp>deepStem) deepStem=tp;
+  });
+  const stemPad=hasDownStem
+    ?Math.max(16,Math.ceil(deepStem-TAB_BOT+BEAM_W/2+2))
+    :4;
   const accBelowY=TAB_BOT+stemPad+11;          /* ›の足。文字は上へ伸びる */
   const belowBase=TAB_BOT+stemPad+(belowAcc?12:0)+(belowSym?24:0)+(belowTrip?10:0);
   const ringY=belowBase+14;                    // let ring の点線
@@ -6739,7 +6917,7 @@ function engrave(s,bar,o){
       const up=!!n.up;
       const sy0v=stemFootOf(n.stemStrs,up,n.boxLong);
       /* まとまりの先端が決まっていればそれ。単独なら自分で出す（tab-1.93） */
-      const sy1v=(n.beamTip!=null)?n.beamTip:stemTipOf(n.stemStrs,up,n.boxLong);
+      const sy1v=tipOfNote(n,up);
       const tick=()=>`<line x1="${(cx-TICK).toFixed(2)}" y1="${sy1v}" x2="${(cx+TICK).toFixed(2)}" y2="${sy1v}" stroke="${INK}" stroke-width="1.6"/>`;
       if(!noteHasStem(n.name)){
         /* 全音符。囲む流儀では丸だけで足りるので、下に何も出さない */
@@ -7209,7 +7387,7 @@ function engrave(s,bar,o){
       const grp=gHead.get(i);
       if(!grp){
         /* まとまりに入らなかった音符は、旗を立てる */
-        if(!gIn.has(i)) g+=flagsSVG(n.name,xs[i],stemTipOf(n.stemStrs,!!n.up,n.boxLong),!!n.up);
+        if(!gIn.has(i)) g+=flagsSVG(n.name,xs[i],tipOfNote(n,!!n.up),!!n.up);
         continue;
       }
       {
@@ -7237,11 +7415,11 @@ function engrave(s,bar,o){
         const lvOf=k=>flat[k].rest?flagsOfName(flat[k].name):noteFlags(flat[k].name);
         const maxLv=Math.max(1,...grp.map(lvOf));
         /* 桁束のいちばん外側。休符を逃がす先はここ（tab-2.70） */
-        const y2=gUp?(beamY+6*(maxLv-1)):(beamY-6*(maxLv-1));
+        const y2=gUp?(beamY+BEAM_PITCH*(maxLv-1)):(beamY-BEAM_PITCH*(maxLv-1));
         const gx0=xs[grp[0]], gx1=xs[grp[grp.length-1]];
-        g+=`<line x1="${gx0}" y1="${beamY}" x2="${gx1}" y2="${beamY}" stroke="${INK}" stroke-width="3.2"/>`;
+        g+=`<line x1="${gx0}" y1="${beamY}" x2="${gx1}" y2="${beamY}" stroke="${INK}" stroke-width="${BEAM_W}"/>`;
         for(let lv=2;lv<=maxLv;lv++){
-          const yL=gUp?(beamY+6*(lv-1)):(beamY-6*(lv-1));
+          const yL=gUp?(beamY+BEAM_PITCH*(lv-1)):(beamY-BEAM_PITCH*(lv-1));
           const nd=grp.map((gi,k)=>{
             if(lvOf(gi)<lv) return false;
             if(flat[gi].rest) return (k>0&&lvOf(grp[k-1])>=lv
@@ -7251,14 +7429,14 @@ function engrave(s,bar,o){
           const lk=grp.map(()=>false);
           grp.forEach((gi,k)=>{
             if(!nd[k]||!nd[k+1]) return;
-            g+=`<line x1="${xs[gi]}" y1="${yL}" x2="${xs[grp[k+1]]}" y2="${yL}" stroke="${INK}" stroke-width="2.8"/>`;
+            g+=`<line x1="${xs[gi]}" y1="${yL}" x2="${xs[grp[k+1]]}" y2="${yL}" stroke="${INK}" stroke-width="${BEAM_W}"/>`;
             lk[k]=true; lk[k+1]=true;
           });
           grp.forEach((gi,k)=>{
             if(!nd[k]||lk[k]) return;
             if(flat[gi].rest) return;             /* 休符に鉤は付かない */
             const dir=(k===grp.length-1)?-1:1;
-            g+=`<line x1="${xs[gi]}" y1="${yL}" x2="${xs[gi]+dir*8}" y2="${yL}" stroke="${INK}" stroke-width="2.8"/>`;
+            g+=`<line x1="${xs[gi]}" y1="${yL}" x2="${xs[gi]+dir*8}" y2="${yL}" stroke="${INK}" stroke-width="${BEAM_W}"/>`;
           });
         }
         /* ══ 二本目の桁は「引いたかどうか」で決める（tab-2.69）══
@@ -8251,30 +8429,27 @@ function openSongTitle(){
 /* ══ セクションごとの音（tab-3.00）══
    音色と摘み一式を束で持たせる。**「曲に従う」を必ず用意すること**——
    一度でも触ったら曲の設定へ戻せない、では困る。 */
-function openSectionSound(si){
-  const sec=song.sections[si]; if(!sec) return;
-  const so=sec.sound||null;
-  const pop=popup('このセクションの音',
-    (sec.name||'（名前なし）')+' … '+(so?'独自の音':'曲ぜんたいに従う'));
-  const re=()=>{ closePop(); render(); openSectionSound(si); };
-  /* 一つでも触れば束ができる。すべて「曲に従う」に戻せば束ごと外す */
+/* ══ 音の板は、セクションもパートも中身が同じ（tab-6.25）══
+   並べる摘みも、「上に従う」の作法も、一つ残らず同じである。
+   二つ書けば片方だけ直す日が必ず来るので、器を一本にし、
+   **どこへ書くか**だけを呼ぶ側から渡す。 */
+function openSoundSheet(cfg){
+  const get=()=>cfg.get()||null;
+  const so=get();
+  const pop=popup(cfg.title,cfg.sub(so));
+  const re=()=>{ closePop(); render(); cfg.again(); };
+  const write=(obj,label)=>{ tx(label,()=>cfg.set(obj)); re(); };
   const put=(k,v,label)=>{
-    tx(label,()=>{
-      const cur=Object.assign({},song.sections[si].sound||{});
-      if(v==null) delete cur[k]; else cur[k]=v;
-      song.sections[si].sound=normSound(cur);
-    });
-    re();
+    const cur=Object.assign({},get()||{});
+    if(v==null) delete cur[k]; else cur[k]=v;
+    write(normSound(cur),label);
   };
   const putFx=(k,v)=>{
-    tx('このセクションのエフェクトを変える',()=>{
-      const cur=Object.assign({},song.sections[si].sound||{});
-      const f=Object.assign({},cur.fx||{});
-      if(v==null||v==='') delete f[k]; else f[k]=v;
-      cur.fx=f;
-      song.sections[si].sound=normSound(cur);
-    });
-    re();
+    const cur=Object.assign({},get()||{});
+    const f=Object.assign({},cur.fx||{});
+    if(v==null||v==='') delete f[k]; else f[k]=v;
+    cur.fx=f;
+    write(normSound(cur),cfg.fxLabel);
   };
   const cur=k=>(so&&so[k]!=null)?String(so[k]):null;
   const curFx=k=>(so&&so.fx&&so.fx[k]!=null)?String(so.fx[k]):null;
@@ -8282,9 +8457,9 @@ function openSectionSound(si){
   const row=(title,list,k,fx)=>{
     const g=pgrp(pop,title);
     const now=fx?curFx(k):cur(k);
-    pbtn(g,'曲に従う',now===null,()=>fx?putFx(k,null):put(k,null,'このセクションの音を曲に戻す'));
+    pbtn(g,'曲に従う',now===null,()=>fx?putFx(k,null):put(k,null,cfg.resetLabel));
     list.forEach(([v,t])=>pbtn(g,t,now===String(v),
-      ()=>fx?putFx(k,v):put(k,v,'このセクションの音を変える')));
+      ()=>fx?putFx(k,v):put(k,v,cfg.setLabel)));
   };
 
   row('音色',TONES.map(t=>[t.id,t.label||t.id]),'tone');
@@ -8304,10 +8479,38 @@ function openSectionSound(si){
 
   if(so){
     const g=pgrp(pop,'まとめて');
-    pbtn(g,'ぜんぶ曲ぜんたいに戻す',false,()=>{
-      tx('このセクションの音を曲に戻す',()=>{ song.sections[si].sound=null; }); re(); });
+    pbtn(g,'ぜんぶ曲ぜんたいに戻す',false,()=>write(null,cfg.resetLabel));
   }
   popClose(pop);
+}
+function openSectionSound(si){
+  const sec=song.sections[si]; if(!sec) return;
+  openSoundSheet({
+    title:'このセクションの音',
+    sub:so=>(sec.name||'（名前なし）')+' … '+(so?'独自の音':'曲ぜんたいに従う'),
+    get:()=>song.sections[si]&&song.sections[si].sound,
+    set:v=>{ song.sections[si].sound=v; },
+    again:()=>openSectionSound(si),
+    setLabel:'このセクションの音を変える',
+    resetLabel:'このセクションの音を曲に戻す',
+    fxLabel:'このセクションのエフェクトを変える',
+  });
+}
+/* ══ パートごとの音（tab-6.25）══
+   セクションに書いてあればそちらが勝つ（`sndForBar` を参照）。
+   パートに書いてなければ曲ぜんたいに従う。 */
+function openPartSound(pi){
+  if(!song||!song.parts[pi]) return;
+  openSoundSheet({
+    title:'このパートの音',
+    sub:so=>partLabel(song,pi)+' … '+(so?'独自の音':'曲ぜんたいに従う'),
+    get:()=>song.parts[pi]&&song.parts[pi].sound,
+    set:v=>{ song.parts[pi].sound=v; try{ clearSndCache(); }catch(_){} },
+    again:()=>openPartSound(pi),
+    setLabel:'このパートの音を変える',
+    resetLabel:'このパートの音を曲に戻す',
+    fxLabel:'このパートのエフェクトを変える',
+  });
 }
 
 function openSongKey(){
@@ -9214,7 +9417,7 @@ function autoTieFor(s,bar,idx,str,force){
   /* (2) 同じ数字 → タイ（手前の音が持つ） */
   if(same){
     if(tieIsHand&&!force) return;
-    if(!tieWhyNot(pv.bar,pv.idx)){ po.t.tie=true; po.t.tieAuto=true; syncTieOut(pv.bar); }
+    if(!tieWhyNot(pv.bar,pv.idx,po.s)){ po.t.tie=true; po.t.tieAuto=true; syncTieOut(pv.bar); }
     return;
   }
   /* (3) 数字が違うのに筆のタイが残っていれば、外す */
@@ -10034,10 +10237,32 @@ function gapHasArc(bar,idx,str,skip){
   if(skip!=='link'&&ob&&ob.t&&ob.t.link) return true;
   return false;
 }
-function tieWhyNot(bar,idx){
+/* ══ 弦を指せば、その弦だけを見る（tab-6.21）══
+   L様——「2つの音を次の音へタイをつけるとき、それぞれ独立してる？
+   ベンドつけると個別にできない気がする」。
+
+   器のほうは tab-1.28 で弦ごとへ移してある。弧も弦ごとに引いている。
+   ところが**この関門だけが音符まるごとで判じていた。**
+   押さえを一つずつ見てはいるのだが、`some`／`find` で拾うので、
+   **一本でも塞がっていれば、残りの弦もまとめて断られる。**
+
+   　3弦 5 ～ 5   ← 掛けたいのはこちら
+   　2弦 7 D 7    ← こちらに戻しが付いている
+
+   この形で 3弦のタイが断られていた。3弦の隙間は空いているのに、
+   2弦の戻しを見て「弧が重なります」と答えていた次第である。
+
+   > **まとめて断るな。塞がっている弦だけを断れ。**
+
+   `str` を渡せば、その弦の押さえだけを見る。渡さなければ今まで通り、
+   音符ぜんたい（＝一本でも通れば通す／一本でも塞がれば断る）で判ずる。 */
+function tieWhyNot(bar,idx,str){
   const n=bar&&bar.notes&&bar.notes[idx];
   if(!n||n.kind==='rest') return '休符からは繋げません';
   if(!n.stops||!n.stops.length) return '押さえの無い音符からは繋げません';
+  /* 見る範囲。弦を指された時は、その一本ぶんだけ */
+  const ss=(str==null)?(n.stops||[]):(n.stops||[]).filter(o=>o.s===str);
+  if(!ss.length) return (STR_LABEL[str]||'')+'弦に押さえがございません';
   /* ══ 弧の載った音からは繋がない（tab-3.59）══
      L様——「タイ、スラーとハンマリングがかぶることがある」。
 
@@ -10054,10 +10279,11 @@ function tieWhyNot(bar,idx){
      **同じことを禁じるなら、書く側と作る側の両方で禁じること。** */
   {
     /* 隙間にもう弧があれば、そこへは引かない（tab-3.81） */
-    const busy=(n.stops||[]).find(o=>typeof o.f==='number'
+    const busy=ss.find(o=>typeof o.f==='number'
       &&gapHasArc(bar,idx,o.s,'tie'));
     if(busy)
-      return 'この音と次の音のあいだには、もう弧がございます。'
+      return (str==null?'この音と次の音のあいだには、もう弧がございます。'
+                       :(STR_LABEL[str]||'')+'弦の、この音と次の音のあいだには、もう弧がございます。')
             +'弧が重なりますので、どちらか一つになさってくださいませ';
     /* ══ 滑り込んだ音も、伸ばせる（tab-4.73）══
        前の音から弧を受けているというだけで、次へ伸ばすことを禁じていた。
@@ -10067,9 +10293,10 @@ function tieWhyNot(bar,idx){
 
        ただし**スライドアウト**（行き先を書かずに滑り落とす印）だけは残す。
        あれは**この音から先へ**引かれる弧なので、タイと同じ隙間で重なる。 */
-    const arc=(n.stops||[]).find(o=>o.t&&o.t.slOut);
+    const arc=ss.find(o=>o.t&&o.t.slOut);
     if(arc)
-      return 'スライドアウトの弧が付いております。弧が重なりますので、'
+      return (str==null?'':(STR_LABEL[str]||'')+'弦に')
+            +'スライドアウトの弧が付いております。弧が重なりますので、'
             +'どちらか一つになさってくださいませ';
   }
   /* ══ ピックスクラッチは繋がらない（tab-2.33）══
@@ -10083,7 +10310,15 @@ function tieWhyNot(bar,idx){
        タイは繋ぐ注釈であって、音を作るものではない。
        次の小節の頭に同じ押さえの音が無ければ、繋ぎようがない。 */
     if((n.start+n.len)<barTicks(song,bar)) return '音符が小節の終わりまで届いておりません';
-    return tieTargetAcross(song,bar,n)?null
+    const tgt=tieTargetAcross(song,bar,n);
+    /* 弦を指されたなら、その弦の相手がいるかまで確かめる。
+       `tieTargetAcross` は「どれか一本でも合えば」で返すので、そのままでは足りない */
+    if(tgt&&str!=null){
+      const me=ss[0], q=(tgt.stops||[]).find(x=>x.s===str);
+      if(!(me&&typeof me.f==='number'&&tieHeadF(q)===me.f))
+        return '次の小節の頭に、'+(STR_LABEL[str]||'')+'弦の同じフレットの音符がございません。先にそちらへ音を置いてくださいませ';
+    }
+    return tgt?null
       :'次の小節の頭に、同じ弦・同じフレットの音符がございません。先にそちらへ音を置いてくださいませ';
   }
   if(nx.kind==='rest') return '次が休符でございます。止まるものへは繋げません';
@@ -10103,7 +10338,7 @@ function tieWhyNot(bar,idx){
      > 弾き手にとっては「そこで鳴る一つの音」に変わりない。
 
      本体と同じ数字なら本体へ、違えば**装飾音符の数字**と比べる。 */
-  const ok=(n.stops||[]).some(o=>{
+  const ok=ss.some(o=>{
     if(typeof o.f!=='number') return false;
     const q=(nx.stops||[]).find(x=>x.s===o.s);
     return tieHeadF(q)===o.f;
@@ -10112,7 +10347,7 @@ function tieWhyNot(bar,idx){
     /* ══ ミュートの時は言い方を変える（tab-1.57）══
        以前は一律に「数字が違えばスラーになります」と申し上げていたが、
        次が × なら**スラーにもならない**。高さが無いのだから繋ぎようがない。 */
-    const anyMute=(n.stops||[]).some(o=>{
+    const anyMute=ss.some(o=>{
       if(typeof o.f!=='number') return false;
       const q=(nx.stops||[]).find(x=>x.s===o.s);
       return !!(q&&typeof q.f!=='number');
@@ -10130,7 +10365,7 @@ function tieWhyNot(bar,idx){
 
        札は塞いだまま（一手で掛かるわけではない）だが、**どこを押せば
        通れるか**を必ず添える。 */
-    const canGrace=(n.stops||[]).some(o=>{
+    const canGrace=ss.some(o=>{
       if(typeof o.f!=='number') return false;
       const q=(nx.stops||[]).find(x=>x.s===o.s);
       if(!q||typeof q.f!=='number') return false;
@@ -10145,7 +10380,7 @@ function tieWhyNot(bar,idx){
   /* ══ 戻し（D）が付いているなら、タイは要らない（tab-1.54）══
      D も「弾き直さない」という指示なので、同じことを二度書くことになる。
      弧は D の側が引いており、譜面の見た目も変わらない。 */
-  const bd=(n.stops||[]).some(o=>{
+  const bd=ss.some(o=>{
     if(typeof o.f!=='number') return false;
     const q=(nx.stops||[]).find(x=>x.s===o.s);
     return !!(q&&q.f===o.f&&q.t&&q.t.link==='bd');
@@ -12656,6 +12891,34 @@ function openTabTech(barId,idx,str,atTick){
                  +'次の音を開いても同じ物が「前の音との繋がり」に出てまいります');
       }
     }
+  }
+
+  /* ══ タイも、この板から掛けられるようにする（tab-6.21）══
+     L様——「2つの音を次の音へタイをつけるとき、それぞれ独立してる？」。
+
+     音符メニューのタイは「全弦まとめて」の道で、その註には
+     **「弦を選んで張りたい時は、その弦の奏法パネルから」**と書いてあった。
+     ところが案内した先に札が無い——弦ごとに掛けられるのは
+     カーソル操作だけであった。**案内した先には、札が要る。**
+
+     ここは `o.t.tie`（この弦の押さえ）を直に触る。
+     H・P は次の音符が持つが、タイは**手前の音が持つ**——
+     すぐ上の組とは持ち主が違うので、組を分けてある。 */
+  {
+    const tg=pgrp(pop,'次の音へタイ');
+    const on=!!t.tie;
+    const twhy=on?null:tieWhyNot(bar,idx,str);
+    pbtn(tg,(twhy?'（不可）':'')+(on?'⌣ タイを外す':'⌣ 次の音へつなぐ'),on,()=>{
+      if(twhy){ toast(twhy); return; }
+      tx(on?'タイを外す':'次の音へつなぐ',()=>{
+        const bb=findBar(song,barId), mm=bb&&bb.notes[idx];
+        const oo=mm&&(mm.stops||[]).find(x=>x.s===str);
+        if(oo){ oo.t=oo.t||{}; if(on) delete oo.t.tie; else oo.t.tie=true; }
+        if(bb){ syncTieOut(bb); sanitizeBarLinks(song,bb); }
+      });
+      re(); },twhy?'dgr':null);
+    pnote(tg,'この弦だけを次の音へ伸ばします。ほかの弦はそのままでございます。'
+            +'押さえた弦をまとめて伸ばしたい時は、音符を長押しして〈タイ〉からどうぞ');
   }
 
   const bg=pgrp(pop,'チョーキング');
@@ -15865,36 +16128,117 @@ function drumForBar(p,nb){
   return p;                      /* 剰余は先頭から使う（切り詰め） */
 }
 
-/* 音源：BD=150→40Hz のピッチ落とし／SN=ノイズ／HH=ノイズ＋7kHzハイパス */
+/* ══ 音源：ことりノームと同じ音に揃えた（tab-6.20）══
+   元は ことりノーム の mdrm を移したものだが、移して以降あちらだけが
+   作り込まれ、こちらは古い形のまま残っていた。改めて写し直す。
+
+     BD … 芯・胴鳴り・ビーターの当たりの三つを重ね、50Hz 以下は落とす
+     SN … 胴（三角波2本）と、帯域を絞ったスナッピー
+     HH … 周波数比の揃わない矩形波6本。開きと閉じの二つを持つ
+
+   HH の段は**開き**へ繋いである（ことりノームのドラムも開きを鳴らす）。
+   閉じ（'hhs'）は今は呼ばれないが、口は開けてある。
+
+   ノイズは毎回作らず、音の器（AC）ごとに一度だけ作って使い回す。
+   器が作り直されれば作り直す——古い器の緩衝は、新しい器では鳴らない。 */
+let _drumNoise=null, _drumNoiseAC=null;
+function drumNoise(){
+  if(_drumNoise&&_drumNoiseAC===AC) return _drumNoise;
+  const len=Math.floor(AC.sampleRate*0.5);
+  const buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  _drumNoise=buf; _drumNoiseAC=AC;
+  return buf;
+}
+function noiseSource(t,dur){
+  const s=AC.createBufferSource();
+  s.buffer=drumNoise();
+  s.loop=true;
+  s.start(t); s.stop(t+dur);
+  return s;
+}
 function mdrm(t,type){
   if(!AC||!DRUMG) return;
+  const bus=DRUMG;
   if(type==='bd'){
+    /* 生のバスドラムに寄せた作り。
+       低音を薄くし、そのぶん胴の「コン」とビーターの「コッ」で輪郭を出す。 */
+    const bus2=AC.createGain(); bus2.gain.value=0.9;
+    const hpf=AC.createBiquadFilter();               /* 50Hz以下を落として重さを抜く */
+    hpf.type='highpass'; hpf.frequency.value=52; hpf.Q.value=0.7;
+    hpf.connect(bus2); bus2.connect(bus);
+
+    /* 芯：落ち方を速くし、着地を高めに取る（低く長く伸ばすと電子音に寄る） */
     const o=AC.createOscillator(), g=AC.createGain();
-    o.connect(g); g.connect(DRUMG);
-    o.frequency.setValueAtTime(150,t);
-    o.frequency.exponentialRampToValueAtTime(40,t+0.1);
-    g.gain.setValueAtTime(0.8,t);
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.15);
-    o.start(t); o.stop(t+0.2);
+    o.type='sine';
+    o.frequency.setValueAtTime(180,t);
+    o.frequency.exponentialRampToValueAtTime(72,t+0.022);
+    o.frequency.exponentialRampToValueAtTime(57,t+0.10);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.72,t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.20,t+0.055);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.19);   /* 余韻は短めに */
+    o.connect(g); g.connect(hpf);
+    o.start(t); o.stop(t+0.24);
+
+    /* 胴鳴り：300Hz付近の短い成分。これがあると木の胴らしさが出る */
+    const ob=AC.createOscillator(), gb=AC.createGain();
+    ob.type='triangle';
+    ob.frequency.setValueAtTime(320,t);
+    ob.frequency.exponentialRampToValueAtTime(190,t+0.03);
+    gb.gain.setValueAtTime(0.22,t);
+    gb.gain.exponentialRampToValueAtTime(0.001,t+0.055);
+    ob.connect(gb); gb.connect(bus2);
+    ob.start(t); ob.stop(t+0.07);
+
+    /* アタック：ビーターが当たる音 */
+    const ns=noiseSource(t,0.03), nf=AC.createBiquadFilter(),
+          nf2=AC.createBiquadFilter(), ng=AC.createGain();
+    nf.type='bandpass'; nf.frequency.value=3600; nf.Q.value=0.8;
+    nf2.type='highpass'; nf2.frequency.value=1200;
+    ng.gain.setValueAtTime(0.42,t);
+    ng.gain.exponentialRampToValueAtTime(0.001,t+0.026);
+    ns.connect(nf); nf.connect(nf2); nf2.connect(ng); ng.connect(bus2);
+
   }else if(type==='sn'){
-    const sr=AC.sampleRate, len=Math.floor(sr*0.1);
-    const buf=AC.createBuffer(1,len,sr), d=buf.getChannelData(0);
-    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
-    const s2=AC.createBufferSource(), g=AC.createGain();
-    s2.buffer=buf; s2.connect(g); g.connect(DRUMG);
-    g.gain.setValueAtTime(0.4,t);
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.1);
-    s2.start(t); s2.stop(t+0.15);
-  }else if(type==='hh'){
-    const sr=AC.sampleRate, len=Math.floor(sr*0.05);
-    const buf=AC.createBuffer(1,len,sr), d=buf.getChannelData(0);
-    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*0.3;
-    const s2=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain();
-    f.type='highpass'; f.frequency.value=7000;
-    s2.buffer=buf; s2.connect(f); f.connect(g); g.connect(DRUMG);
-    g.gain.setValueAtTime(0.25,t);
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.05);
-    s2.start(t); s2.stop(t+0.08);
+    /* 胴：2本の三角波。少しだけピッチが落ちる */
+    [[188,0.30],[336,0.18]].forEach(v=>{
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type='triangle';
+      o.frequency.setValueAtTime(v[0],t);
+      o.frequency.exponentialRampToValueAtTime(v[0]*0.82,t+0.09);
+      g.gain.setValueAtTime(v[1],t);
+      g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+      o.connect(g); g.connect(bus);
+      o.start(t); o.stop(t+0.14);
+    });
+    /* スナッピー：帯域を絞ったノイズ。胴より長く残す */
+    const s1=noiseSource(t,0.22), hp=AC.createBiquadFilter(),
+          bp=AC.createBiquadFilter(), g1=AC.createGain();
+    hp.type='highpass'; hp.frequency.value=1400;
+    bp.type='bandpass'; bp.frequency.value=4200; bp.Q.value=0.55;
+    g1.gain.setValueAtTime(0.0001,t);
+    g1.gain.exponentialRampToValueAtTime(0.62,t+0.002);
+    g1.gain.exponentialRampToValueAtTime(0.12,t+0.06);
+    g1.gain.exponentialRampToValueAtTime(0.001,t+0.20);   /* 響き線の余韻 */
+    s1.connect(hp); hp.connect(bp); bp.connect(g1); g1.connect(bus);
+
+  }else if(type==='hh'||type==='hhs'){
+    /* 金属の濁り：周波数比の揃わない矩形波6本をバンドパスに通す */
+    const open=(type==='hh'), dur=open?0.075:0.045;
+    const ratios=[2,3,4.16,5.43,6.79,8.21], base=open?318:404;
+    const bp2=AC.createBiquadFilter(), hp2=AC.createBiquadFilter(), g2=AC.createGain();
+    bp2.type='bandpass'; bp2.frequency.value=open?9200:11000; bp2.Q.value=0.7;
+    hp2.type='highpass'; hp2.frequency.value=open?7400:9500;
+    g2.gain.setValueAtTime(0.0001,t);
+    g2.gain.exponentialRampToValueAtTime(open?0.30:0.13,t+0.002);
+    g2.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    ratios.forEach(r=>{
+      const o=AC.createOscillator();
+      o.type='square'; o.frequency.value=base*r;
+      o.connect(bp2); o.start(t); o.stop(t+dur+0.02);
+    });
+    bp2.connect(hp2); hp2.connect(g2); g2.connect(bus);
   }
 }
 
@@ -17568,6 +17912,25 @@ let VOICES=[];
    ハンマリング・プリング・スライドは、弦を弾き直さずに
    **鳴っている弦の音程だけを動かす**。そのために直前の声を控えておく。 */
 let LASTV=new Map();
+/* ══ 弦の帳簿を、パートごとに分ける（tab-6.27）══
+   L様——「可能であれば同時再生も」。
+
+   音は「いま何弦が鳴っているか」で管理している（`LASTV`）。
+   二つのパートを同時に鳴らすと**両方が同じ3弦を使う**ので、
+   後から来た方が前の音を消してしまう——ギターが二本あるのに、
+   器は弦を六本しか数えていなかった。
+
+   ここで分けるのは**帳簿の鍵だけ**である。弦の番号そのものは
+   `strTone` が音色を決めるのに使っており（太い弦は暗く、細い弦は明るい）、
+   番号をずらせば音色まで変わってしまう。
+
+   > **鍵と番号は別物。分けるのは鍵の方だけ。**
+
+   `VK_BASE` はこれから鳴らす出来事のパートを指す。`fireEvent` が
+   出来事ごとに置き換える（`_sndNow` と同じ作法）。 */
+const VK_SPAN=16;              /* 一パートに取っておく鍵の幅。弦は最大でも十数本 */
+let VK_BASE=0;
+function vkOf(str){ return (str==null||str<0)?str:(VK_BASE+str); }
 function pruneVoices(t){
   if(VOICES.length<=180) return;
   VOICES=VOICES.filter(v=>v.offAt>t-0.25);
@@ -17607,7 +17970,7 @@ function dampVoices(t,ms){
     v.vol=Math.max(0.0001,lv); v.relAt=t; v.rel=fade;
     v.offAt=t+fade;
     /* 掌で止めた弦は、もう繋げられない */
-    if(v.str!=null&&v.str>=0&&LASTV.get(v.str)===v) LASTV.delete(v.str);
+    if(v.vk!=null&&v.vk>=0&&LASTV.get(v.vk)===v) LASTV.delete(v.vk);
   });
 }
 function stopAllVoices(t){ dampVoices(t+0.001,60); VOICES=[]; LASTV.clear(); }
@@ -17694,6 +18057,7 @@ function pluckHarmonic(at,midi,vol,cut,kind,vib){
      tab-1.15 で片づけた病が、ハーモニクスにだけ残っていた。 */
   const v={g,vol:Math.max(0.0002,vol*1.15),at,relAt:at+0.008,rel:Math.max(0.01,dur-0.008),offAt:at+dur,
            src:null,pr:null,base:1,midi,str:(opt_str_stash==null?-1:opt_str_stash),
+           vk:vkOf(opt_str_stash==null?-1:opt_str_stash),
            vol0:vol,decT:dur,bq:null,c0:null,harm:true};
   VOICES.push(v); pruneVoices(at);
   return v;
@@ -17716,13 +18080,13 @@ function pluck(at,midi,vol,cut,opt){
        tab-1.46 で入れた掟は `pluck` の末尾にあるが、この分岐は**その手前で返る**。
        ゆえにハーモニクスの時だけ素通りし、前の音のビブラートが下で鳴り続けていた。
        物理の側の決まりなので、音色で分かれてはならない。 */
-    if(opt.str!=null&&opt.str>=0&&!opt.skip) hushVoice(opt.str,at,22);
+    if(opt.str!=null&&opt.str>=0&&!opt.skip) hushVoice(opt.str,at,22);   /* 鍵は hushVoice の中で付く */
     /* ハーモニクスは別の音色で作る。ここで分ける */
     midi+=harmShift(opt.harm,opt.fret);
     opt_str_stash=(opt.str==null?-1:opt.str);
     const hv=pluckHarmonic(at,midi,vol,cut,opt.harm,opt.vib);   /* 揺れも渡す（tab-2.21） */
     opt_str_stash=null;
-    if(hv&&opt.str!=null&&opt.str>=0) LASTV.set(opt.str,hv);
+    if(hv&&opt.str!=null&&opt.str>=0){ hv.vk=vkOf(opt.str); LASTV.set(hv.vk,hv); }
     return hv;
   }
   const f=440*Math.pow(2,(midi-69)/12);
@@ -17749,21 +18113,29 @@ function pluck(at,midi,vol,cut,opt){
         const fr=base*Math.pow(2,opt.from.semi/12);
         const d=Math.max(0.02,opt.from.dur);
         pr.setValueAtTime(fr,at);
-        pr.linearRampToValueAtTime(base,at+d);
+        /* 滑って入るのだから、こちらも段で踏む（tab-6.23） */
+        slidePitch(pr,fr,base,at,d,opt.str,(vol||0.2)*0.16);
         cur=base; t=at+d;
         /* 着地は書かれた高さそのもの。endRate / endMidi は動かさない */
       }
       if(opt.glide){
         const to=base*Math.pow(2,opt.glide.semi/12);
+        const gd=Math.max(0.02,opt.glide.dur);
         pr.setValueAtTime(cur,at);
-        pr.linearRampToValueAtTime(to,at+Math.max(0.02,opt.glide.dur));
-        cur=to; t=at+Math.max(0.02,opt.glide.dur);
+        /* ══ 滑りと張りを、ここで分ける（tab-6.23）══
+           `step` が立っていれば滑り——フレットを跨ぐので段で踏む。
+           立っていなければ張り——弦を曲げるので曲線で上がる。 */
+        if(opt.glide.step) slidePitch(pr,cur,to,at,gd,opt.str,(vol||0.2)*0.18);
+        else bendRamp(pr,cur,to,at,gd);
+        cur=to; t=at+gd;
         endRate=to; endMidi=midi+opt.glide.semi;
       }
       if(opt.back){
         const to=base*Math.pow(2,opt.back.semi/12);
-        pr.setValueAtTime(cur,Math.max(t,opt.back.at||t));
-        pr.linearRampToValueAtTime(to,Math.max(t,opt.back.at||t)+Math.max(0.02,opt.back.dur));
+        const bt=Math.max(t,opt.back.at||t);
+        /* 戻しも弦をゆるめる技。フレットは跨がないので曲線（tab-6.23） */
+        pr.setValueAtTime(cur,bt);
+        bendRamp(pr,cur,to,bt,Math.max(0.02,opt.back.dur));
         cur=to; endRate=to; endMidi=midi+opt.back.semi;
       }
       /* ══ ビブラートは、動き終わった先で揺らす（tab-1.45）══
@@ -17828,7 +18200,7 @@ function pluck(at,midi,vol,cut,opt){
               ゆるめる処理が一度も走らなかった。
               `midi` は上げるたびに書き換わるが、こちらは押さえた高さのまま。 */
            midi0:((opt&&opt.midi0!=null)?opt.midi0:midi),
-           str:(opt.str==null?-1:opt.str),
+           str:(opt.str==null?-1:opt.str), vk:vkOf(opt.str==null?-1:opt.str),
            /* vol0 … 弾いた時の音量。レガートで繋ぐ時、ここまで戻す
               decT … バッファに焼き込まれた減衰の時定数（0.001 まで落ちる秒数） */
            /* 途中から鳴らした声は、既にその分だけ痩せている。
@@ -17850,7 +18222,7 @@ function pluck(at,midi,vol,cut,opt){
        `skip` が立っているのは「鳴っている弦を途中から引き継ぐ」道で、
        そちらは既に自分で `hushVoice` を呼んでいる。二重に止めない。 */
     if(!opt.skip) hushVoice(opt.str,at,22);
-    LASTV.set(opt.str,v);
+    v.vk=vkOf(opt.str); LASTV.set(v.vk,v);
   }
   return v;
 }
@@ -17858,6 +18230,110 @@ function pluck(at,midi,vol,cut,opt){
    ハンマリング・プリングには、ピックとは別の「打つ・引っ掛ける」当たりがある。
    これが無いと、音量を揃えても輪郭がぼやけて小さく聞こえる。
    ピックより低く短い、鈍い一撃にする。 */
+/* ══ 滑りは、フレットを跨いでゆく（tab-6.23）══
+   L様——「スライドがベンドと同じに聞こえる」。
+
+   聞こえるはずである。**どちらも同じ直線で音程を移していた。**
+   違いは掛ける時間だけ（滑り 音価の45%／張り 35%）で、
+   曲線の形も、途中の刻みも、色も同じであった。
+
+   実物では別の出来事である。
+     滑り … 指がフレットを跨ぐ。途中の音が半音ずつ**実際に鳴る**
+     張り … 弦を押し曲げる。フレットは跨がず、連続して上がる
+
+   ゆえに滑りは**段**で動かす。5F から 9F へなら 6・7・8 を踏む。
+   段の中では音程を動かさず、フレットを越える所だけ短く渡る——
+   指は瞬間移動しないが、越える時間は数ミリ秒でしかない。
+
+   段が細かすぎて刻みに聞こえない時（ごく短い滑り、遠いフレット）は、
+   何フレットかまとめて踏む。**踏めない段は、踏まない。** */
+const STEP_MIN=0.016;     /* 一段に要る最短の時間。割るなら段を間引く */
+const STEP_CROSS=0.004;   /* フレットを越えるのに掛ける時間 */
+/* ══ 段の速さは、指が決める（tab-6.24）══
+   L様——「スライドのリズムが狂って聞こえる」。
+
+   滑りに掛ける時間は「音価の45%（最大0.20秒）」であった。これは
+   **なめらかに移す**前提で決めた値で、段を踏む今は長すぎる——
+   ♩=120 の4分音符で4フレット滑ると一段 0.050秒、すなわち32分音符。
+   途中の半音が一つひとつ独立した音に聞こえ、滑りではなく
+   **クロマチックの速弾き**になっていた。
+
+   実物の指は4フレットを 60〜100ms で渡る。一段はおよそ 20ms。
+
+   > **滑る速さは、音価ではなく指が決める。**
+   音価から出した時間は**上限**として残す——長い音符で間延びさせないため。 */
+const STEP_TIME=0.020;    /* 一フレット渡るのに掛かる時間 */
+function stepPlan(from,to,maxDur){
+  const semi=Math.round(12*Math.log(to/from)/Math.LN2);
+  const n=Math.abs(semi);
+  /* 半音一つ、または段を踏む間が無いなら、これまで通り直線で */
+  if(n<2||maxDur<STEP_MIN*2) return {steps:0,stride:1,semi:semi,dur:maxDur};
+  const dur=Math.min(maxDur,Math.max(STEP_MIN*2,n*STEP_TIME));
+  let stride=1;
+  while(stride<n&&dur/Math.ceil(n/stride)<STEP_MIN) stride++;
+  return {steps:Math.max(1,Math.ceil(n/stride)),stride:stride,semi:semi,dur:dur};
+}
+function stepPitch(pr,from,at,plan){
+  if(!plan.steps){
+    pr.linearRampToValueAtTime(from*Math.pow(2,plan.semi/12),at+plan.dur);
+    return 0;
+  }
+  const n=Math.abs(plan.semi), sgn=(plan.semi<0)?-1:1, span=plan.dur/plan.steps;
+  let prev=from;
+  for(let k=1;k<=plan.steps;k++){
+    const sm=(k===plan.steps)?plan.semi:(sgn*Math.min(n,k*plan.stride));
+    const y=from*Math.pow(2,sm/12);
+    const edge=at+span*k;
+    pr.setValueAtTime(prev,Math.max(at,edge-STEP_CROSS));  /* 段の中は動かさない */
+    pr.linearRampToValueAtTime(y,edge);                    /* 越える所だけ渡る */
+    prev=y;
+  }
+  return plan.steps;
+}
+/* 計画から実行まで一息で。着地の頃合いを動かさない道（抜け・グリスイン） */
+function slidePitch(pr,from,to,at,maxDur,str,vol){
+  const plan=stepPlan(from,to,maxDur);
+  stepPitch(pr,from,at,plan);
+  scrapeSteps(at,plan.dur,plan.steps,str,vol);
+  return plan;
+}
+/* ══ フレットを越える擦れ（tab-6.23）══
+   巻き弦（6・5・4弦）は溝が深く、越えるたびにはっきり擦れる。
+   プレーン弦（3・2・1弦）は滑らかなので控えめに。
+   弦は鳴り続けているので、ここで足すのは**擦過そのもの**だけである。 */
+function fretScrape(at,str,vol){
+  if(!AC||!(vol>0)) return;
+  const sr=AC.sampleRate, dur=0.016, len=Math.max(8,Math.round(sr*dur));
+  const buf=AC.createBuffer(1,len,sr), o=buf.getChannelData(0);
+  for(let i=0;i<len;i++){ const e=1-i/len; o[i]=(Math.random()*2-1)*e*e; }
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1800;
+  const bp=AC.createBiquadFilter(); bp.type='bandpass';
+  /* 巻き弦は低め（溝の鳴り）、プレーン弦は高め（表面のこすれ） */
+  const wound=(typeof str==='number'&&str<=2);
+  bp.frequency.value=wound?3200:5200; bp.Q.value=0.9;
+  const g=AC.createGain(); g.gain.value=Math.max(0.0001,vol*(wound?1:0.45));
+  src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(guitarBus()||MASTER);
+  src.start(at); src.stop(at+dur+0.02);
+}
+/* 段のそれぞれに擦れを添える。段そのものは `stepPitch` が刻む */
+function scrapeSteps(at,dur,steps,str,vol){
+  if(!(steps>1)) return;
+  /* 段が多いほど一粒は控える。同じ大きさで並べると鈴を振ったように鳴る */
+  const each=vol/Math.sqrt(steps), span=dur/steps;
+  for(let k=1;k<=steps;k++) fretScrape(at+span*k,str,each);
+}
+/* ══ 張りは、曲線で上がる（tab-6.23）══
+   直線は機械の動きである。指は張力に逆らって押すので、
+   **出だしはためらい、途中で伸び、着地でゆるむ。**
+   滑りを段にした以上、こちらも直線のままでは片手落ちになる。 */
+function bendRamp(pr,from,to,at,dur){
+  const N=7;
+  for(let k=1;k<=N;k++){
+    const u=k/N, e=u*u*(3-2*u);          /* なめらかな S 字 */
+    pr.linearRampToValueAtTime(from+(to-from)*e,at+dur*u);
+  }
+}
 function fingerHit(at,vol,pull){
   if(!AC) return;
   const sr=AC.sampleRate, dur=0.022, len=Math.max(8,Math.round(sr*dur));
@@ -17887,7 +18363,7 @@ function hushOthers(str,at,ms){
   });
 }
 function hushVoice(str,at,ms){
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   if(!v||!v.g||v.offAt<=at) return false;
   const f=(ms||60)/1000;
   try{
@@ -17930,7 +18406,7 @@ function slideOut(s,t,str,midi,t0,dur,vol){
      同じバッファの同じ地点から鳴らせば、波形の状態も音量も倍音も一致する。
      頭から鳴らすから発音に聞こえるのであって、途中から拾えば発音は起きない。
      残るのは位相の食い違いだけで、それは短い入れ替わりで均せる。 */
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   const el=(v&&v.at!=null)?Math.max(0,at-v.at):0;
   const lv=v?Math.max(0.0001,voiceLevelAt(v,at)):vol;
   /* ══ 抜けは「いま鳴っている高さ」から始める（tab-1.65）══
@@ -17948,7 +18424,7 @@ function slideOut(s,t,str,midi,t0,dur,vol){
   hushVoice(str,at,XF*1000);
   pluck(at,from,lv,d*0.78,
         {str:str,soft:true,skip:el,fadeIn:XF,
-         glide:{semi:(t.slOut==='up'?7:-7),dur:d}});
+         glide:{semi:(t.slOut==='up'?7:-7),dur:d,step:true}});
   /* 擦れる音は入れない。弦は鳴り続けており、ここで新たに立つ音は無い */
   return true;
 }
@@ -17960,13 +18436,14 @@ function slideOut(s,t,str,midi,t0,dur,vol){
    焼き込まれた減衰を**押し戻して音量を揃える**。
    抜けは逆に、滑りながら痩せてゆく音である。押し戻しては別物になる。 */
 function glideOut(str,at,semi,dur){
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   if(!v||!v.pr||v.offAt<=at+0.01) return false;
   const to=v.base*Math.pow(2,semi/12);
   try{
     v.pr.cancelScheduledValues(at);
     v.pr.setValueAtTime(v.base,at);
-    v.pr.linearRampToValueAtTime(to,at+dur);
+    /* 抜けも滑りである。フレットを跨いで落ちてゆく（tab-6.23） */
+    slidePitch(v.pr,v.base,to,at,dur,str,(v.vol0||v.vol||0.2)*0.16);
   }catch(e){ return false; }
   /* ══ 焼き込まれた減衰を押し戻してから消す ══
      Karplus-Strong のバッファは、減衰が波形そのものに焼き込まれている。
@@ -17991,7 +18468,7 @@ function glideOut(str,at,semi,dur){
   }catch(e){}
   /* 滑って消えた音を、次の繋ぎの出発点にしない */
   v.offAt=Math.min(v.offAt,at+dur*1.35);
-  LASTV.delete(str);
+  LASTV.delete(vkOf(str));
   return true;
 }
 
@@ -18006,7 +18483,7 @@ function glideOut(str,at,semi,dur){
    `v.midi` は上げ切った先を控えている（`bendVoice` が更新する）。
    素の高さ（`v.midi0`）との差が、いま張られている分。 */
 function bentSemisOf(str,at){
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   if(!v||v.midi==null||v.midi0==null) return 0;
   if(v.offAt<=at+0.005) return 0;          /* もう鳴っていない */
   return Math.max(0,v.midi-v.midi0);
@@ -18084,14 +18561,15 @@ function applyVib(pr,to,vt0,dep,rate,room){
   return t;
 }
 function bendVoice(str,at,semi,dur,vib){
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   if(!v||!v.pr||v.offAt<=at+0.005||v.at>at+0.001) return false;
   const to=v.base*Math.pow(2,semi/12);
   try{
     v.pr.cancelScheduledValues(at);
     v.pr.setValueAtTime(v.base,at);
     const rise=semi?Math.max(0.03,dur):0;
-    if(semi) v.pr.linearRampToValueAtTime(to,at+rise);
+    /* 弦を曲げる技。直線ではなく曲線で上げる（tab-6.23） */
+    if(semi) bendRamp(v.pr,v.base,to,at,rise);
     if(vib){
       /* 上げ切った先で揺らす。丈に収め、終わりは中心へ戻す（tab-1.47 と同じ筋） */
       const vt0=at+rise+0.02;
@@ -18164,7 +18642,7 @@ function bendStartAfter(t0,dur,rise,land,holdMax){
 const BEND_EAR=0.09;
 
 function glideVoice(str,at,midi,opt){
-  const v=LASTV.get(str);
+  const v=LASTV.get(vkOf(str));
   if(!v||!v.pr||v.offAt<=at+0.005||v.at>at+0.001) return false;
   /* 折り返しの断ちを挟む場合は繋がない（周をまたいで滑ってしまう） */
   if(TP&&TP.damps&&TP.damps.some(dt=>dt>v.at&&dt<=at+0.001)) return false;
@@ -18219,15 +18697,42 @@ function glideVoice(str,at,midi,opt){
   }
   const to=v.base*Math.pow(2,(midi-v.midi)/12);
   try{
-    v.pr.cancelScheduledValues(at);
-    v.pr.setValueAtTime(v.base,at);
     /* ハンマリング・プリングは即座に、スライドは少し掛けて移る */
     /* 下限は 0.02（tab-2.65 で 0.05→0.03、tab-2.66 でさらに下げた）。
        〈ごく短い〉装飾音符が 0.028 を頼むので、上で止めると設定が効かない。
        頼まれない限り届かない値なので、ふつうのスライドの手触りは変わらない */
     /* 叩いてあるなら滑らせない（tab-4.49）。呼ぶ側が丈を短く渡してくる */
     const d=(opt&&opt.slide)?Math.max(0.015,Math.min(0.20,opt.dur||0.12)):0.018;
-    v.pr.linearRampToValueAtTime(to,at+d);
+    /* ══ 滑りは段、叩きは一息（tab-6.23）══
+       ハンマリング・プリングはフレットを跨がない（押さえ替えるだけ）ので
+       これまで通り一息で移る。滑りだけが段を踏む。 */
+    if(opt&&opt.slide){
+      /* ══ 着地は、拍の上（tab-6.24）══
+         これまでは**着地する音符の時刻から滑り始めて**いた。
+         ゆえに目的のフレットへ届くのは拍の後——音価の45%ぶん遅れる。
+
+         実演は逆である。前の音を弾いて押さえたまま、**拍の手前で滑り、
+         拍の上で着地する。** 届いてから拍が来るのではない。
+
+         > **滑りは拍へ向かう動きであって、拍から始まる動きではない。**
+
+         ただし手前へ戻せる範囲には限りがある——
+           ・前の音が鳴り始める前へは戻れない（まだ何も鳴っていない）
+           ・いま鳴っている時刻より前へは戻れない（過ぎた時刻は予約できない）
+         戻せないぶんは、これまで通り拍から滑り出す。 */
+      const plan=stepPlan(v.base,to,d);
+      const floor=Math.max((v.at!=null?v.at:0)+0.012,
+                           (AC?AC.currentTime:0)+0.004);
+      const t0s=Math.max(Math.min(at,floor),at-plan.dur);
+      v.pr.cancelScheduledValues(t0s);
+      v.pr.setValueAtTime(v.base,t0s);
+      stepPitch(v.pr,v.base,t0s,plan);
+      scrapeSteps(t0s,plan.dur,plan.steps,str,(v.vol0||0.2)*0.20);
+    }else{
+      v.pr.cancelScheduledValues(at);
+      v.pr.setValueAtTime(v.base,at);
+      v.pr.linearRampToValueAtTime(to,at+d);
+    }
     if(opt&&opt.vib){
       /* 繋いだ先の揺れも、丈に収めて中心で締める（tab-1.47。上の pluck と同じ筋） */
       const vt0=at+d+0.05+Math.max(0,opt.vib.wait||0);   /* 付けた所から（tab-4.95） */
@@ -19161,7 +19666,7 @@ function strumTab(s,at,note,secPerTick,bar,idx){
         const gd=(t.grace.link==='sl')?Math.min(gw2.sl,dur*gw2.rt):0.018;
         if(glideVoice(n.str,t0,n.midi,{slide:(t.grace.link==='sl'),
                                        pull:(t.grace.link==='p'),dur:gd}))
-          v0=LASTV.get(n.str)||null;
+          v0=LASTV.get(vkOf(n.str))||null;
       }
       if(!v0) v0=pluck(t0,midiOut,vol*w,0,opt);
       if(v0&&v0.pr){
@@ -19197,7 +19702,7 @@ function strumTab(s,at,note,secPerTick,bar,idx){
               Object.assign({},opt,{str:(q?-1:n.str)}));
         if(pv) lastV=pv;
       }
-      if(lastV&&n.str!=null&&n.str>=0){ lastV.str=n.str; LASTV.set(n.str,lastV); }
+      if(lastV&&n.str!=null&&n.str>=0){ lastV.str=n.str; lastV.vk=vkOf(n.str); LASTV.set(lastV.vk,lastV); }
       return;
     }
     pluck(t0,midiOut,vol*w*softMul,cut,opt);
@@ -19208,7 +19713,7 @@ function strumTab(s,at,note,secPerTick,bar,idx){
      後から来る「消す手」（`hushOthers`）が避けてくれる。 */
   list.forEach(o=>{
     if(o.mute) return;
-    const v=LASTV.get(o.str); if(!v) return;
+    const v=LASTV.get(vkOf(o.str)); if(!v) return;
     if(sym.ring||(o.t&&o.t.tie)) v.hold=true;
   });
   /* ══ 書いた音価で切る（tab-2.72）══
@@ -20127,7 +20632,6 @@ function clearLoopRange(){
 }
 /* 帯を塗り直す。render() を通さないので、ドラッグ中でも軽い */
 function paintLoopBand(){
-  if(window.SL_TAB_SYNC) setTimeout(window.SL_TAB_SYNC,0);   /* くり返しの範囲が変わったら、上の棚の表示も直す */
   /* ⟳ が切なら帯は出さない。範囲そのものは控えたままなので、
      もう一度入れれば同じ所が戻る */
   const r=TP.loop?loopIdx():null;
@@ -20183,6 +20687,41 @@ function loopWindow(tl){
    最初に決まった窓のまま回り続ける——⟳ が切のまま始めていれば、窓は
    「曲ぜんたい」で確定しており、以後どこを指しても効かない。
    組み直せる形にして、⟳ と範囲の両方から呼ぶ。 */
+/* ══════════════════════════════════════════
+   同時再生（tab-6.27）
+
+   拍子も記号も小節の数も全パートで共通ゆえ、**時刻は必ず一致する。**
+   ならば別の時計を回す必要はない——表に出ているパートの時間割へ、
+   ほかのパートの**音の出来事だけ**を混ぜ込めばよい。
+
+   混ぜるのは音符・ミュート・伴奏の三つだけ。拍・太鼓・小節の切れ目は
+   すでに表のパートが持っているので、重ねれば二重に鳴る。
+
+   線を動かすのも、段を追うのも、これまで通り表のパートの出来事が担う。
+   ゆえに**鳴らしている最中にパートを切り替えても、音には何も起こらない。** */
+const MERGE_KINDS={note:1,mute:1,backing:1};
+function mergeOtherParts(tl){
+  if(!song||!tl||!tl.ev||partCount(song)<2) return tl;
+  if(song.play&&song.play.allParts===false) return tl;
+  const keep=song.part, add=[];
+  for(let pi=0;pi<partCount(song);pi++){
+    if(pi===keep) continue;
+    setPart(song,pi);
+    let t2=null;
+    try{ t2=buildTimeline(song); }catch(e){ t2=null; }
+    if(t2&&t2.ev) t2.ev.forEach(e=>{
+      if(!MERGE_KINDS[e.kind]) return;
+      const o=Object.assign({},e); o._pt=pi; add.push(o);
+    });
+  }
+  setPart(song,keep);
+  try{ clearSndCache(); }catch(_){}
+  if(!add.length) return tl;
+  /* 同じ時刻では、表のパート（印なし）が先。並べ替えは安定なので
+     もともとの順（拍→太鼓→音符）は崩れない */
+  tl.ev=tl.ev.concat(add).sort((a,b)=>(a.t-b.t)||((a._pt||0)-(b._pt||0)));
+  return tl;
+}
 function buildLoopWindow(){
   const tl=TP.tl; if(!tl) return;
   const st=tl.startT;
@@ -20228,7 +20767,7 @@ function playStart(){
   const ac=audioReady();
   if(!ac){ toast('この環境では音を出せません'); return; }
   closePop(); closeDock();
-  TP.tl=buildTimeline(song);
+  TP.tl=mergeOtherParts(buildTimeline(song));
   if(!TP.tl.bars){ toast('鳴らす小節がありません'); return; }
   if(TP.tl.warn) toast(TP.tl.warn);
   VOICES=[]; LASTV.clear();
@@ -20420,22 +20959,34 @@ function playToggle(){
    出し終えたら必ず戻す。**戻し忘れると、以後ずっとその音のままになる。**
    束は毎回引き直すと重いので、小節ごとに控える。 */
 const _secSndCache=new Map();
-function sndForBar(barId){
+function sndForBar(barId,pi){
   if(!barId) return null;
-  if(_secSndCache.has(barId)) return _secSndCache.get(barId);
+  /* ══ 控えはパートごとに分ける（tab-6.27）══
+     小節の名だけを鍵にしていたので、同時に鳴らすと
+     **先に尋ねたパートの音が、もう一方にも使われて**いた。 */
+  const p=(pi==null)?((song&&song.part)||0):pi;
+  const key=p+'|'+barId;
+  if(_secSndCache.has(key)) return _secSndCache.get(key);
   const sec=sectionOfBar(song,barId);
-  const sd=(sec&&sec.sound)?soundAt(song,sec):null;
-  _secSndCache.set(barId,sd);
+  /* ══ 音の決まり方（tab-6.25）══
+     セクション → パート → 曲 の順に、**書いてある物が勝つ。**
+     書いてなければ一つ上に従う。`null` は「上に任せる」であって「なし」ではない */
+  const pt=(song&&song.parts&&song.parts[p])||null;
+  const sd=(sec&&sec.sound)?soundAt(song,sec)
+          :((pt&&pt.sound)?soundAt(song,pt):null);
+  _secSndCache.set(key,sd);
   return sd;
 }
 function clearSndCache(){ _secSndCache.clear(); }
 function fireEvent(e,at){
-  if(e&&e.kind==='beat'&&window.SL_TAB_BEAT){ try{ window.SL_TAB_BEAT(at,e.barId,e.beat); }catch(_){} }   /* 上の棚の位置の表示へ、拍を知らせる */
   /* 音に関わる出来事だけ差し替える。メトロノームやドラムは曲の設定のまま */
   const needSnd=(e.kind==='note'||e.kind==='mute');
-  const prevSnd=_sndNow;
-  if(needSnd) _sndNow=sndForBar(e.barId)||null;
-  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; }
+  const prevSnd=_sndNow, prevVK=VK_BASE;
+  /* どのパートの出来事かで、弦の帳簿の鍵と音の束を切り替える（tab-6.27）。
+     印が無ければ表に出ているパート＝0番の鍵 */
+  VK_BASE=((e._pt||0)*VK_SPAN);
+  if(needSnd) _sndNow=sndForBar(e.barId,e._pt)||null;
+  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; }
 }
 function _fireEvent(e,at){
   if(e.kind==='count'||e.kind==='precount') playCount(at,e.accent);
@@ -20774,12 +21325,6 @@ function scrollHost(){
   }
   return null;
 }
-/* 上の棚の位置の表示（共通の画面の部品）に、曲と再生の様子を渡す窓口。部品が読めない時は使われない */
-window.SL_TAB={
-  now:()=>AC?AC.currentTime:0, playing:()=>TP.playing, disp:()=>_disp, song:()=>song,
-  loop:()=>{ try{ return TP.loop?loopIdx():null; }catch(_){ return null; } },
-  follow:(el)=>{ try{ followBar(el,true); }catch(_){ el.scrollIntoView({block:'center'}); } }
-};
 function setPlayhead(barId){
   if(TP.curBar===barId) return;
   TP.curBar=barId;
@@ -20797,12 +21342,40 @@ function setPlayhead(barId){
    （A4縦・余白15mm ＝ 180mm ≒ 680px） */
 const PRINT_W=680;
 let _printRestore=null, _printGuard=null;
+/* ══ 紙には全パートを並べる（tab-6.25）══
+   L様——「全パート並べる」。
+
+   画面は一度に一本しか出さないが、紙は違う。**紙は一覧である。**
+   渡された者はパートを切り替えられないのだから、
+   そこに無いものは読めない。
+
+   組み方は単純で、パートを順に表へ出し、そのつど組んだ姿を控えて繋ぐ。
+   **組版そのものには一切手を入れない**——同じ `render()` が、
+   同じ幅で、ただ中身を替えて何度か走るだけである。
+
+   パートが一本の曲では見出しも出さない。一本しかない物に
+   「パート1」と書いても、読む者に何も伝わらない。 */
+function printAllParts(){
+  return song&&partCount(song)>1&&!(song.play&&song.play.allParts===false);
+}
 function beginPrintLayout(){
   const paper=$('paper'); if(!paper||_printRestore) return;
   fillPrintHead();
   _printRestore={w:paper.style.width,mw:paper.style.maxWidth};
   paper.style.width=PRINT_W+'px'; paper.style.maxWidth=PRINT_W+'px';
-  render();
+  if(!printAllParts()){ render(); return; }
+  const keep=song.part, html=[];
+  for(let pi=0;pi<partCount(song);pi++){
+    setPart(song,pi);
+    try{ clearSndCache(); }catch(_){}
+    render();
+    html.push('<div class="pt-sheet"><div class="pt-head">'
+      +esc(partLabel(song,pi))+'</div>'+paper.innerHTML+'</div>');
+  }
+  setPart(song,keep);
+  try{ clearSndCache(); }catch(_){}
+  paper.innerHTML=html.join('');
+  _printRestore.stacked=true;
 }
 function endPrintLayout(){
   const paper=$('paper'); if(!paper||!_printRestore) return;
@@ -22143,7 +22716,7 @@ function nselJoin(){
         }
       }
       /* 同じ数字が続くなら**タイ**——弾き直さず伸ばす */
-      if(!tieWhyNot(b,idx)&&!(st.t&&(st.t.link||st.t.slOut))){
+      if(!tieWhyNot(b,idx,st.s)&&!(st.t&&(st.t.link||st.t.slOut))){
         if(!(st.t&&st.t.tie)){ st.t=st.t||{}; st.t.tie=true; nTie++; any=true; }
         return;
       }
@@ -25758,6 +26331,7 @@ const HELP=[
       +'**繋ぐか、滑り込むか、どちらか一つ**でお願いいたします。'
       +'どちらの向きからも同じようにお断りいたします（弧→タイ／タイ→弧）。'
       +'自動生成でも同じ関門を通してございます'],
+    ['タイは弦ごとに掛かります','和音の中の一本だけを次の音へ伸ばせます。弦を選んで掛けるなら、その弦の数字を長押し →〈奏法〉の【次の音へタイ】から。押さえた弦をまとめて伸ばすなら、音符を長押し →【タイ】からでございます。**掛けられるかどうかも弦ごとに見ます**ので、たとえば6弦に「次の音で戻す（D）」が付いていても、5弦のタイはそのまま掛かります'],
     ['タイは音符を作りません','小節線を越えてなぞっても、次の小節に音符は生まれません。**次の小節の頭に同じ弦・同じフレットの音符が既にある時だけ**繋がります。無ければ、越えても何も起きません（先にそちらへ音を置いてくださいませ）'],
     ['休符にした時','休符は「音の無い時間」でございますので、押さえも奏法も繋がりも持ちません。前から伸びてきたタイもそこで切れます。どの道（休符の筆・音符メニュー・選択からまとめて・押さえを外し切る）から休符にしても、休符が持つものは同じでございます'],
     ['どこまでが休符になるか','**道によって範囲が違います。**〈休符の筆〉と〈選ぶ〉からの【休符に】は**叩いた／選んだマスの分だけ**——音符は前後に残ります。音符メニューの〈休符にする〉は**その音符まるごと**でございます。前後に分かれた音符は別々の押さえを持ちますので、片方を直しても、もう片方は動きません'],
@@ -25921,6 +26495,7 @@ const HELP=[
       +'上を叩く操作が成り立たなくなりますゆえ。**コード名はその上に固定**されます'],
     ['タッピング','数字の前に T。右手の指で叩きますので、ピックの当たりではなく指の当たりで鳴ります'],
     ['アーミング','Arm. Down／Up。下げは1オクターブ沈めてから断ち、上げは全音上げて戻します。**タイで伸ばした音にも掛かります**（伸ばしている最中に掛ける技でございますゆえ）。**グリスアウトとは重ねられません**——どちらも音符の終わりで音程を動かす技ですので、重ねるとどちらで抜けるのか決まらなくなります'],
+    ['滑る技と、曲げる技は別の音でございます','**スライド・グリッサンド・グリスイン／アウトはフレットを跨ぐ技**ですので、途中の半音を一段ずつ踏んで鳴ります（5F→9F なら 6・7・8 を通ります）。渡る速さは実物の指に合わせて**1フレットおよそ20ミリ秒**、越えるたびに擦れる音が入り、巻き弦（6〜4弦）のほうがはっきり擦れます。音符から音符への滑りは**拍の手前から滑り、拍の上で着地**いたします——実演と同じく、届いてから拍が来るのではございません。**チョーキングと戻しは弦を押し曲げる技**ですので、フレットは跨がず、出だしがためらい着地でゆるむ曲線で動きます。ごく短い滑りや半音一つの滑りは、踏む間がございませんので今まで通りなめらかに移ります'],
     ['グリスアウトは、いま鳴っている高さから抜けます','チョーキングで上げた先から抜ければ、上げた高さから滑り出します。書かれた数字の高さへ戻ってから抜けるのではございません（戻れば、そこで音が飛んで聞こえます）'],
     ['レイキング','**着地する音の手前で、低音弦側を鈍く撫でます。**見ているのは和音のいちばん高い弦——そこへ向かって撫でますので、和音に6弦が混ざっていても、狙いの音が上の方にあれば付きます。撫でる本数は着地の弦より下にある数（最大3本）。ミュート（×）は勘定に入れません（撫でた跡の印であって、着地する音ではございませんゆえ）。**着地が6弦しかない音符・× だけの音符には付きません**。**× を書いておけば、置いた側にかかわらず、その × がそのまま拾いになります**——目的音の120ms手前から順に鳴り、着地はぴたりと拍の上でございます。× を書いていない時だけ、記号の側が擦過音で補います。いずれも下の弦の実音は鳴りません'],
     ['ピックスクラッチ','◈ 菱形に×の符頭と、斜めの鋸歯。**音符そのものが置き換わります**ので、フレット数字も音程も出ませんし、押さえは鳴りません。ピックが巻き弦の溝を擦る音だけが**音価いっぱい**続きます。〈下降〉はネック側へ擦り下ろす技で鋸歯が右下がり、〈上昇〉はブリッジ側へ擦り上げる技で右上がり。**押さえのデータは消えません**ので、記号を外せば元の数字が戻ります。アルペジオ・レイキング・トレモロとは重ねられません——押さえを鳴らさない音符に、弾き方の記号は載りませんゆえ'],
@@ -25953,6 +26528,14 @@ const HELP=[
     ['候補の絞り方','指の幅が4フレットを超えるもの、高い位置に開放弦が混じるもの、セーハより手前へ指を伸ばす形は出しません'],
     ['六線の上下をタップ','その小節を選びます（〈入力〉と同じ）'],
     ['小節の ⋯','その小節の記号（反復・強弱・速度・拍子）'],
+    ['パートの切り替え（上の帯の左）','同じ曲の中にパートを並べ、釦で表示を切り替えられます。**拍子・テンポ・小節の数は曲ぜんたいで一つ**ですので、パートを変えても揃ったまま。パートごとに違うのは**音符だけ**でございます。表示中のパートの釦をもう一度押すと、名前を変える・音を決める・消す、の口が開きます。右端の【＋】で足せます（8本まで）'],
+    ['印刷は全パートを並べます','紙には**全パートが順に並びます**。パートごとに見出しが付き、二本目からは改ページ。渡された方はパートを切り替えられませんので、そこに無いものは読めないからでございます。【全パートを鳴らす】を切っているときは、表示しているパートだけを刷ります'],
+    ['MIDI も全パートぶん','弦ごとに口（チャンネル）を分けておりますので、一パートで六つ使います。MIDI の口は十六、うち一つは打楽器ですので、**二パートまで**並べられます。それを超える本数のときは表示しているパートだけを書き出し、その旨をお伝えします'],
+    ['曲の書き出し（JSON）はすべて入ります','パートの数に関わらず、書いた音符も名前も音色も丸ごと入ります'],
+    ['全パートが同時に鳴ります','パートが2本以上あれば、再生は**全パートを重ねて**鳴らします。下の帯の【全パートを鳴らす】で切れば、表示しているパートだけになります。拍子もテンポも共通ですので、ずれることはございません'],
+    ['鳴らしている最中でも切り替えられます','表示の切り替えは**音に影響しません。**鳴らしながらパートの釦を押せば、音はそのままで譜面だけが入れ替わります'],
+    ['小節の印もパートごと','**定型で置いた印**と**自動の矢印を止める印**は、パートごとに持ちます。1本目を定型で置き、2本目を手で書く、といった書き分けができます。拍子・反復・区切りは**小節そのものの性質**ですので、こちらは全パート共通でございます'],
+    ['パートごとの音','表示中のパートの釦 →〈このパートの音を決める〉から。**セクションに書いてあればそちらが勝ち**、パートに書いてなければ曲ぜんたいに従います'],
   ], lead:'コード名を入れると、押さえも一緒に TAB へ書き込みます。書き方は設定〈コードを入れた時〉で変えられます。' },
 
   { id:'select', t:'選択（音符）', mode:'select', rows:[
@@ -28808,6 +29391,15 @@ function renderPlayBar(){
     ()=>tx('メトロノームを切り替える',()=>{ song.play.metro=(song.play.metro===false); },FREE));
   mk(sg,'pick','ギターの音',song.play.chord!==false,
     ()=>tx('ギターの音を切り替える',()=>{ song.play.chord=(song.play.chord===false); }));
+  /* ══ 全パートを鳴らす（tab-6.27）══
+     パートが一本きりの曲では出さない——押しても何も変わらない札は、
+     置いてあるだけで迷いの種になる。 */
+  if(partCount(song)>1)
+    mk(sg,'parts','全パートを鳴らす（切ると、表示しているパートだけになります）',
+      song.play.allParts!==false,
+      ()=>tx('全パートを鳴らすかを切り替える',()=>{
+        song.play.allParts=(song.play.allParts===false);
+      },FREE));
   mk(sg,'drum','ドラム',drumOn(),()=>tx('ドラムを切り替える',()=>{
     /* ══ ドラムを持たない曲がある（tab-1.85）══
        `song.play.drum` は既定が `null`。**古い曲や新しい曲では null のまま**なので、
@@ -28909,6 +29501,94 @@ function modeBtns(){
   });
   return g;
 }
+/* ══════════════════════════════════════════
+   パートの切り替え（tab-6.25）
+
+   押せば、その場で向きが変わる。音符は一つも動かないので、
+   鳴っている最中に押しても音は途切れない。
+
+   いま出ているパートをもう一度押すと、名前を変える・足す・消すの口が開く。
+   釦を増やさずに済ませるための作法で、〈輪〉と同じ筋である。 */
+function renderPartBar(){
+  const bar=$('tb-parts'); if(!bar) return;
+  bar.innerHTML='';
+  if(!song) return;
+  alignParts(song);
+  const n=partCount(song);
+  for(let i=0;i<n;i++){
+    const b=document.createElement('button');
+    b.className='pt-btn'+(i===song.part?' on':'');
+    b.textContent=partLabel(song,i);
+    b.title=(i===song.part)?'このパートの名前を変える・足す・消す':(partLabel(song,i)+'へ切り替える');
+    b.onclick=()=>{ if(i===song.part) openPartMenu(); else switchPart(i); };
+    bar.appendChild(b);
+  }
+  const add=document.createElement('button');
+  add.className='pt-btn pt-add';
+  add.textContent='＋';
+  add.title='パートを足す';
+  add.onclick=()=>addPart();
+  bar.appendChild(add);
+}
+/* 表示を向け替える。譜面の書き換えではないので取り消しには積まない */
+function switchPart(i){
+  if(!song||i===song.part) return;
+  setPart(song,i);
+  curCell=null; curAnchor=null;
+  try{ clearSndCache(); }catch(_){}
+  try{ clearBarRateCache(); }catch(_){}
+  touch(); render();
+  toast(partLabel(song,song.part)+'を表示しています');
+}
+function addPart(){
+  if(!song) return;
+  if(partCount(song)>=8){ toast('パートは8本まででございます'); return; }
+  tx('パートを足す',()=>{
+    song.parts.push(mkPart({name:'パート'+(partCount(song)+1)}));
+    alignParts(song);
+    song.part=partCount(song)-1;
+    alignParts(song);
+  });
+  curCell=null; curAnchor=null;
+  try{ clearSndCache(); }catch(_){}
+  render();
+  toast(partLabel(song,song.part)+'を足しました（空の譜面です）');
+}
+function openPartMenu(){
+  const i=song.part;
+  const pop=popup(partLabel(song,i),
+    (partCount(song)>1?(partCount(song)+'本のうち '+(i+1)+'本目'):'いまは1本だけ'));
+  const g=pgrp(pop,'このパート');
+  pbtn(g,'✎ 名前を変える',false,()=>{
+    closePop();
+    const cur=(song.parts[i].name||'');
+    const v=prompt('パートの名前',cur);
+    if(v==null) return;
+    tx('パートの名前',()=>{ song.parts[i].name=String(v).slice(0,20); });
+    render();
+  });
+  pbtn(g,'♪ このパートの音を決める',false,()=>{ closePop(); openPartSound(i); });
+  if(partCount(song)>1){
+    pbtn(g,'🗑 このパートを消す',false,()=>{
+      closePop();
+      if(!confirm(partLabel(song,i)+'を消します。書いた音符も一緒に消えますが、よろしいですか。')) return;
+      tx('パートを消す',()=>{
+        song.parts.splice(i,1);
+        (song.bars||[]).forEach(b=>{
+        if(Array.isArray(b.np)) b.np.splice(i,1);
+        if(Array.isArray(b.pm)) b.pm.splice(i,1);
+      });
+        song.part=Math.max(0,i-1);
+        alignParts(song);
+      });
+      curCell=null; curAnchor=null;
+      try{ clearSndCache(); }catch(_){}
+      render();
+    },'dgr');
+  }
+  pnote(g,'拍子・テンポ・小節の数は曲ぜんたいで一つですので、パートを変えても揃ったままでございます');
+  popClose(pop);
+}
 function renderModeBar(){
   const bar=$('modebar'); if(!bar) return;
   bar.innerHTML='';
@@ -28919,6 +29599,7 @@ function renderModeBar(){
     document.body.classList.toggle('md-'+v,mode===v));
 
   renderPlayBar();
+  renderPartBar();          /* パートの切り替え（tab-6.25）。上の帯の左枠へ */
 
   /* ══ モードの三枚は下の帯へ降ろした（tab-2.86）══
      L様——「入力モードを下の帯に移動して整理したい」。
@@ -31308,7 +31989,7 @@ function bindPaper(){
           const oo=nn&&(nn.stops||[]).find(x=>x.s===c.str); if(oo&&oo.t) oo.t.tie=false;
           if(bb) sanitizeBarLinks(song,bb); });
         toast('タイを外しました'); render(); return; }
-      const why=tieWhyNot(b,idx);
+      const why=tieWhyNot(b,idx,c.str);
       if(why){ toast(why); return; }
       tx('タイ',()=>{
         const bb=findBar(song,c.barId), nn=bb&&bb.notes[idx];
@@ -35564,6 +36245,21 @@ function midiBend(semi){                   /* 半音 → ピッチベンドの�
   const n=Math.max(0,Math.min(16383,Math.round(8192+v*8191)));
   return [n&0x7f,(n>>7)&0x7f];
 }
+/* ══ MIDI の口を、パートぶん広げる（tab-6.25）══
+   弦ごとに口（チャンネル）を分けているので、一パートで六つ使う。
+   MIDI の口は十六、うち 9番は打楽器に取られているから、**十五**。
+   ゆえに二パート（十二口）までは並べられる。
+
+   足りなければ表に出ているパートだけを書き出し、その旨を申し上げる——
+   **黙って落とすのが、いちばんいけない。** */
+const MIDI_CH=[0,1,2,3,4,5,6,7,8,10,11,12,13,14,15];   /* 9番は打楽器ゆえ外す */
+function midiPartsOf(s){
+  const n=partCount(s);
+  if(n<2||(s.play&&s.play.allParts===false)) return [s.part];
+  const fit=Math.floor(MIDI_CH.length/6);
+  if(n<=fit){ const o=[]; for(let i=0;i<n;i++) o.push(i); return o; }
+  return [s.part];
+}
 function buildMidi(s){
   const tl=buildTimeline(s);
   if(!tl||!tl.ev||!tl.ev.length) return null;
@@ -35586,7 +36282,10 @@ function buildMidi(s){
   const ts0=s.meta.timeSig||{n:4,d:4};
   const den=Math.round(Math.log2(ts0.d||4));
   put(0,0,[0xff,0x58,0x04,ts0.n||4,den,24,8]);
-  for(let ch=0;ch<6;ch++){
+  const parts=midiPartsOf(s);
+  const chOf=(pi,str)=>MIDI_CH[parts.indexOf(pi)*6+str];
+  for(const pi of parts) for(let k=0;k<6;k++){
+    const ch=chOf(pi,k);
     /* **一つずつ別の出来事として書く。**MIDI は出来事ごとに刻みの差を要るので、
        まとめて並べると、次の合図が刻みの差として読まれ、その先が全部ずれる */
     put(0,0,[0xb0|ch,101,0]); put(0,0,[0xb0|ch,100,0]);
@@ -35595,9 +36294,17 @@ function buildMidi(s){
     put(0,1,[0xe0|ch].concat(midiBend(0)));
   }
 
-  /* 音符 */
+  /* 音符。表に出ているパートは手元の時間割、ほかは組み直して拾う */
   const VEL=96;
-  tl.ev.forEach(e=>{
+  const keep=s.part;
+  const evsOf=pi=>{
+    if(pi===keep) return tl.ev;
+    setPart(s,pi);
+    let t2=null; try{ t2=buildTimeline(s); }catch(_){ t2=null; }
+    setPart(s,keep);
+    return (t2&&t2.ev)||[];
+  };
+  for(const pi of parts) evsOf(pi).forEach(e=>{
     if(e.kind!=='note'||!e.note) return;
     const nt=e.note;
     if(nt.kind==='rest') return;
@@ -35607,7 +36314,7 @@ function buildMidi(s){
       if(!o||typeof o.f!=='number') return;             /* ✕（ミュート）は音がないので省く */
       const str=o.s;
       if(!(str>=0&&str<6)) return;
-      const ch=str;                                     /* 弦ごとに口を分ける */
+      const ch=chOf(pi,str);                            /* 弦ごと・パートごとに口を分ける */
       const base=(tu.midi[str]|0)+capo+o.f;             /* ② 鳴る通りの高さ */
       if(!(base>=0&&base<=127)) return;
       const on=at(e.t), off=Math.max(on+1,at(e.t+durSec));
@@ -35667,8 +36374,15 @@ function exportMidi(){
     a.download=((song.meta.title||'無題の曲').replace(/[\\/:*?"<>|]/g,'_'))+'.mid';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(u),1500);
+    /* 何本ぶん書けたかは、必ず申し上げる（tab-6.25）——
+       全パートのつもりで受け取って一本しか無ければ、気づくのは先方である */
+    const ps=midiPartsOf(song), np=ps.length;
+    const all=(partCount(song)>1&&np<partCount(song));
     toast('MIDI で書き出しました（ギターのみ・'+(data.length/1024).toFixed(1)+' KB）。'
-         +'弦ごとに口を分けておりますので、受け取る側では6つ並びます',null,null,8000);
+         +(np>1?('パート'+np+'本ぶん、'):'')
+         +'弦ごとに口を分けておりますので、受け取る側では'+(np*6)+'つ並びます'
+         +(all?('。口が足りませんので、'+partLabel(song,song.part)+'だけを書き出しました'):''),
+         null,null,8000);
   }catch(e){ console.error('[MIDI]',e); toast('保存できませんでした'); }
 }
 
@@ -38345,7 +39059,12 @@ window.UTADORI={
   mkNote, mkBar, mkSection, mkSong, demoSong, migrate,
 
   /* ── 曲の出し入れ ── */
-  loadSong, saveSong, switchSong, flushSave, findBar,   /* saveLibrary は下の library の節に一つだけ置く */
+  loadSong, saveSong, switchSong, flushSave, findBar,
+  /* パート（tab-6.25） */
+  mkPart, mkBarMark, bindBar, bindSong, partCount, curPart, alignParts, setPart, partLabel,
+  renderPartBar, switchPart, addPart, openPartMenu, openPartSound, openSoundSheet,
+  mergeOtherParts, sndForBar, clearSndCache, vkOf, get VK_BASE(){ return VK_BASE; },
+  midiPartsOf, printAllParts, beginPrintLayout, endPrintLayout,   /* saveLibrary は下の library の節に一つだけ置く */
   checkSong, checkSong2, openCheckSong, staleCheckSheet,
 
   /* ── 描く ── */
@@ -38489,45 +39208,6 @@ else boot();
 
 })();
 
-</script>
-<script>/* 共通の画面の部品（版 1.2 以上）が読めた時だけ、録音スタジオの卓（夜）にする */
-(function(){
-  if(!(window.DS&&DS.ui&&parseFloat(DS.ui.version)>=1.2&&DS.ui.bridge))return;
-  var T=window.SL_TAB;if(!T)return;
-  var b=document.body;b.classList.add('ds-studio','sl-st');b.setAttribute('data-ds-finish','night');b.setAttribute('data-ds-enter','off');
-  DS.ui.init(b);
-  var tools=document.querySelector('.topbar .tb-tools');if(!tools)return;
-  var el=document.createElement('div');el.id='sl-bridge';tools.parentNode.insertBefore(el,tools);
-  /* 表示順の小節を、中央の表示の 1,2,3… に写す */
-  function idxOf(si,pos){var D=T.disp();for(var i=0;i<D.length;i++){if(D[i].si===si&&D[i].pos===pos)return i;}return -1;}
-  function idxOfBar(barId){var w=document.querySelector('#paper .mwrap[data-bar="'+barId+'"]');if(!w)return -1;return idxOf(+w.getAttribute('data-si'),+w.getAttribute('data-pos'));}
-  var br=DS.ui.bridge(el,{bars:1,beats:4,onJump:function(k){
-    var d=T.disp()[k-1];if(!d)return;var w=document.querySelector('#paper .mwrap[data-si="'+d.si+'"][data-pos="'+d.pos+'"]');if(w)T.follow(w);}});
-  /* 曲の形：区切りの名前と小節の数、くり返しの範囲、拍子 */
-  var last='';
-  function sync(){
-    var D=T.disp(),S=T.song();if(!D||!D.length)return;
-    var secs=[],cur=null;
-    D.forEach(function(d,i){if(!cur||cur.si!==d.si){var nm='';try{nm=(S.sections[d.si]||{}).name||'';}catch(e){}cur={si:d.si,name:nm,from:i+1,to:i+1};secs.push(cur);}else cur.to=i+1;});
-    var r=T.loop(),lp=r?[r[0]+1,r[1]+1]:null;
-    var ts=4;try{var t=(S.meta&&S.meta.timeSig)||S.timeSig;if(t&&t.n)ts=t.n;}catch(e){}
-    var shape={sections:secs.map(function(x){return {name:x.name,from:x.from,to:x.to};}),bars:D.length,loop:lp,beats:ts};
-    var k=JSON.stringify(shape);if(k!==last){last=k;br.set(shape);}
-  }
-  window.SL_TAB_SYNC=sync;
-  new MutationObserver(function(){clearTimeout(sync._t);sync._t=setTimeout(sync,60);}).observe(document.getElementById('paper'),{childList:true});
-  /* 再生：拍の予定を控え、聞こえる時刻になったら位置と拍を進める */
-  var q=[],shown=false,bar=1,raf=null;
-  window.SL_TAB_BEAT=function(at,barId,beat){q.push({at:at,barId:barId,beat:beat});if(!raf)raf=requestAnimationFrame(loop);};
-  function loop(){
-    raf=null;var now=T.now(),hit=null;
-    while(q.length&&q[0].at<=now){hit=q.shift();}
-    if(hit){var i=idxOfBar(hit.barId);if(i>=0){bar=i+1;br.pos(bar,hit.beat,true);shown=true;}}
-    if(T.playing()){raf=requestAnimationFrame(loop);}
-    else{q=[];if(shown){br.pos(bar,0,false);shown=false;}}
-  }
-  setTimeout(sync,0);window.addEventListener('load',function(){setTimeout(sync,50);});
-})();
 </script>
 </body>
 </html>
