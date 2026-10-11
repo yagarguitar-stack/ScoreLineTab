@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.30', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.31', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -7081,10 +7081,26 @@ function engrave(s,bar,o){
       return Math.max(12.6,Math.max.apply(null,bs.map(txtW))+3.6)/2;
     };
     const tieGap=(fe)=>Math.max(5,boxHalfOf(fe)+2);
-    const tieList=(a)=>((a&&a.length)?a:[null]);
+    /* ══ 弦の無いタイは引かない（tab-6.31）══
+       ここは弦の一覧が空なら `[null]` 一本に落としていた。
+       `tieY(null)` は六線のいちばん上なので、弧が**弦を離れて天井へ飛ぶ。**
+       受け側は弦の高さに引くから、両端が合わず斜めに走る——
+       L様の画面に出ていた、あの一本である。
+
+       押さえを持つ音符で弦が割り出せないのは、**器が壊れている**しるし。
+       そういう時は黙って引かないのが正しい——
+       **嘘の弧を描くより、何も描かない方がましである。**
+
+       押さえを持たない音符（斜線の符頭など）は元から弦を持たないので、
+       そちらは今まで通り `[null]` で引く。 */
+    const tieList=(a,fe)=>{
+      if(a&&a.length) return a;
+      if(fe&&fe.stops&&fe.stops.length) return [];   /* 弦があるはずなのに無い＝引かない */
+      return [null];
+    };
 
     if(n.tieInner&&i>0){
-      tieList(n.tieStrs).forEach(si=>{
+      tieList(n.tieStrs,n).forEach(si=>{
         const pb=bendAt(flat[i-1],si);
         const x0=xs[i-1]+(pb?Math.max(7,tieGap(flat[i-1])):tieGap(flat[i-1]));
         const x1=cx-tieGap(n);
@@ -7139,7 +7155,7 @@ function engrave(s,bar,o){
          **隣り合う小節は同じ段に並ぶ**ので、両端を切ると
          宙に浮いた切れ端が向かい合うだけで、一本の弧に見えない。
          小節線で高さを揃えて（y-dep）繋ぎ、次の小節の受けが続きを描く。 */
-      tieList(n.tieOutStrs).forEach(si=>{
+      tieList(n.tieOutStrs,n).forEach(si=>{
         const y=tieY(si), x0=cx+(bendAt(n,si)?Math.max(7,tieGap(n)):tieGap(n)), x1=W-0.5, L=x1-x0;
         if(L<=6) return;
         /* ══ 深さは固定（tab-1.41）══
@@ -7188,7 +7204,7 @@ function engrave(s,bar,o){
     }
     if(n.tieIn){
       /* 前の小節から来た続き。小節線の高さ（y-dep）で受け、数字まで下ろす */
-      tieList(n.tieStrs).forEach(si=>{
+      tieList(n.tieStrs,n).forEach(si=>{
         const y=tieY(si), x0=0.5, x1=cx-tieGap(n), L=x1-x0;
         if(L<=6) return;
         const dep=arcUp?TIE_CROSS_DEP:-TIE_CROSS_DEP;
@@ -8859,9 +8875,16 @@ function setLenAcross(s,bar,i,len){
   nb.notes=(nb.notes||[]).filter(m=>m!==head);
   nb.notes.push(mkNote(cp));
   if(tail>0) nb.notes.push(mkNote({start:over,len:tail,kind:'rest',stops:null}));
-  /* 手前の音は小節の終いまで、そこからタイで繋ぐ */
+  /* 手前の音は小節の終いまで、そこからタイで繋ぐ。
+     印を立てるのは**こぼした先が受け持った弦だけ**（tab-6.31）——
+     ここは押さえを丸ごと写すので今は全弦が揃うが、
+     写し方が変われば食い違いが起きる。**受けを見て決める。** */
   setLen(s,bar,i,room);
-  (bar.notes[i].stops||[]).forEach(o=>{ o.t=o.t||{}; o.t.tie=true; });
+  const got=new Set((cp.stops||[]).map(o=>o.s));
+  (bar.notes[i].stops||[]).forEach(o=>{
+    o.t=o.t||{};
+    if(got.has(o.s)) o.t.tie=true; else delete o.t.tie;
+  });
   syncTieOut(bar);
   normalizeBar(s,nb);
   sanitizeBarLinks(s,nb);
@@ -10184,13 +10207,40 @@ function tieOutHasPartner(s,bar,nb){
 }
 
 /* 小節をまたぐ時、繋ぐ相手になる音符（次の小節の頭。押さえが重なること） */
-function tieTargetAcross(s,bar,note,nbIn){
+/* ══ 相手は、弦ごとに探す（tab-6.31）══
+   L様——「複数の音のタイがおかしい」。
+
+   ここは「**どれか一本でも**同じフレットが合えば相手あり」と答えていた。
+   そして受け取った側は、
+
+     (n.stops||[]).forEach(o=>{ … o.t.tie=true … });
+
+   と**和音の全弦に印を立てる。** 次の小節に一本しか受けが無くても、
+   五本に印が立つ——繋ぐ相手のいない四本は、印だけが宙に残る。
+   描画はその四本ぶんの弧を引こうとして破綻していた。
+
+   tab-6.21 で関門（`tieWhyNot`）は弦ごとに直したが、
+   **書き込む側は手付かずで残っていた。** 関門と筆は対で直さねばならない。
+
+   > **合った弦にだけ、印を立てる。**
+
+   `str` を渡せばその弦だけを見る。渡さなければ今まで通り（どれか一本でも）。
+   `tieStrsAcross` は「相手のいる弦の一覧」を返す——筆はこちらを使う。 */
+function tieTargetAcross(s,bar,note,nbIn,str){
   const nb=nbIn||nextBarOf(s,bar.id); if(!nb) return null;
   const first=firstPlayableOf(nb);         /* 休符始まりでも、鳴る音まで進む（tab-4.45） */
   if(!first) return null;
-  const okAny=(note.stops||[]).some(o=>typeof o.f==='number'
-    &&(first.stops||[]).some(q=>q.s===o.s&&tieHeadF(q)===o.f));
-  return okAny?first:null;
+  const hit=o=>typeof o.f==='number'
+    &&(first.stops||[]).some(q=>q.s===o.s&&tieHeadF(q)===o.f);
+  const ss=(str==null)?(note.stops||[]):(note.stops||[]).filter(o=>o.s===str);
+  return ss.some(hit)?first:null;
+}
+/* 相手のいる弦だけを並べて返す（tab-6.31） */
+function tieStrsAcross(s,bar,note,nbIn){
+  const nb=nbIn||nextBarOf(s,bar.id); if(!nb) return [];
+  const first=firstPlayableOf(nb); if(!first) return [];
+  return (note.stops||[]).filter(o=>typeof o.f==='number'
+    &&(first.stops||[]).some(q=>q.s===o.s&&tieHeadF(q)===o.f)).map(o=>o.s);
 }
 
 /* ══ またぐタイだけを、曲ぜんたいで見直す（tab-1.40）══
@@ -26665,6 +26715,7 @@ const HELP=[
       +'**繋ぐか、滑り込むか、どちらか一つ**でお願いいたします。'
       +'どちらの向きからも同じようにお断りいたします（弧→タイ／タイ→弧）。'
       +'自動生成でも同じ関門を通してございます'],
+    ['小節をまたぐタイも弦ごとです','和音を伸ばして小節線を越えたとき、**次の小節に受けのある弦だけ**にタイが掛かります。受けのない弦には掛かりません。以前の版で受けのない弦に印が残っている譜面は、**開き直せば直ります**'],
     ['タイは弦ごとに掛かります','和音の中の一本だけを次の音へ伸ばせます。弦を選んで掛けるなら、その弦の数字を長押し →〈奏法〉の【次の音へタイ】から。押さえた弦をまとめて伸ばすなら、音符を長押し →【タイ】からでございます。**掛けられるかどうかも弦ごとに見ます**ので、たとえば6弦に「次の音で戻す（D）」が付いていても、5弦のタイはそのまま掛かります'],
     ['タイは音符を作りません','小節線を越えてなぞっても、次の小節に音符は生まれません。**次の小節の頭に同じ弦・同じフレットの音符が既にある時だけ**繋がります。無ければ、越えても何も起きません（先にそちらへ音を置いてくださいませ）'],
     ['休符にした時','休符は「音の無い時間」でございますので、押さえも奏法も繋がりも持ちません。前から伸びてきたタイもそこで切れます。どの道（休符の筆・音符メニュー・選択からまとめて・押さえを外し切る）から休符にしても、休符が持つものは同じでございます'],
@@ -32997,13 +33048,18 @@ function bindPaper(){
       if(drag.spilled) return;               /* 既に割ってある。二重に置かない */
     }
     const tieTo=crossed?tieTargetAcross(song,bar,n):null;
+    /* 印を立てるのは、相手のいる弦だけ（tab-6.31） */
+    const tieSs=tieTo?tieStrsAcross(song,bar,n):[];
     /* 見比べる相手は「前の一手」ではなく **いまの音符そのもの**。
        前の一手で見ると、掴んだ時点で既に付いていたタイを外せない */
     const hasTie=(n.stops||[]).some(o=>o&&o.t&&o.t.tie);
     if(len===n.len&&!!tieTo===hasTie) return;
     drag.tieTo=!!tieTo;
     if(len!==n.len) setLen(song,bar,drag.src,len);
-    (n.stops||[]).forEach(o=>{ o.t=o.t||{}; if(tieTo) o.t.tie=true; else delete o.t.tie; });
+    (n.stops||[]).forEach(o=>{
+      o.t=o.t||{};
+      if(tieTo&&tieSs.indexOf(o.s)>=0) o.t.tie=true; else delete o.t.tie;
+    });
     syncTieOut(bar);
     refreshMeasure(drag.wrap);
   });
@@ -39440,7 +39496,9 @@ window.UTADORI={
   midiPartsOf, printAllParts, beginPrintLayout, endPrintLayout,
   /* 選んだ音の音価（tab-6.29） */
   nselRegions, regNotes, layRegion, nselSetLen, valLabel, VAL_STRAIGHT, VAL_TRIPLET,
-  clone, nkey, newBar, mkNote, barTicks, get nsel(){ return nsel; },   /* saveLibrary は下の library の節に一つだけ置く */
+  clone, nkey, newBar, mkNote, barTicks, get nsel(){ return nsel; },
+  setLenAcross, setLen, noteTieOut, syncTieOut,
+  tieTargetAcross, tieStrsAcross, sanitizeTiesAcross,   /* saveLibrary は下の library の節に一つだけ置く */
   checkSong, checkSong2, openCheckSong, staleCheckSheet,
 
   /* ── 描く ── */
