@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.34', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.35', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -4734,6 +4734,7 @@ function graceFoldPair(s,bar,note){
   return run?{a:run.list[0],b:run.main,list:run.list}:null;
 }
 function engrave(s,bar,o){
+  const _opt=o;   /* 押さえの o に隠れる所から、組みの指図を読むため（tab-6.35） */
   o=o||{};
   const W=Math.max(80,o.width||210);
   const ts=barTS(s,bar);
@@ -6892,7 +6893,15 @@ function engrave(s,bar,o){
                 const tk=Math.max(1.05,Math.min(2.0,0.85+Math.sqrt(L)*0.08));
                 /* 受けは「小節線の高さ」から「この音」へ。掛かりと高さを揃える */
                 const dep=arcUp?TIE_CROSS_DEP:-TIE_CROSS_DEP;
-                mk+=tieHalf(x1,y,x0,y-dep,arcUp,bg,tk);
+                /* ══ 弧の高さは、数字の上（tab-6.35）══
+                   ここは数字の真ん中（`strY`）から引いており、掛かり側（`tieY`）より
+                   9.5px 低かった。**小節線で高さが食い違い、段差になっていた。**
+                   小節の中のスラーと同じ `TIE_Y_OFF` を足す。
+                   同じ段なら一本で引くので、位置だけ控える（tab-6.35） */
+                const ay=y+(arcUp?-TIE_Y_OFF:TIE_Y_OFF);
+                const half=tieHalfFlat(x1,ay,x0,ay-dep,arcUp,tk);
+                if(!_opt.isRowStart) xIn.push({kind:'slur',si:o.s,x:x1,y:ay,up:arcUp,cap:vibCap(o,null),half});
+                else mk+=half;
                 symPlace(x0,x1,0);                    /* またぐ弧も席を取る（tab-4.97） */
                 if(def.t) mk+=`<text x="${((x0+x1)/2).toFixed(2)}" y="${symY((x0+x1)/2,linkTxt(s,lk),9,0).toFixed(2)}" text-anchor="middle" font-size="9" font-weight="800" fill="${INK}">${linkTxt(s,lk)}</text>`;
                 if(wantLinkHits&&n.src>=0)
@@ -7208,7 +7217,7 @@ function engrave(s,bar,o){
           /* 同じ段に次の小節がいる——位置だけ控え、一本の弧は段が組み上がってから。
              繋げなかった時のために、片側の姿も持たせておく */
           const _st=(n.stops||[]).find(q=>q&&q.s===si)||null;
-          xOut.push({si,x:x0,y,up:arcUp,cap:capMin(bendAt(n,si)?TIE_CAP_BEND:null,vibCap(_st,null)),half});
+          xOut.push({kind:'tie',si,x:x0,y,up:arcUp,cap:capMin(bendAt(n,si)?TIE_CAP_BEND:null,vibCap(_st,null)),half});
           /* 席も取る（小節の中のタイと同じ筋。tab-4.97） */
           { const _bow=Math.min(9,2.2+Math.sqrt(Math.max(1,L))*0.62);
             const _apex=y+(arcUp?-_bow:_bow);
@@ -7245,9 +7254,13 @@ function engrave(s,bar,o){
             g+=`<line x1="${(x0+2).toFixed(2)}" y1="${(y+(up?3:-3)).toFixed(2)}" x2="${x1.toFixed(2)}" y2="${(y+(up?-1:1)).toFixed(2)}" stroke="${INK}" stroke-width="1.3"/>`;
           }
           if(def.slur){
-            const bg=Math.max(3.5,Math.min(9,2.2+Math.sqrt(L)*0.62));
+            /* ══ またぐスラーも、同じ段なら一本で（tab-6.35）══
+               タイ（tab-6.34）と同じ筋。**同じ弧は、同じ引き方で。**
+               段が変わる所だけ半分ずつ、小節線で水平に着く。 */
             const tk=Math.max(1.05,Math.min(2.0,0.85+Math.sqrt(L)*0.08));
-            g+=tieHalf(x0,y,x1,y-dep,arcUp,bg,tk);
+            const half=tieHalfFlat(x0,y,x1,y-dep,arcUp,tk);
+            if(!o.isRowEnd) xOut.push({kind:'slur',si:op.s,x:x0,y,up:arcUp,cap:vibCap(op,null),half});
+            else g+=half;
           }
         });
       }
@@ -7263,7 +7276,7 @@ function engrave(s,bar,o){
         const half=tieHalfFlat(x1,y,x0,y-dep,arcUp,tk);
         if(!o.isRowStart){
           const _st=(n.stops||[]).find(q=>q&&q.s===si)||null;
-          xIn.push({si,x:x1,y,up:arcUp,cap:vibCap(_st,null),half});
+          xIn.push({kind:'tie',si,x:x1,y,up:arcUp,cap:vibCap(_st,null),half});
           { const _bow=Math.min(9,2.2+Math.sqrt(Math.max(1,L))*0.62);
             const _apex=y+(arcUp?-_bow:_bow);
             for(let r=0;r<4;r++){
@@ -34272,7 +34285,7 @@ function joinCrossTies(a,b){
   const used=new Set();
   let joined=false;
   outs.forEach(po=>{
-    const k=ins.findIndex((pi,j)=>!used.has(j)&&pi.si===po.si);
+    const k=ins.findIndex((pi,j)=>!used.has(j)&&pi.si===po.si&&(pi.kind||'tie')===(po.kind||'tie'));
     const pi=k<0?null:ins[k];
     if(!pi||!map||pi.up!==po.up){ put(sa,po.half,'xt-out'); return; }
     const [x0,y0]=map(po.x,po.y);
