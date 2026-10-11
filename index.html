@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.36', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.38', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2696,6 +2696,25 @@ function findBar(song,id){ return song.bars.find(b=>b.id===id)||null; }
    小節が持つ音符の束の数は、**常にパートの本数と同じ**でなければならない——
    足りなければ空で埋め、余れば捨てる。 */
 function partCount(s){ return (s&&s.parts&&s.parts.length)||1; }
+/* ══ 時間を動かす記号は、どのパートに書いても曲ぜんたいに効く（tab-6.38）══
+   フェルマータ・rit.・accel.・a tempo は音符に付くので、パートごとに持つ。
+   だが**時間は全パートで一つ**である。書いたパートだけが伸びれば、
+   他のパートは先へ進み、二本がずれて鳴る（実測でフェルマータ一つにつき 1.25秒）。
+   時間を数える所は、すべてのパートの音符を見る。 */
+function partNotesAll(bar){
+  if(!bar) return [];
+  if(!Array.isArray(bar.np)||bar.np.length<2) return (bar.notes||[]).slice();
+  return [].concat(...bar.np.map(ns=>ns||[])).sort((a,b)=>(a.start||0)-(b.start||0));
+}
+/* ══ 曲の形を変える操作は、全パートへ（tab-6.38）══
+   拍子を変える・移調する——**曲そのもの**を変える操作は、
+   表に出ているパートだけでなく、すべてのパートに施す。 */
+function eachPart(s,fn){
+  if(!s) return;
+  const keep=s.part||0, n=partCount(s);
+  try{ for(let i=0;i<n;i++){ setPart(s,i); fn(i); } }
+  finally{ setPart(s,keep); }
+}
 function curPart(s){ return (s&&s.parts&&s.parts[s.part])||null; }
 function alignParts(s){
   if(!s) return s;
@@ -4648,10 +4667,10 @@ function barTempoRate(s,bar){
       seq.forEach(b2=>{
         const mk=b2.bar.marks||{};
         if(mk.tempo) tm.push({tick:b2.tick,kind:mk.tempo});
-        (b2.bar.notes||[]).forEach(n=>{ const sy=n.sym||{};
+        partNotesAll(b2.bar).forEach(n=>{ const sy=n.sym||{};
           if(sy.tempo) tm.push({tick:b2.tick+n.start,kind:sy.tempo}); });
         if(mk.count>0) tm.push({tick:b2.tick,kind:'atempo',auto:true});
-        (b2.bar.notes||[]).forEach(n=>{
+        partNotesAll(b2.bar).forEach(n=>{
           if(n.sym&&n.sym.fermata)
             tm.push({tick:Math.min(b2.tick+b2.tot,b2.tick+n.start+n.len),kind:'atempo',auto:true}); });
         if(mk.fermata) tm.push({tick:b2.tick+b2.tot,kind:'atempo',auto:true});
@@ -8484,7 +8503,8 @@ function tsOverflow(s,n,d){
   const cap=Math.round(n*(4/d)*T.QUARTER);
   const out=[];
   songTsBars(s).forEach(b=>{
-    const end=(b.notes||[]).reduce((a,x)=>Math.max(a,x.start+x.len),0);
+    /* あふれは全パートで数える（tab-6.38）。表のパートが空でも、他で溢れる */
+    const end=partNotesAll(b).reduce((a,x)=>Math.max(a,x.start+x.len),0);
     if(end>cap) out.push({bar:b,end,cap});
   });
   return out;
@@ -8503,7 +8523,7 @@ function fitBar(s,bar){
 function barLoss(s,bar,ts){
   const cap=Math.round(ts.n*(4/ts.d)*T.QUARTER);
   let gone=0,cut=0;
-  (bar.notes||[]).forEach(n=>{
+  partNotesAll(bar).forEach(n=>{     /* 全パート（tab-6.38） */
     if(!n||n.kind==='rest') return;
     if(n.start>=cap) gone++;
     else if(n.start+n.len>cap) cut++;
@@ -8580,7 +8600,7 @@ function openBarTimeSig(barId,si,pos,n,d,own){
     false,()=>{
       if(same){ back(); return; }
       tx(own?'拍子を変える':'拍子を戻す',()=>{
-        bar.timeSig=own?{n,d}:null; fitBar(song,bar);
+        bar.timeSig=own?{n,d}:null; eachPart(song,()=>fitBar(song,bar));   /* 全パート（tab-6.38） */
       });
       back();
       if(L.gone) toast(L.gone+'個の音符が入りきらず消えました','取り消す',()=>{ closePop(); doUndo(); });
@@ -8857,7 +8877,7 @@ function applySongTimeSig(n,d,opt){
   const go=()=>{
     tx('拍子を変える',()=>{
       song.meta.timeSig={n,d};
-      songTsBars(song).forEach(b=>fitBar(song,b));
+      eachPart(song,()=>songTsBars(song).forEach(b=>fitBar(song,b)));   /* 全パート（tab-6.38） */
     });
     renderSettings();
     if(over.length) toast(over.length+'小節を切り詰めました','取り消す',()=>doUndo());
@@ -16074,7 +16094,7 @@ function openBarMenu(barId,si,pos){
     if(mk.count>0) ch('▷ 前に'+mk.count+'拍数える',()=>{mk.count=0;});
     if(mk.hair&&HAIR_L[mk.hair])  ch(HAIR_L[mk.hair],()=>{mk.hair=null;});
     if(mk.text&&mk.text.t) ch('✎ '+mk.text.t,()=>{mk.text=null;});
-    if(bar.timeSig) ch(bar.timeSig.n+'/'+bar.timeSig.d,()=>{ bar.timeSig=null; normalizeBar(song,bar); });
+    if(bar.timeSig) ch(bar.timeSig.n+'/'+bar.timeSig.d,()=>{ bar.timeSig=null; eachPart(song,()=>normalizeBar(song,bar)); });
     const ly=lyricSlots(bar).filter(x=>x.n.lyric).map(x=>x.n.lyric).join('');
     if(ly) ch('♪ '+ly,()=>{ lyricSlots(bar).forEach(x=>{ x.n.lyric=null; }); });
 
@@ -18278,6 +18298,17 @@ function voiceLevelAt(v,t){
   const k=Math.min(1,(t-v.relAt)/Math.max(0.001,v.rel));
   return Math.max(0.0001,v.vol*Math.pow(0.0001/Math.max(0.0001,v.vol),k));
 }
+/* ══ 止めるのは、自分のパートの弦だけ（tab-6.37）══
+   L様——「パートを増やすとタイで繋いだ音が消える」。
+
+   パートを足すと、表に出るのは新しい空のパート——休符ばかりである。
+   休符は「弦を止める」出来事を出す。その出来事が**全パートの弦を止めていた。**
+   1本目でタイで伸ばしている音は、2本目の休符に切られて消えていた。
+
+   止める手は、そのパートの手である。**他のパートの弦には触れない。**
+   出来事を鳴らしている間（`fireEvent`）は、その出来事のパートの弦だけを止める。
+   外から呼ぶ時（周の折り返し・停止）は、これまで通りすべてを止める。 */
+let DAMP_VB=null;
 function dampVoices(t,ms){
   const fade=(ms||45)/1000;
   /* ══ 控えを消すのは、本当に止めた声だけ（tab-1.73）══
@@ -18292,6 +18323,7 @@ function dampVoices(t,ms){
 
      止めた声の控えだけを外す。止めていない声は、そのまま控えに残す。 */
   VOICES.forEach(v=>{
+    if(DAMP_VB!=null&&(v.vb||0)!==DAMP_VB) return;  /* 他のパートの弦（tab-6.37） */
     if(v.at>=t-0.001||v.offAt<=t) return;       /* まだ鳴っていない／もう消えている */
     const lv=voiceLevelAt(v,t);
     try{
@@ -18391,7 +18423,7 @@ function pluckHarmonic(at,midi,vol,cut,kind,vib){
            src:null,pr:null,base:1,midi,str:(opt_str_stash==null?-1:opt_str_stash),
            vk:vkOf(opt_str_stash==null?-1:opt_str_stash),
            vol0:vol,decT:dur,bq:null,c0:null,harm:true};
-  VOICES.push(v); pruneVoices(at);
+  v.vb=VK_BASE; VOICES.push(v); pruneVoices(at);
   return v;
 }
 function pluck(at,midi,vol,cut,opt){
@@ -18542,7 +18574,7 @@ function pluck(at,midi,vol,cut,opt){
               丈と減衰の速さは別物である。ここを取り違えると
               **繋いだ時の押し戻しが効きすぎる／効かなすぎる。** */
            vol0:vol, decT:Math.max(0.2,ksT60(f,tn)), bq, c0};
-  VOICES.push(v); pruneVoices(at);
+  v.vb=VK_BASE; VOICES.push(v); pruneVoices(at);
   if(opt.str!=null&&opt.str>=0){
     /* ══ 同じ弦を弾けば、前の音は止まる（tab-1.46）══
        実弦では当たり前のことだが、ここでは前の声を止めずに
@@ -18688,10 +18720,12 @@ function fingerHit(at,vol,pull){
 /* その弦以外の余韻をすぼめる（tab-2.72）。
    `hold` の立った声（let ring・伸ばしている最中のタイ）には手を触れない */
 function hushOthers(str,at,ms){
+  /* 消すのは同じパートの弦だけ（tab-6.37）。鍵はパートごとに幅を取ってある */
   LASTV.forEach((v,k)=>{
-    if(k===str) return;
+    if(k==null||k<VK_BASE||k>=VK_BASE+VK_SPAN) return;
+    if(k===vkOf(str)) return;
     if(v&&v.hold) return;
-    hushVoice(k,at,ms||45);
+    hushVoice(k-VK_BASE,at,ms||45);
   });
 }
 function hushVoice(str,at,ms){
@@ -20245,7 +20279,7 @@ function leadFor(e){
    一つ目の拍は静かな器の上で鳴る。待たされる感じは出るが、
    **数え始めてから崩れるよりはるかによい。** 摘みで調えられるようにもした。 */
 function startLead(s){
-  const need=(s.bars||[]).some(b=>(b.notes||[]).some(n=>n.sym&&(n.sym.rasg||(n.sym.arp&&arpLandOf(s)==='toBeat'))));
+  const need=(s.bars||[]).some(b=>partNotesAll(b).some(n=>n.sym&&(n.sym.rasg||(n.sym.arp&&arpLandOf(s)==='toBeat'))));   /* 全パート（tab-6.38） */
   const base=need?0.62:0.30;
   if(!REC.on) return base;
   /* 支度を先に済ませるようにしたので（tab-5.88）、既定は短くてよい。
@@ -20290,8 +20324,12 @@ function buildTimeline(s){
   seq.forEach(b=>{
     const mk=b.bar.marks||{};
     if(mk.tempo) tm.push({tick:b.tick,kind:mk.tempo});
-    (b.bar.notes||[]).forEach(n=>{ const sy=n.sym||{};
-      if(sy.tempo) tm.push({tick:b.tick+n.start,kind:sy.tempo}); });
+    /* 全パートの記号を拾う（tab-6.38）。同じ所に同じ記号があれば一つ */
+    const seen=new Set();
+    partNotesAll(b.bar).forEach(n=>{ const sy=n.sym||{};
+      if(!sy.tempo) return;
+      const k=n.start+'|'+sy.tempo; if(seen.has(k)) return; seen.add(k);
+      tm.push({tick:b.tick+n.start,kind:sy.tempo}); });
   });
 
   /* ══ フェルマータと数え込みは、rit./accel. を打ち切る（tab-3.44）══
@@ -20324,8 +20362,8 @@ function buildTimeline(s){
     const mk=b.bar.marks||{};
     /* 数え込みを置いた小節は、その頭から元の速さ */
     if(mk.count>0) tm.push({tick:b.tick,kind:'atempo',auto:true});
-    /* フェルマータは、伸ばし終えた所から元の速さ */
-    (b.bar.notes||[]).forEach(n=>{
+    /* フェルマータは、伸ばし終えた所から元の速さ（全パート。tab-6.38） */
+    partNotesAll(b.bar).forEach(n=>{
       if(n.sym&&n.sym.fermata)
         tm.push({tick:Math.min(b.tick+b.tot,b.tick+n.start+n.len),kind:'atempo',auto:true});
     });
@@ -20352,16 +20390,24 @@ function buildTimeline(s){
   };
 
   /* ③ フェルマータ：その音符を FERMATA_X 倍に伸ばす */
+  /* ══ 伸ばしは全パートを見て、同じ所は長い方を採る（tab-6.38）══
+     パートごとに数えてから重ねる。**足さずに大きい方**——
+     二本が同じ所にフェルマータを書いたなら、それは一つのフェルマータである。 */
   const holds=new Map();
   seq.forEach(b=>{
     const mk=b.bar.marks||{};
-    const ns=(b.bar.notes||[]).filter(n=>n.start<b.tot);
-    const add=(n)=>{ if(!n) return; const at=b.tick+Math.min(b.tot,n.start+n.len);
-      holds.set(at,(holds.get(at)||0)+n.len*(FERMATA_X-1)); };
-    ns.forEach(n=>{ if(n.sym&&n.sym.fermata) add(n); });
-    if(mk.fermata){ const last=ns[ns.length-1];
-      if(last&&!(last.sym&&last.sym.fermata)) add(last);
-      else if(!ns.length) holds.set(b.tick+b.tot,(holds.get(b.tick+b.tot)||0)+b.tot*(FERMATA_X-1)); }
+    const lists=(Array.isArray(b.bar.np)&&b.bar.np.length)?b.bar.np:[b.bar.notes||[]];
+    lists.forEach(raw=>{
+      const ph=new Map();
+      const ns=(raw||[]).filter(n=>n.start<b.tot);
+      const add=(n)=>{ if(!n) return; const at=b.tick+Math.min(b.tot,n.start+n.len);
+        ph.set(at,(ph.get(at)||0)+n.len*(FERMATA_X-1)); };
+      ns.forEach(n=>{ if(n.sym&&n.sym.fermata) add(n); });
+      if(mk.fermata){ const last=ns[ns.length-1];
+        if(last&&!(last.sym&&last.sym.fermata)) add(last);
+        else if(!ns.length) ph.set(b.tick+b.tot,(ph.get(b.tick+b.tot)||0)+b.tot*(FERMATA_X-1)); }
+      ph.forEach((v,k)=>holds.set(k,Math.max(holds.get(k)||0,v)));
+    });
   });
 
   /* ④ はねる（スウィング）
@@ -21084,9 +21130,14 @@ function mergeOtherParts(tl){
   setPart(song,keep);
   try{ clearSndCache(); }catch(_){}
   if(!add.length) return tl;
-  /* 同じ時刻では、表のパート（印なし）が先。並べ替えは安定なので
+  /* ══ 表のパートにも、自分の番号を付ける（tab-6.37）══
+     印の無い出来事は 0番として扱われる。表が 3本目なら、
+     **1本目と表とが同じ 0番の弦を分け合い**、止め合い・繋ぎ合ってしまう。 */
+  tl.ev.forEach(e=>{ if(MERGE_KINDS[e.kind]&&e._pt==null) e._pt=keep; });
+  /* 同じ時刻では、表のパートが先。並べ替えは安定なので
      もともとの順（拍→太鼓→音符）は崩れない */
-  tl.ev=tl.ev.concat(add).sort((a,b)=>(a.t-b.t)||((a._pt||0)-(b._pt||0)));
+  const rk=e=>(e._pt==null||e._pt===keep)?-1:e._pt;
+  tl.ev=tl.ev.concat(add).sort((a,b)=>(a.t-b.t)||(rk(a)-rk(b)));
   return tl;
 }
 function buildLoopWindow(){
@@ -21355,7 +21406,8 @@ function fireEvent(e,at){
      印が無ければ表に出ているパート＝0番の鍵 */
   VK_BASE=((e._pt||0)*VK_SPAN);
   if(needSnd) _sndNow=sndForBar(e.barId,e._pt)||null;
-  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; }
+  const prevDV=DAMP_VB; DAMP_VB=VK_BASE;      /* 止める手は、このパートの手（tab-6.37） */
+  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; DAMP_VB=prevDV; }
 }
 function _fireEvent(e,at){
   if(e.kind==='count'||e.kind==='precount') playCount(at,e.accent);
@@ -33861,7 +33913,7 @@ function tempoWarn(s){
     const mk=b.marks||{};
     if(mk.tempo) marks.push({kind:mk.tempo,stop:false});
     if(mk.count>0) marks.push({kind:'atempo',stop:true});
-    (b.notes||[]).forEach(n=>{
+    partNotesAll(b).forEach(n=>{      /* 全パート（tab-6.38） */
       const sy=n.sym||{};
       if(sy.tempo) marks.push({kind:sy.tempo,stop:false});
       if(sy.fermata) marks.push({kind:'atempo',stop:true});
@@ -34392,7 +34444,7 @@ function fillMeasures(){
       /* 数え込みは、その小節の頭で打ち切る */
       if(open&&mk.count>0&&!mk.tempo){ auto.set(id,true); open=false; }
       /* フェルマータは、伸ばし終えた所——つまり次の小節から */
-      const hasF=(mk.fermata)||(b.notes||[]).some(n=>n.sym&&n.sym.fermata);
+      const hasF=(mk.fermata)||partNotesAll(b).some(n=>n.sym&&n.sym.fermata);   /* 全パート（tab-6.38） */
       if(open&&hasF){ pending=true; open=false; }
     });
     _autoATempo=auto;
@@ -38386,7 +38438,7 @@ function transposeSong(n){
     if(song.meta.key.root!==null) song.meta.key.root=(song.meta.key.root+n)%12;
     const done=new Set();          /* 同じコードの実体を共有していても一度だけ動かす */
     song.bars.forEach(b=>{
-      b.notes.forEach(x=>{
+      partNotesAll(b).forEach(x=>{   /* 全パートのコード名（tab-6.38） */
         x.voicing=null;
         if(!x.chord||done.has(x.chord)) return;
         done.add(x.chord);
