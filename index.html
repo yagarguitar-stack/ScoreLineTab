@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.35', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.36', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2611,7 +2611,8 @@ function mkSong(o){
          **既定を 'short' にした**——tab-2.64 まではふつう（75ms）の決め打ちで、
          教材どおりに弾くより長く聞こえていた。 */
       graceLen:'short',
-      arpLand:'onbeat',     // アルペジオの着地 'onbeat' 拍から始める（記譜の標準）/ 'toBeat' 最後の音が拍に着地
+      arpLand:'toBeat',     // アルペジオの着地 'onbeat' 拍から始める（記譜の標準）/ 'toBeat' 最後の音が拍に着地（既定。tab-6.36）
+                            // 実際に読む時は `arpLandOf` を通す——設定を触っていない曲は 'toBeat'
       arpWidth:'normal',    // アルペジオの広がり（総幅）'narrow' 40ms / 'normal' 120ms / 'wide' 280ms
       defaultRhythm:null,   // 新しい小節に最初から入れる刻み
     },o.meta||{}),
@@ -19456,6 +19457,25 @@ function holdTab(s,at,note,secPerTick){
   });
 }
 
+/* ══ アルペジオの着地は「最後の弦が拍」を既定に（tab-6.36）══
+   L様——「arp が最後の弦がなるタイミングが１拍目に聞こえない」。
+
+   着地の設定（拍から始める／最後の音が拍に着地）は前からあった。
+   だが**読んでいたのはコード名から鳴らす道だけで、TAB の音符は読んでいなかった。**
+   TAB の音符は、どちらを選んでもいつも「拍から始める」で鳴っていた。
+
+   直しは二つ——
+     ・TAB の音符でも設定を読む
+     ・既定を「最後の音が拍に着地」に改める
+
+   古い曲は 'onbeat' を値として保存してある（既定がそれだったゆえ）。
+   それを「選んだ」のか「触っていない」のかは値からは分からない。
+   ゆえに**設定を触った印（`arpLandSet`）が無い曲は、すべて新しい既定で読む。**
+   以前は TAB の音符に効いていなかったので、これで崩れる譜面は無い。 */
+function arpLandOf(s){
+  const m=(s&&s.meta)||{};
+  return m.arpLandSet?(m.arpLand==='onbeat'?'onbeat':'toBeat'):'toBeat';
+}
 function strumTab(s,at,note,secPerTick,bar,idx){
   if(note._hold){ holdTab(s,at,note,secPerTick); return; }
   /* 二重に守る（tab-1.58）。ここへ直に来る道（試験用の口など）もあるため */
@@ -19574,6 +19594,20 @@ function strumTab(s,at,note,secPerTick,bar,idx){
     prevS=n.str;
     offs.push(acc);
   });
+  /* ══ 最後の弦を拍に着地させる（tab-6.36）══
+     渡りの総幅（最後に鳴る弦の遅れ）だけ、全体を手前へずらす。
+     拾いへ回した × は自前の時刻を持つので触れない。
+     手前へずらして過ぎた時刻になったら、いま以降へ寄せる
+     （過ぎた予約は即座に鳴り、弦が一斉に固まるゆえ）。 */
+  if(sym.arp&&!sym.rasg&&acc>0&&arpLandOf(s)==='toBeat'){
+    const floor=AC?AC.currentTime+0.004:0;
+    const sh=Math.min(acc,Math.max(0,at-floor));
+    for(let k=0;k<offs.length;k++){
+      const n=seq[k];
+      if(n.mute&&rakeAt.has(n.str)) continue;
+      offs[k]-=sh;
+    }
+  }
   seq.forEach((n,k)=>{
     if(n.mute){
       /* ══ ミュートは弦を止める処理である ══
@@ -20128,7 +20162,7 @@ function strum(s,at,note,chord,secPerTick){
      記譜の標準は「いちばん下の音が拍の頭」＝広がりは後ろへ伸びる（onbeat）。
      歌の伴奏では「最後の音が拍に着地」させたい場面があり、その時は手前へずらす（toBeat）。
      ラスゲアードは記号の性格上いつも着地させる。 */
-  const land=(sym.rasg||(wide&&s.meta.arpLand==='toBeat'))?(seq.length-1)*spread:0;
+  const land=(sym.rasg||(wide&&arpLandOf(s)==='toBeat'))?(seq.length-1)*spread:0;
   /* 万一その時刻が過ぎていたら、いま以降へ寄せる。
      0 に丸めると遥か過去になり、弦が一斉に鳴ってしまう */
   const floor=AC?AC.currentTime+0.004:0;
@@ -20211,7 +20245,7 @@ function leadFor(e){
    一つ目の拍は静かな器の上で鳴る。待たされる感じは出るが、
    **数え始めてから崩れるよりはるかによい。** 摘みで調えられるようにもした。 */
 function startLead(s){
-  const need=(s.bars||[]).some(b=>(b.notes||[]).some(n=>n.sym&&(n.sym.rasg||(n.sym.arp&&s.meta.arpLand==='toBeat'))));
+  const need=(s.bars||[]).some(b=>(b.notes||[]).some(n=>n.sym&&(n.sym.rasg||(n.sym.arp&&arpLandOf(s)==='toBeat'))));
   const base=need?0.62:0.30;
   if(!REC.on) return base;
   /* 支度を先に済ませるようにしたので（tab-5.88）、既定は短くてよい。
@@ -37710,8 +37744,8 @@ function renderSettings(){
   fld('装飾音符の長さ',sel([['tiny','ごく短い（0.022秒・掠める）'],['short','短い（0.032秒）'],['normal','ふつう（0.05秒）']],song.meta.graceLen||'short',
     v=>tx('装飾音符の長さを変える',()=>{song.meta.graceLen=v;})),false,
     '本体の手前に置く小さい音が、どれだけ耳に居るかです。速い曲ほど短いほうが本体の頭が濁りません。スライドで入る装飾音符は滑っている間も鳴っておりますので、滑る時間も一緒に縮みます。短い音符では自動的に詰まります——**手前の分も滑る分も**、音価に対する割合と、この長さの短いほうを採ります');
-  fld('アルペジオの着地',sel([['onbeat','拍から始める（記譜の標準）'],['toBeat','最後の音が拍に着地する']],song.meta.arpLand||'onbeat',
-    v=>tx('アルペジオの着地を変える',()=>{song.meta.arpLand=v;})),false,
+  fld('アルペジオの着地',sel([['onbeat','拍から始める（記譜の標準）'],['toBeat','最後の音が拍に着地する']],arpLandOf(song),
+    v=>tx('アルペジオの着地を変える',()=>{song.meta.arpLand=v; song.meta.arpLandSet=true;})),false,
     '波線の記号を付けた和音の弾き方です。〈拍から始める〉はいちばん下の弦が拍の頭に来ます。〈最後の音が拍に着地〉は手前から弾き始め、いちばん上の弦が拍に来ます（歌の頭を合わせたい時に）。ラスゲアードは、この設定にかかわらず常に着地します');
   fld('アルペジオの広がり',sel([['narrow','狭い（0.04秒・ほぼ一撃）'],['normal','ふつう（0.12秒）'],['wide','広い（0.28秒）']],song.meta.arpWidth||'normal',
     v=>tx('アルペジオの広がりを変える',()=>{song.meta.arpWidth=v;})),false,
