@@ -577,12 +577,20 @@ body.playing .mwrap{cursor:default}
    取り消し・やり直し・案内文まで下へ降ろしたので、残る物が無い。
    **空の帯は、その丈だけ譜面を狭くする。** */
 body.no-modebar .modebar{display:none}
-/* 帯の締めに置く案内文（tab-2.89）。札の並びを押し出さないよう、折り返しは一行 */
-.bb-hint{
-  flex:1 1 100%;order:99;font-size:11.5px;color:var(--on-ink-dim);
-  line-height:1.35;padding:2px 2px 0;cursor:pointer;
-}
-.bb-hint::after{content:'　ⓘ';color:var(--on-ink-dim);font-size:11px}
+/* ══ 道具の箱（tab-6.41）══ はみ出す分は横になぞる。札は縮めない・折らない */
+.bb-scroll{display:flex;align-items:center;gap:6px;flex:1 1 0;min-width:0;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.bb-scroll::-webkit-scrollbar{display:none}
+.bb-scroll>*:not(.bb-sp){flex-shrink:0}
+.bb-ctx .bb-btn,.bb-ctx .mode-btn,.bb-ctx .bb-lab,.bb-ctx .bb-lab2{white-space:nowrap}
+.bb-ctx>.bb-btn{flex-shrink:0}
+/* 案内文は ⓘ だけにする（tab-6.41。L様の選択）。押せば使い方が開き、
+   指を載せれば文が出る。帯は道具一段だけで、譜面を広く使える */
+.bb-hint{flex:0 0 auto;font-size:0;padding:0 4px;order:0}
+.bb-hint::after{content:'ⓘ';font-size:18px}
+/* 帯の締めに置く案内文（tab-2.89）。tab-6.41 から ⓘ だけを出す——上の指定を見よ */
+.bb-hint{color:var(--on-ink-dim);line-height:1;cursor:pointer}
+.bb-hint::after{color:var(--on-ink-dim)}
 
 /* ── 触れる領域 ─────────────────────────── */
 /* ══ 放射メニュー ══
@@ -1612,7 +1620,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.39', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.41', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -9290,7 +9298,9 @@ function previewStop(str,fret){
     const tu=tuningOf(song), capo=Math.max(0,song.meta.capo||0);
     const midi=tu.midi[str]+capo+fret;
     hushVoice(str,AC.currentTime+0.005,20);
-    pluck(AC.currentTime+0.01,midi,0.26,0.55,{str:str});
+    /* 表のパートの音で鳴らす（tab-6.40） */
+    const _k=_sndNow; _sndNow=partSound(song);
+    try{ pluck(AC.currentTime+0.01,midi,0.26,0.55,{str:str}); } finally { _sndNow=_k; }
   }catch(e){}
 }
 
@@ -16935,6 +16945,48 @@ function ringMode(s){
    `null` なら曲ぜんたいに従う——**予約を出す側が差し込み、出し終えたら戻す。**
    音を出す道（`pluck` 等）は曲を直に見ずに、ここを通す。 */
 let _sndNow=null;
+/* ══ ギターの音は、パートごと（tab-6.40）══
+   L様——「エフェクトも連動しないように」。音色・弦の伸び・胴の鳴り・歪み・エフェクト、
+   ギターの音の設定をすべてパートごとにした。
+
+   器はもとからある——パートの音（`part.sound`、tab-6.25）は曲の設定に上書きできた。
+   **ただ〈曲の設定〉の欄が、曲ぜんたい（`song.play`）を書き換えていた**ので、
+   上書きしていないパートは全部が一緒に変わっていた。
+
+   いま書く先は——
+     ・パートが2本以上ある、または表のパートが自分の音を持つ → 表のパート
+     ・それ以外（パート1本の曲） → これまで通り曲ぜんたい
+   欄に出す値も、表のパートの音（`partSound`）を見る。 */
+function partSound(s){
+  const pt=s&&s.parts&&s.parts[s.part||0];
+  return (pt&&pt.sound)?soundAt(s,pt):null;
+}
+function sndToPart(s){
+  const pt=s&&s.parts&&s.parts[s.part||0];
+  return !!pt&&(partCount(s)>1||!!pt.sound);
+}
+function setSnd(s,k,v){
+  if(!sndToPart(s)){ s.play[k]=v; return; }
+  const pt=s.parts[s.part||0];
+  pt.sound=normSound(Object.assign({},pt.sound||{},{[k]:v}));
+}
+function setSndFx(s,k,v){
+  if(!sndToPart(s)){ s.play.fx=Object.assign({},s.play.fx||{}); s.play.fx[k]=v; return; }
+  const pt=s.parts[s.part||0];
+  const so=Object.assign({},pt.sound||{});
+  so.fx=Object.assign({},so.fx||{},{[k]:v});
+  pt.sound=normSound(so);
+}
+/* 「なし」に戻す。パートの束は曲の束に重ねて読むので、
+   消すのではなく「0」を書く——消すと曲の設定が透けて出る */
+const FX_MAIN=['comp','wah','phaser','chorus','flange','trem','delay','room'];
+function resetSndFx(s){
+  if(!sndToPart(s)){ s.play.fx={}; return; }
+  const pt=s.parts[s.part||0];
+  const so=Object.assign({},pt.sound||{});
+  so.fx={}; FX_MAIN.forEach(k=>{ so.fx[k]='0'; });
+  pt.sound=normSound(so);
+}
 function sndPick(s,k,def){
   if(_sndNow&&_sndNow[k]!=null) return _sndNow[k];
   const v=(s&&s.play)?s.play[k]:undefined;
@@ -23952,13 +24004,21 @@ function renderCtxRow(){
      どの道を通っても最後にこれを呼ぶ。`measureBot` はこの中で済ませる——
      **付け忘れを防ぐため、帯を閉じる手続きを一つにまとめた。** */
   const closeRow=()=>{
-    const sp=document.createElement('span'); sp.className='bb-sp'; row.appendChild(sp);
+    /* ══ 道具は一列のまま、はみ出す分は横へ（tab-6.41）══
+       L様——「ループ押したらやたら帯がデカくなる」。
+       道具が帯の幅を越えると、右端の案内文が細い柱に押し込まれ、
+       **一文字ずつ縦に折れて帯が何段にも伸びていた**（ループでは道具が増えるので必ず起きる）。
+       道具を一つの箱に入れ、はみ出す分は横になぞって見せる。
+       取り消し・やり直し・案内は箱の外——**いつでも右端に見えている。** */
+    const sc=document.createElement('div'); sc.className='bb-scroll';
+    while(row.firstChild) sc.appendChild(row.firstChild);
+    row.appendChild(sc);
     const dv=document.createElement('span'); dv.className='bb-div'; row.appendChild(dv);
     btn('','取り消す（⌘Z）',doUndo,!hist.undo.length,'undo');
     btn('','やり直す（⌘⇧Z）',doRedo,!hist.redo.length,'redo');
     const h=document.createElement('div'); h.className='bb-hint'; h.id='mb-hint-el';
     h.textContent=modeHint();
-    h.title='このモードの使い方';
+    h.title=modeHint()||'このモードの使い方';   /* 文は ⓘ に畳んだので、指を載せれば出す（tab-6.41） */
     h.onclick=openHelpPop;   /* 譜面を隠さない小札。ⓘ は擬似要素で添えてある */
     row.appendChild(h);
     measureBot();
@@ -30202,7 +30262,11 @@ function addPart(){
   if(partCount(song)>=8){ toast('パートは8本まででございます'); return; }
   tx('パートを足す',()=>{
     /* 新しいパートのカポは、表のパートと同じ値から（tab-6.39） */
-    song.parts.push(mkPart({name:'パート'+(partCount(song)+1),capo:(song.meta.capo|0)}));
+    /* 新しいパートの音は、表のパートと同じ音から（tab-6.40）。
+       表のパートが曲の設定に従っていれば、その値を写して持たせる */
+    const _cur=song.parts[song.part||0];
+    const _snd=normSound((_cur&&_cur.sound)?soundAt(song,_cur):soundAt(song,null));
+    song.parts.push(mkPart({name:'パート'+(partCount(song)+1),capo:(song.meta.capo|0),sound:_snd}));
     alignParts(song);
     song.part=partCount(song)-1;
     alignParts(song);
@@ -37510,8 +37574,11 @@ function renderSettings(){
     v=>{ tx('目安線を変える',()=>{ song.meta.grid=v; }); }),false,
     '譜面の薄い縦線でございます。書いている間は〈拍とマス〉が置き場所の目安になり、'
     +'人にお見せする時は〈出さない〉が澄んで見えます。**印刷では元より出ません**');
-  fld('ギターの音色',sel(TONES.map(t=>[t.id,t.label]),song.play.tone||TONE_DEF,
-    v=>{ tx('音色を変える',()=>{song.play.tone=v;},FREE); try{ audioReady(); guitarBus(); }catch(_){} renderSettings(); }),false,
+  /* 音の欄は、表のパートの音を見せる（tab-6.40）。欄を組み終えたら戻す */
+  const _sndKeep=_sndNow; _sndNow=partSound(song);
+  const _ptTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
+  fld('ギターの音色'+_ptTag,sel(TONES.map(t=>[t.id,t.label]),sndPick(song,'tone',TONE_DEF),
+    v=>{ tx('音色を変える',()=>{setSnd(song,'tone',v);},FREE); try{ audioReady(); guitarBus(); }catch(_){} renderSettings(); }),false,
     '音源は持たず、その場で弦の振動を計算しています。端末によって鳴り方が少し変わります');
   fld('置いた音を鳴らす',sel([['on','鳴らす'],['off','鳴らさない']],
     (song.play.preview===false)?'off':'on',
@@ -37528,19 +37595,19 @@ function renderSettings(){
     +'〈切らずに…〉は生のギターに近い鳴り方でございます。'
     +'なお **let ring とタイの音は、どれを選んでも消えません**——伸ばすと書いてあるものは伸びます');
   fld('弦の伸び（サスティーン）',sel(SUSTAIN_AMT,String(sustainAmt(song)),
-    v=>{ tx('弦の伸びを変える',()=>{song.play.sustain=parseFloat(v);},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
+    v=>{ tx('弦の伸びを変える',()=>{setSnd(song,'sustain',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
     '音色ごとの伸びに掛ける加減でございます。太い弦ほど、低い音ほど長く伸び、'
     +'歪ませるほど伸びるという関係はそのままに、全体を伸び縮みさせます。'
     +'長くするほど和音は重なって濁りますので、速い曲では短めが聴き取りやすうございます。'
     +'ハンマリング・プリングを繋ぐか弾き直すかの分かれ目も、これに従います');
   fldOn('胴の鳴り',sel(BODY_AMT,String(bodyAmt(song)),
-    v=>{ tx('胴の鳴りを変える',()=>{song.play.body=parseFloat(v);},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),bodyAmt(song),false,
+    v=>{ tx('胴の鳴りを変える',()=>{setSnd(song,'body',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),bodyAmt(song),false,
     '箱の響きの量です。エレキには元から胴がありません');
   /* 歪みの摘みは、歪む音色を選んでいる時だけ出す。
      効かない摘みが並んでいるのが、設定画面でいちばん惑わせる */
   if((toneOf(song)||{}).drive)
     fld('歪みの強さ',sel(DRIVE_AMT,String(driveAmt(song)),
-      v=>{ tx('歪みの強さを変える',()=>{song.play.drive=parseFloat(v);},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
+      v=>{ tx('歪みの強さを変える',()=>{setSnd(song,'drive',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
       '全部の弦を混ぜてから潰しております。一音ずつ歪ませると音どうしが混じり合わず、和音が濁らないためでございます。※強くするほど弦そのものの伸びは短くしてございます（tab-3.05）——潰しが深くなると痩せた尾まで持ち上がりますので、そのままでは書いた音価の何倍も鳴り続けてしまうためでございます');
 
   /* ══ エフェクト（tab-2.99）══
@@ -37556,7 +37623,7 @@ function renderSettings(){
     const fxOnCount=['comp','wah','phaser','chorus','flange','trem','delay','room']
       .filter(k=>{ const v=String(fxOf(song,k,'0')); return v!=='0'&&v!==''; }).length;
     const t=document.createElement('div'); t.className='fx-ttl';
-    t.textContent='エフェクト';
+    t.textContent='エフェクト'+_ptTag;
     if(fxOnCount){ const c=document.createElement('span'); c.className='cnt';
       c.textContent=fxOnCount+' 掛かっています'; t.appendChild(c); }
     fxBox.appendChild(t);
@@ -37565,8 +37632,7 @@ function renderSettings(){
   const _grpHost=host;
   host=fxBox;                     /* ここから先は枠の中へ入れる */
   /* 従属の摘み（速さ・量）は、親を選んだ時に現れる。組み直して出す */
-  const fxSet=(k,v)=>{ tx('エフェクトを変える',()=>{
-    song.play.fx=Object.assign({},song.play.fx||{}); song.play.fx[k]=v; },FREE);
+  const fxSet=(k,v)=>{ tx('エフェクトを変える',()=>{ setSndFx(song,k,v); },FREE);
     /* ══ 摘みを動かしたら、その場で配る（tab-3.21）══
        `fxApply` は音を出す時（`guitarBus`）にしか呼ばれないので、
        **鳴らしている最中に動かしても、次の音まで効かなかった。**
@@ -37613,9 +37679,7 @@ function renderSettings(){
      取り消し（⌘Z）で戻せるとはいえ、押し間違いで消えては困るので
      一度目は確かめを挟む。 */
   {
-    const has=Object.keys((song.play&&song.play.fx)||{}).some(k=>{
-      const v=String(song.play.fx[k]); return v!=='0'&&v!=='';
-    });
+    const has=FX_MAIN.some(k=>{ const v=String(fxOf(song,k,'0')); return v!=='0'&&v!==''; });
     const b=document.createElement('button');
     b.className='t-btn'; b.textContent='エフェクトをぜんぶ戻す';
     b.disabled=!has;
@@ -37627,13 +37691,14 @@ function renderSettings(){
           b.textContent='エフェクトをぜんぶ戻す'; b.classList.remove('dgr'); } },4000);
         return;
       }
-      tx('エフェクトをぜんぶ戻す',()=>{ song.play.fx={}; },FREE);
+      tx('エフェクトをぜんぶ戻す',()=>{ resetSndFx(song); },FREE);
       renderSettings();
       toast('エフェクトをぜんぶ戻しました','取り消す',()=>doUndo(),5000);
     };
-    fld('',b,true,has?'この曲のエフェクトを、ぜんぶ「なし」に戻します。セクションごとに決めた音はそのまま残ります'
+    fld('',b,true,has?((_ptTag?'このパートの':'この曲の')+'エフェクトを、ぜんぶ「なし」に戻します。セクションごとに決めた音はそのまま残ります')
                      :'いま掛かっているエフェクトはございません');
   }
+  _sndNow=_sndKeep;               /* 音の欄はここまで（tab-6.40） */
   host=_grpHost;                  /* 枠を抜けて、区分の器へ戻る（tab-3.13／3.15） */
 
   fld('rit./accel. の効き',sel([['small','控えめ（−15% / +20%）'],['normal','ふつう（−30% / +40%）'],['large','大きく（−45% / +70%）']],song.play.bend||'normal',
