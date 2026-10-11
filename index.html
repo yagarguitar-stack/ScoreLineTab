@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.38', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.39', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2450,7 +2450,11 @@ function mkMarks(o){
    > 音符そのものは動かないので、鳴っている音には何も起こらない。 */
 function mkPart(o){
   o=o||{};
-  return { id:o.id||uid('pt'), name:o.name||'', sound:normSound(o.sound) };
+  const p={ id:o.id||uid('pt'), name:o.name||'', sound:normSound(o.sound) };
+  /* カポはパートごと（tab-6.39）。持っていなければ書かない——
+     古い曲は `alignParts` が曲のカポを写す */
+  if(Number.isInteger(o.capo)) p.capo=Math.max(0,Math.min(12,o.capo));
+  return p;
 }
 /* 小節に「いまのパートの音符」という窓を開ける。
    既に開いていれば何もしない（二度呼ばれても壊れない） */
@@ -2721,6 +2725,7 @@ function alignParts(s){
   if(!Array.isArray(s.parts)||!s.parts.length) s.parts=[mkPart({name:'パート1'})];
   const n=s.parts.length;
   s.part=Math.min(Math.max(0,(+s.part)||0),n-1);
+  bindCapo(s);
   (s.bars||[]).forEach(b=>{
     bindBar(b);
     if(!Array.isArray(b.np)) b.np=[[]];
@@ -2744,6 +2749,35 @@ function alignParts(s){
     b._pi=s.part;
   });
   return s;
+}
+/* ══ カポはパートごと（tab-6.39）══
+   L様——「capo は連動しないようにして」。
+   これまでカポは曲に一つで、全パートが同じ値を使っていた。
+   パートごとに持たせ、**`meta.capo` はその窓**にする——
+   読めば「いま見ている（鳴らしている）パートのカポ」、書けば表のパートだけが変わる。
+   カポを読む所は三十を超えるので、窓にすれば一つも書き換えずに済む。
+
+   鳴らしている最中は、出来事のパート（`CAPO_PT`）を見る。
+   表が2本目でも、1本目の音は1本目のカポで鳴らねばならない。
+
+   古い曲は `meta.capo` を値として持っている。持っていないパートへ写して引き継ぐ
+   （全パートに同じ値＝開いた時の音は変わらない）。
+   保存の形には `meta.capo` も残す（表のパートの値）——外の道具が読めるように。 */
+var CAPO_PT=null;   /* var：読み込みの途中で曲を組んでも落ちないように */
+function bindCapo(s){
+  if(!s||!s.meta||!Array.isArray(s.parts)) return;
+  const d=Object.getOwnPropertyDescriptor(s.meta,'capo');
+  const legacy=(d&&!d.get&&Number.isInteger(d.value))?d.value:null;
+  const fall=Number.isInteger(legacy)?legacy:0;
+  s.parts.forEach(p=>{ if(p&&!Number.isInteger(p.capo)) p.capo=fall; });
+  if(d&&d.get) return;                      /* もう窓が開いている */
+  Object.defineProperty(s.meta,'capo',{
+    enumerable:true, configurable:true,
+    get(){ const i=(CAPO_PT!=null)?CAPO_PT:(s.part||0);
+           const p=s.parts[i]||s.parts[s.part||0]||s.parts[0];
+           return (p&&Number.isInteger(p.capo))?p.capo:0; },
+    set(v){ const p=s.parts[s.part||0]; if(p) p.capo=Math.max(0,Math.min(12,(v|0))); }
+  });
 }
 /* 表示を向け替えるだけ。音符は一つも動かないので、鳴っている音は途切れない */
 function setPart(s,i){
@@ -8791,7 +8825,9 @@ function openSongTuning(){
 }
 
 function openSongCapo(){
-  const pop=popup('カポ',song.meta.capo>0?(song.meta.capo+'フレット'):'なし');
+  /* パートが2本以上なら、どのパートのカポかを添える（tab-6.39） */
+  const _pl=(partCount(song)>1)?(partLabel(song,song.part)+'　'):'';
+  const pop=popup('カポ',_pl+(song.meta.capo>0?(song.meta.capo+'フレット'):'なし'));
   const re=()=>{ closePop(); render(); openSongCapo(); };
   const g1=pgrp(pop,'位置');
   for(let n=0;n<=9;n++)
@@ -21407,7 +21443,8 @@ function fireEvent(e,at){
   VK_BASE=((e._pt||0)*VK_SPAN);
   if(needSnd) _sndNow=sndForBar(e.barId,e._pt)||null;
   const prevDV=DAMP_VB; DAMP_VB=VK_BASE;      /* 止める手は、このパートの手（tab-6.37） */
-  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; DAMP_VB=prevDV; }
+  const prevCP=CAPO_PT; if(e._pt!=null) CAPO_PT=e._pt;   /* カポもこのパートの物（tab-6.39） */
+  try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; DAMP_VB=prevDV; CAPO_PT=prevCP; }
 }
 function _fireEvent(e,at){
   if(e.kind==='count'||e.kind==='precount') playCount(at,e.accent);
@@ -30164,7 +30201,8 @@ function addPart(){
   if(!song) return;
   if(partCount(song)>=8){ toast('パートは8本まででございます'); return; }
   tx('パートを足す',()=>{
-    song.parts.push(mkPart({name:'パート'+(partCount(song)+1)}));
+    /* 新しいパートのカポは、表のパートと同じ値から（tab-6.39） */
+    song.parts.push(mkPart({name:'パート'+(partCount(song)+1),capo:(song.meta.capo|0)}));
     alignParts(song);
     song.part=partCount(song)-1;
     alignParts(song);
