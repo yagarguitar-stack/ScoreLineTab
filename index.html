@@ -1620,7 +1620,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.41', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.42', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -1915,7 +1915,9 @@ function normFx(o){
   const out={};
   Object.keys(o).forEach(k=>{
     if(!FX_KEYS[k]) return;
-    const v=o[k];
+    let v=o[k];
+    /* 旧「4分3連」は8分3連で鳴っていた——鳴り方のまま名を正す（tab-6.42） */
+    if(k==='delay'&&String(v)==='t4') v='t8';
     if(typeof v==='string'||typeof v==='number') out[k]=v;
   });
   return out;
@@ -2631,7 +2633,7 @@ function mkSong(o){
     play:normSwing(normDrum(Object.assign({ bpm:96, metro:true, chord:true, allParts:true, drum:null, countIn:1, ramp:0, backing:'off', swapEvery:'off', bend:'normal', swing:null, tone:TONE_DEF, body:BODY_DEF, sustain:SUSTAIN_DEF,
       /* エフェクトの摘み（tab-2.99）。**既定は空**——既にある曲を開いた時に、
          勝手に音が変わってはならない */
-      preview:true, ring:RING_DEF, fx:normFx(o.play&&o.play.fx) },o.play||{}))),   /* 置いた音をその場で鳴らす（tab-1.74） */
+      preview:true, ring:RING_DEF, fx:normFx(o.play&&o.play.fx) },o.play||{},{fx:normFx(o.play&&o.play.fx)}))),   /* fx は均した物を残す（tab-6.42：旧4分3連の引き継ぎ） */   /* 置いた音をその場で鳴らす（tab-1.74） */
     voicings:o.voicings||{},
     /* ══ パート（tab-6.25）══
        最低一本。古い曲は `parts` を持たないので、名無しの一本として受ける。
@@ -16876,7 +16878,15 @@ const FX_ROOM=[['0','なし'],['room','ルーム（小さな部屋）'],
                ['plate','プレート（板の響き）'],['hall','ホール（広い場）']];
 const FX_ROOM_AMT=[['0.2','控えめ'],['0.35','ふつう'],['0.55','たっぷり'],['0.75','どっぷり']];
 /* やまびこ。長さは拍から割り出すので、速さを変えても付いてくる */
-const FX_DELAY=[['0','なし'],['8','8分'],['d8','付点8分'],['4','4分'],['t4','4分3連']];
+/* ══ ディレイの音価（tab-6.42）══
+   L様——「エフェクトの音価に2分とかも追加したい」。短い順に揃えた。
+   **以前の 't4' は「4分3連」と名乗りながら、1拍の 1/3（＝8分3連）で鳴っていた。**
+   耳で決めた音を勝手に変えないよう、't4' は読み込みで 't8'（8分3連）へ移す（normFx）。
+   正しい4分3連（1拍の 2/3）は別の鍵 't4b' で持つ——'t4' を使い回すと、
+   保存し直した曲が次に開いた時に8分3連へ化けるため。 */
+const FX_DELAY=[['0','なし'],['16','16分'],['t8','8分3連'],['8','8分'],['d8','付点8分'],
+                ['t4b','4分3連'],['4','4分'],['d4','付点4分'],['2','2分'],['d2','付点2分'],['1','全音符']];
+const FX_DELAY_MUL={'16':0.25,'t8':1/3,'8':0.5,'d8':0.75,'t4b':2/3,'4':1,'d4':1.5,'2':2,'d2':3,'1':4};
 const FX_DELAY_AMT=[['0.25','控えめ'],['0.4','ふつう'],['0.55','たっぷり'],['0.7','どっぷり']];
 const FX_CHORUS=[['0','なし'],['0.4','控えめ'],['0.7','ふつう'],['1','たっぷり'],['1.3','どっぷり']];
 const FX_FLANGE=[['0','なし'],['0.4','控えめ'],['0.7','ふつう'],['1','たっぷり'],['1.25','どっぷり']];
@@ -17465,7 +17475,7 @@ function _fxChainBuild(){
   }
   /* ⑦ ディレイ（戻りの中に濾しを入れて、繰り返すほど丸くする） */
   {
-    const d=AC.createDelay(2.0); d.delayTime.value=0.3;
+    const d=AC.createDelay(4.0); d.delayTime.value=0.3;   /* 上限 4秒（tab-6.42） */
     const fb=mk(); fb.gain.value=0.3;
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
     const w=wrap((inN,wet)=>{ inN.connect(d); d.connect(lp); lp.connect(fb);
@@ -17870,9 +17880,10 @@ function fxApply(){
   {
     const kind=String(fxOf(s,'delay','0'));
     const a=fxNum(s,'delayAmt',0.28);
-    const mul={'8':0.5,'d8':0.75,'4':1,'t4':1/3}[kind];
+    const mul=FX_DELAY_MUL[kind==='t4'?'t8':kind];
     if(mul&&FXDL_D){
-      FXDL_D.delayTime.value=Math.min(2,beat*mul);
+      /* 長い音価でも切れないよう、上限は 4秒（BPM60 の全音符まで。tab-6.42） */
+      FXDL_D.delayTime.value=Math.min(4,beat*mul);
       /* ══ 返りは、弾いた音より前へ出ない（tab-4.78）══
          L様——「ディレイが基本かかりすぎかな」。
 
