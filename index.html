@@ -1501,6 +1501,91 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 }
 /* 紙に刷る時は、卓の灯りを持ち込まない */
 @media print{ body.sl-st .tb-song .t{background:none;box-shadow:none;transform:none;color:#000} }
+/* ══════════════════════════════════════════
+   アンプ（tab-6.43）
+   L様——「アンプっぽい見た目の部分を作って音色いじれるようにできない？」
+   中央の〈アンプ〉を押すと、ヘッドが譜面の上に降りてくる。
+   上段はアンプ（音色・歪み・胴の鳴り・弦の伸び）、下段はエフェクトの踏み台。
+   ══════════════════════════════════════════ */
+.amp-knob{--s:52px;position:relative;width:var(--s);height:var(--s);border-radius:50%;flex:0 0 auto;
+  touch-action:none;cursor:ns-resize;
+  background:radial-gradient(circle at 50% 50%,#2a2a2c 0 46%,transparent 47%),
+    repeating-conic-gradient(from 0deg,#141415 0 4deg,#3a3a3d 4deg 8deg);
+  box-shadow:0 2px 3px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.12)}
+.amp-knob::before{content:'';position:absolute;inset:22%;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#d9d6cf,#8d8a84 55%,#55534f);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.5),0 1px 1px rgba(0,0,0,.6)}
+.amp-knob i{position:absolute;left:50%;top:6%;width:2px;height:40%;margin-left:-1px;border-radius:1px;
+  background:#f6f1e6;box-shadow:0 0 2px rgba(0,0,0,.6);transform-origin:50% 110%;transition:transform .12s ease-out}
+.amp-knob.dim{opacity:.38;cursor:default}
+.amp-knob:focus-visible{outline:2px solid #ffb340;outline-offset:3px}
+.amp-cell{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:64px}
+.amp-lab{font:700 11.5px/1 var(--ds-font,system-ui,sans-serif);letter-spacing:.08em;color:#2b2214;white-space:nowrap}
+.amp-val{font:600 10.5px/1 var(--ds-font,system-ui,sans-serif);color:#5a4a2c;white-space:nowrap}
+.amp-jewel{width:14px;height:14px;border-radius:50%;flex:0 0 auto;
+  background:radial-gradient(circle at 40% 35%,#ffd2c2 0 12%,#ff5a3c 30%,#a3180c 70%,#4a0905);
+  box-shadow:0 0 8px 2px rgba(255,80,50,.55),inset 0 0 0 1px rgba(0,0,0,.45)}
+.amp-led{width:7px;height:7px;border-radius:50%;background:#3a2a20;box-shadow:inset 0 1px 1px rgba(0,0,0,.6)}
+.amp-led.on{background:radial-gradient(circle at 40% 35%,#fff3c8,#ffb340 50%,#b86b00);box-shadow:0 0 6px rgba(255,179,64,.8)}
+.amp-plate{background:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,#e9d9a6 0%,#d5bd7a 45%,#c3a660 55%,#d9c48a 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(0,0,0,.25)}
+.amp-win{font:700 12px/1 var(--ds-font,system-ui,sans-serif);color:#ffcf7a;letter-spacing:.06em;background:#0c0b0a;
+  border-radius:3px;padding:5px 8px;box-shadow:inset 0 1px 3px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.35);
+  text-shadow:0 0 6px rgba(255,179,64,.55);white-space:nowrap;min-width:5.5em;text-align:center}
+#amp-wrap{position:fixed;left:0;right:0;top:56px;z-index:60;display:flex;justify-content:center;padding:10px 12px;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0));pointer-events:none}
+.ampB{pointer-events:auto;width:min(760px,100%);border-radius:10px;padding:10px;
+  background:radial-gradient(circle at 20% 30%,rgba(255,255,255,.035) 0 1px,transparent 1.5px) 0 0/5px 5px,
+    radial-gradient(circle at 70% 60%,rgba(0,0,0,.35) 0 1px,transparent 1.5px) 0 0/4px 4px,
+    linear-gradient(180deg,#2a2826,#151413);
+  box-shadow:0 18px 40px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000}
+.ampB .piping{border-radius:6px;padding:3px;background:linear-gradient(180deg,#e8d9b0,#9c8452)}
+.ampB .face{border-radius:4px;overflow:hidden;background:#111}
+.ampB .grille{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 14px;
+  background:repeating-linear-gradient(45deg,rgba(255,255,255,.07) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(-45deg,rgba(0,0,0,.35) 0 1px,transparent 1px 4px),
+    linear-gradient(180deg,#5b4a35,#3e3224)}
+.ampB .logo{font:italic 700 17px/1 Georgia,'Times New Roman',serif;color:#f4ead2;letter-spacing:.02em;
+  text-shadow:0 1px 0 #000,0 0 6px rgba(255,220,160,.25)}
+.ampB .part{display:flex;align-items:center;gap:8px;font:700 11px/1 var(--ds-font,system-ui,sans-serif);color:#f4ead2}
+.ampB .close{border:0;cursor:pointer;width:24px;height:24px;border-radius:50%;padding:0;
+  background:radial-gradient(circle at 40% 35%,#3a3835,#1a1918);color:#e6dccb;font:700 12px/24px var(--ds-font,system-ui,sans-serif);
+  box-shadow:0 1px 2px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.1)}
+.ampB .panel{display:flex;align-items:flex-end;gap:18px;padding:12px 18px 10px}
+.ampB .ch{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ampB .grow{flex:1}
+.ampB .pw{align-self:center;margin-right:2px}
+.ampB .fxrow{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px 12px;justify-content:center;
+  background:linear-gradient(180deg,#1b1a19,#121110)}
+.ampB .stomp{display:flex;flex-direction:column;align-items:center;gap:5px;width:74px;padding:7px 4px 8px;border-radius:6px;
+  background:linear-gradient(180deg,#3a3835,#24221f);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.6)}
+.ampB .stomp.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.6),0 0 0 1px rgba(255,179,64,.35)}
+.ampB .stomp .nmb{display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;padding:0;cursor:pointer}
+.ampB .stomp .nm{font:700 10.5px/1 var(--ds-font,system-ui,sans-serif);color:#e6dccb;white-space:nowrap;letter-spacing:-.01em}
+.ampB .stomp.on .nm{color:#ffd27a}
+.ampB .stomp .lv{font:600 9.5px/1 var(--ds-font,system-ui,sans-serif);color:#9c9384;white-space:nowrap}
+.ampB .stomp .ft{width:24px;height:24px;border-radius:50%;border:0;padding:0;cursor:pointer;
+  background:radial-gradient(circle at 40% 35%,#f4f4f4,#a9a9a9 45%,#5a5a5a 80%);box-shadow:0 2px 3px rgba(0,0,0,.7),inset 0 -1px 1px rgba(0,0,0,.4)}
+.ampB .stomp .ft:active{transform:translateY(1px);box-shadow:0 1px 1px rgba(0,0,0,.7),inset 0 -1px 1px rgba(0,0,0,.4)}
+@media (max-width:520px){
+  .ampB .panel{gap:8px;padding:10px 8px 8px;justify-content:space-between}
+  .ampB .amp-knob{--s:44px}
+  .ampB .amp-cell{min-width:0}
+  .ampB .grow,.ampB .pw{display:none}
+  .ampB .stomp{width:calc(25% - 6px)}
+  .ampB .stomp .nm{font-size:10px}
+}
+/* 〈アンプ〉の札。上の帯（中央）に置く。狭い画面では下の帯へ移る */
+.amp-open{display:flex;align-items:center;gap:7px;height:36px;padding:0 12px;border-radius:8px;border:0;cursor:pointer;flex:0 0 auto;
+  background:linear-gradient(180deg,#2c2a27,#1a1918);color:#e6dccb;font:700 12px/1 var(--ds-font,system-ui,sans-serif);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000,0 2px 3px rgba(0,0,0,.5)}
+.amp-open .amp-jewel{width:10px;height:10px;box-shadow:0 0 5px 1px rgba(255,80,50,.45),inset 0 0 0 1px rgba(0,0,0,.45)}
+.amp-open.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000,0 0 0 2px rgba(255,179,64,.45)}
+#bb-tr .bb-btn.bb-amp{display:none}
+@media (max-width:700px){ #tb-amp{display:none!important} #bb-tr .bb-btn.bb-amp{display:flex} }
+@media print{ #amp-wrap,.amp-open,.bb-amp{display:none!important} }
+
 </style>
 </head>
 <body>
@@ -1620,7 +1705,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.42', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.43', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -1634,6 +1719,9 @@ const ICONS={
   loop:'<path d="M4.2 8.6a5.8 5.8 0 0 1 9.9-3M15.8 11.4a5.8 5.8 0 0 1-9.9 3"/>'
       +'<path d="M13.6 2.4v3.4h-3.4M6.4 17.6v-3.4h3.4"/>',
   rec:'<circle cx="10" cy="10" r="4.6" fill="currentColor" stroke="none"/>',
+  amp:'<rect x="2.6" y="4.2" width="14.8" height="11.6" rx="1.6"/><path d="M2.6 8.2h14.8"/>'
+     +'<circle cx="6" cy="6.2" r=".7" fill="currentColor"/><circle cx="9" cy="6.2" r=".7" fill="currentColor"/>'
+     +'<circle cx="12" cy="6.2" r=".7" fill="currentColor"/><path d="M5.2 10.8h9.6M5.2 13h9.6" stroke-width="1"/>',
   fret:'<path d="M2.6 5.2h14.8M2.6 10h14.8M2.6 14.8h14.8"/>'
       +'<path d="M6.6 3.4v13.2M11.2 3.4v13.2M15.4 3.4v13.2"/>',
   recstop:'<rect x="5.6" y="5.6" width="8.8" height="8.8" rx="1.4" fill="currentColor" stroke="none"/>',
@@ -21854,7 +21942,8 @@ function scrollHost(){
 window.SL_TAB={
   now:()=>AC?AC.currentTime:0, playing:()=>TP.playing, disp:()=>_disp, song:()=>song,
   loop:()=>{ try{ return TP.loop?loopIdx():null; }catch(_){ return null; } },
-  follow:(el)=>{ try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){} }
+  follow:(el)=>{ try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){} },
+  ampButton:()=>$('tb-amp')||ampTopButton()
 };
 function setPlayhead(barId){
   if(TP.curBar===barId) return;
@@ -29985,6 +30074,8 @@ function renderPlayBar(){
                                      +'メトロノームとドラムは鳴ります。イヤホン推奨）'),
       REC.on||recHas(),recToggle);
     if(REC.on) b.classList.add('rec-on');
+    /* 〈アンプ〉（tab-6.43）。狭い画面では上の帯に置けないので、ここに出す */
+    { const a=mk(tg,'amp','アンプ（ギターの音を変えます）',ampIsOpen(),ampToggle,'bb-amp'); a.classList.add('bb-amp'); }
     let lp=null;
     b.addEventListener('pointerdown',()=>{ if(REC.on||!recHas()) return;
       lp=setTimeout(()=>{ lp=null; recClear(); toast('録音を消しました'); renderPlayBar(); },650); });
@@ -34069,6 +34160,7 @@ const _dispNo=new Map();
 
 function render(){
   renderTopbar();
+  if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
   renderModeBar();
   const paper=$('paper'); if(!paper) return;
   /* ══ 組み直しても、見ている所を失わない（tab-1.48）══
@@ -39688,11 +39780,197 @@ function boot(){
   if(song) warnForeign(song.id);
 }
 
+/* ══════════════════════════════════════════
+   アンプ（tab-6.43）
+   L様——「アンプっぽい見た目の部分を作って音色いじれるようにできない？」
+
+   〈アンプ〉を押すと、ヘッドが譜面の上に降りてくる（引き出す案。L様の選択）。
+   変えるのは**表に出ているパートの音**——〈曲の設定〉の音の欄と同じ所を書く
+   （`setSnd`／`setSndFx`、tab-6.40）。どちらで変えても同じである。
+
+   つまみ——上下になぞると一段ずつ回る。離した所で決まる（取り消しは一手で戻る）。
+            押すだけなら、選択肢の一覧が開く。
+   踏み台——足踏みの丸を押すと入／切。入れる時は前に使った強さ、初めてなら「ふつう」。
+            名前を押すと、強さ（ディレイなら音価）を選べる。
+   ══════════════════════════════════════════ */
+var AMP={el:null,last:{}};   /* var：読み込みの途中で描画が走っても落ちないように */
+const AMP_CH=[['steel','アコギ'],['nylon','ナイロン'],['clean','クリーン'],
+              ['crunch','クランチ'],['metal','ハイゲイン'],['insane','超ハイゲイン']];
+function ampFxList(){
+  return [['comp','コンプ',FX_COMP,'0.7'],['wah','ワウ',FX_WAH,'auto'],['phaser','フェイザー',FX_PHASER,'0.7'],
+          ['chorus','コーラス',FX_CHORUS,'0.7'],['flange','フランジャー',FX_FLANGE,'0.7'],['trem','トレモロ',FX_TREM,'0.6'],
+          ['delay','ディレイ',FX_DELAY,'d8'],['room','残響',FX_ROOM,'room']];
+}
+function ampIsOpen(){ return !!AMP.el; }
+function ampToggle(){ if(AMP.el) ampClose(); else ampOpen(); }
+function ampOpen(){
+  if(AMP.el) return;
+  const w=document.createElement('div'); w.id='amp-wrap';
+  document.body.appendChild(w); AMP.el=w;
+  ampRender(); ampMarks();
+}
+function ampClose(){
+  if(!AMP.el) return;
+  AMP.el.remove(); AMP.el=null; ampMarks();
+}
+/* 札の点き方を合わせる（上の帯と下の帯の両方） */
+function ampMarks(){
+  document.querySelectorAll('.amp-open,.bb-amp').forEach(b=>b.classList.toggle('on',!!AMP.el));
+}
+/* 上の帯の下端に揃えて降ろす（帯の高さは画面で変わる） */
+function ampPlace(){
+  if(!AMP.el) return;
+  const tb=document.querySelector('.topbar');
+  const y=tb?Math.max(0,Math.round(tb.getBoundingClientRect().bottom)):56;
+  AMP.el.style.top=y+'px';
+}
+/* 音を変えて、すぐ鳴りに効かせる */
+function ampApply(label,fn){
+  tx(label,fn,FREE);
+  try{ audioReady(); guitarBus(); }catch(_){}
+  ampRender();
+}
+function ampChoose(title,list,cur,onPick,extra){
+  const pop=popup(title,ampPartName());
+  const g=pgrp(pop,null);
+  list.forEach(([v,l])=>pbtn(g,l,String(v)===String(cur),()=>{ closePop(); onPick(v); }));
+  if(extra) extra(pop);
+  popClose(pop);
+}
+function ampPartName(){
+  return (partCount(song)>1)?(partLabel(song,song.part)+' の音'):'ギターの音';
+}
+/* つまみ一つ。list は [[値,名前],…]。なぞって回し、押せば一覧 */
+function ampKnob(list,cur,label,onSet,opt){
+  opt=opt||{};
+  let idx=Math.max(0,list.findIndex(x=>String(x[0])===String(cur)));
+  const n=list.length;
+  const ang=i=>-135+270*(n<=1?0:i/(n-1));
+  const cell=document.createElement('div'); cell.className='amp-cell';
+  const k=document.createElement('div'); k.className='amp-knob'+(opt.dim?' dim':'');
+  k.tabIndex=opt.dim?-1:0;
+  k.setAttribute('role','slider'); k.setAttribute('aria-label',label);
+  const ptr=document.createElement('i'); k.appendChild(ptr);
+  const lab=document.createElement('span'); lab.className='amp-lab'; lab.textContent=label;
+  const val=document.createElement('span'); val.className='amp-val';
+  const show=()=>{ ptr.style.transform='rotate('+ang(idx)+'deg)'; val.textContent=(list[idx]||[])[1]||'';
+                   k.setAttribute('aria-valuetext',val.textContent);
+                   if(opt.onShow) opt.onShow(idx); };
+  show();
+  if(opt.top) cell.appendChild(opt.top);
+  cell.appendChild(k); cell.appendChild(lab);
+  if(!opt.noVal) cell.appendChild(val);
+  if(opt.dim){ k.title=opt.dimTip||''; return cell; }
+  k.title=label+'：上下になぞると回ります／押すと一覧から選べます';
+  const STEP=16;
+  let st=null;
+  k.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    st={y:e.clientY,i0:idx,moved:false};
+    try{ k.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  k.addEventListener('pointermove',e=>{
+    if(!st) return;
+    const dy=st.y-e.clientY;
+    if(Math.abs(dy)>4) st.moved=true;
+    const ni=Math.max(0,Math.min(n-1,st.i0+Math.round(dy/STEP)));
+    if(ni!==idx){ idx=ni; show(); }
+  });
+  const end=e=>{
+    if(!st) return;
+    const s0=st; st=null;
+    if(!s0.moved){ ampChoose(label,list,list[idx][0],v=>onSet(v)); return; }
+    if(idx!==s0.i0) onSet(list[idx][0]);
+  };
+  k.addEventListener('pointerup',end);
+  k.addEventListener('pointercancel',()=>{ if(st){ idx=st.i0; st=null; show(); } });
+  /* 鍵盤でも回せる（↑↓） */
+  k.addEventListener('keydown',e=>{
+    if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
+    e.preventDefault(); e.stopPropagation();
+    const ni=Math.max(0,Math.min(n-1,idx+(e.key==='ArrowUp'?1:-1)));
+    if(ni!==idx){ idx=ni; show(); onSet(list[idx][0]); }
+  });
+  return cell;
+}
+function ampRender(){
+  if(!AMP.el||!song) return;
+  ampPlace();
+  const keep=_sndNow; _sndNow=partSound(song);
+  let tone,drv,bod,sus,fxv={},hasDrive;
+  try{
+    tone=String(sndPick(song,'tone',null)||TONE_DEF);
+    hasDrive=!!(TONES.find(t=>t.id===tone)||{}).drive;
+    drv=String(driveAmt(song)); bod=String(bodyAmt(song)); sus=String(sustainAmt(song));
+    ampFxList().forEach(([key])=>{ fxv[key]=String(fxOf(song,key,'0')); });
+  }finally{ _sndNow=keep; }
+  const w=AMP.el; w.innerHTML='';
+  const box=document.createElement('div'); box.className='ampB';
+  box.innerHTML='<div class="piping"><div class="face">'
+    +'<div class="grille"><span class="logo">ScoreLine</span><span class="part"><span class="pn"></span>'
+    +'<button class="close" title="閉じる" aria-label="アンプを閉じる">✕</button></span></div>'
+    +'<div class="panel amp-plate"></div><div class="fxrow"></div></div></div>';
+  w.appendChild(box);
+  box.querySelector('.pn').textContent=ampPartName();
+  box.querySelector('.close').onclick=ampClose;
+  const panel=box.querySelector('.panel');
+  const pw=document.createElement('span'); pw.className='amp-jewel pw'; pw.title='鳴っている印';
+  panel.appendChild(pw);
+  /* 音色：窓に名前、つまみで回す */
+  const win=document.createElement('span'); win.className='amp-win';
+  const chList=AMP_CH.filter(([id])=>TONES.some(t=>t.id===id));
+  panel.appendChild(ampKnob(chList,tone,'音色',v=>ampApply('音色を変える',()=>setSnd(song,'tone',v)),
+    {top:win,noVal:true,onShow:i=>{ win.textContent=(chList[i]||[])[1]||''; }}));
+  panel.appendChild(ampKnob(DRIVE_AMT,drv,'歪み',v=>ampApply('歪みの強さを変える',()=>setSnd(song,'drive',parseFloat(v))),
+    {dim:!hasDrive,dimTip:'歪みは、エレキの歪む音色（クランチ・ハイゲイン）の時に効きます'}));
+  panel.appendChild(ampKnob(BODY_AMT,bod,'胴の鳴り',v=>ampApply('胴の鳴りを変える',()=>setSnd(song,'body',parseFloat(v)))));
+  panel.appendChild(ampKnob(SUSTAIN_AMT,sus,'弦の伸び',v=>ampApply('弦の伸びを変える',()=>setSnd(song,'sustain',parseFloat(v)))));
+  const gr=document.createElement('span'); gr.className='grow'; panel.appendChild(gr);
+  /* エフェクトの踏み台 */
+  const row=box.querySelector('.fxrow');
+  ampFxList().forEach(([key,name,list,def])=>{
+    const cur=fxv[key]; const on=cur!=='0'&&cur!=='';
+    const lv=(list.find(x=>String(x[0])===cur)||[])[1]||(on?cur:'なし');
+    const st=document.createElement('div'); st.className='stomp'+(on?' on':'');
+    const nb=document.createElement('button'); nb.className='nmb';
+    nb.title=name+'：押すと強さを選べます';
+    nb.innerHTML='<span class="amp-led'+(on?' on':'')+'"></span><span class="nm"></span><span class="lv"></span>';
+    nb.querySelector('.nm').textContent=name; nb.querySelector('.lv').textContent=lv;
+    nb.onclick=()=>ampChoose(name,list,cur,v=>{
+      if(String(v)!=='0') AMP.last[key]=String(v);
+      ampApply('エフェクトを変える',()=>setSndFx(song,key,String(v)));
+    },pop=>{
+      const g=pgrp(pop,null);
+      pbtn(g,'くわしい設定（速さ・量など）を開く',false,()=>{ closePop(); renderSettings(); openSheet('ov-set'); },'wide');
+    });
+    const ft=document.createElement('button'); ft.className='ft';
+    ft.title=name+'：押すと'+(on?'切ります':'入ります');
+    ft.setAttribute('aria-label',name+(on?'を切る':'を入れる'));
+    ft.onclick=()=>{
+      if(on){ AMP.last[key]=cur; ampApply('エフェクトを切る',()=>setSndFx(song,key,'0')); }
+      else{ const v=AMP.last[key]||def; ampApply('エフェクトを入れる',()=>setSndFx(song,key,v)); }
+    };
+    st.appendChild(nb); st.appendChild(ft); row.appendChild(st);
+  });
+}
+/* 〈アンプ〉の札（上の帯に置く物） */
+function ampTopButton(){
+  const b=document.createElement('button'); b.className='amp-open'+(AMP.el?' on':''); b.id='tb-amp';
+  b.type='button'; b.title='アンプ（ギターの音を変えます）';
+  b.innerHTML='<span class="amp-jewel"></span><span>アンプ</span>';
+  b.onclick=ampToggle;
+  return b;
+}
+window.addEventListener('resize',()=>ampPlace());
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&AMP.el&&!$('pop-ov')){ ampClose(); } });
+
 function bindUI(){
   $('tb-song').onclick=()=>{ renderSongList(); openSheet('ov-songs'); };
   setIco($('tb-set'),'gear'); setIco($('tb-print'),'print');
   $('tb-set').onclick=()=>{ renderSettings(); openSheet('ov-set'); };
   $('tb-help').onclick=openHelp;
+  /* 〈アンプ〉の札（tab-6.43）。共通部品が読めた時は、中央の表示の隣へ移る */
+  { const t=document.querySelector('.topbar .tb-tools'); if(t&&!$('tb-amp')) t.insertBefore(ampTopButton(),t.firstChild); }
   unlockAudioOnce();
   /* ══ 札に焦点を残さない（tab-2.73）══
      L様——「たまにスペースボタン押したら音符が消えるんだけど」。
@@ -40248,6 +40526,9 @@ else boot();
     else{q=[];if(shown){br.pos(bar,0,false);shown=false;}}
   }
   setTimeout(sync,0);window.addEventListener('load',function(){setTimeout(sync,50);});
+  /* 〈アンプ〉の札を中央の表示の隣へ（tab-6.43）。表示が組み直しても外れないよう、見張っておく */
+  function putAmp(){try{var a=T.ampButton&&T.ampButton();if(a&&a.parentNode!==el)el.appendChild(a);}catch(e){}}
+  putAmp();new MutationObserver(function(){if(!document.getElementById('tb-amp')||document.getElementById('tb-amp').parentNode!==el)putAmp();}).observe(el,{childList:true});
 })();
 </script>
 </body>
