@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.33', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.34', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3743,6 +3743,26 @@ function tieHalf(x0,y0,x1,y1,up,bulge,th){
   const inner=` C ${bx.toFixed(2)} ${(y1+b*0.55-t*k).toFixed(2)} `
             + `${ax.toFixed(2)} ${(y0+b-t*k).toFixed(2)} ${x0.toFixed(2)} ${y0.toFixed(2)} Z`;
   return `<path d="${outer}${inner}" fill="${INK}"/>`;
+}
+/* ══ 段の変わり目のタイは、小節線で水平に着く（tab-6.34）══
+   引き継ぎ書（tab-6.33）の測り——小節線での傾きが、掛かり +0.06・受け +0.46。
+   **高さは揃っていても、着く角度が八倍違えば、折れた二本の線に見える。**
+
+   長さに見合わせて曲がり方を変える `tieHalf` では、角度が長さに引きずられる。
+   ゆえに**小節線の側の向きを決め打ちにする——水平に。**
+   掛かりも受けも水平に着けば、長さがどれほど違っても角度は同じである。
+
+   音符の側から小節線の高さ（`TIE_CROSS_DEP`）まで上り、そこで寝る。
+   太さは中ほどで最も厚く、両端で尖る（`tieHalf` と同じ作法）。
+   **またぐタイのうち、段が変わる所だけ**に使う。同じ段なら一本の弧で引く。 */
+function tieHalfFlat(xn,yn,xb,yb,up,th){
+  const L=Math.abs(xb-xn);
+  if(L<=4) return '';
+  const k=up?-1:1, t=Math.max(1.0,th||1.6), dx=xb-xn;
+  const ax=xn+dx*0.38, ay=yn+(yb-yn)*0.85, bx=xb-dx*0.40;
+  const f=v=>v.toFixed(2);
+  return `<path d="M ${f(xn)} ${f(yn)} C ${f(ax)} ${f(ay)} ${f(bx)} ${f(yb)} ${f(xb)} ${f(yb)}`
+       + ` C ${f(bx)} ${f(yb-t*k)} ${f(ax)} ${f(ay-t*k)} ${f(xn)} ${f(yn)} Z" fill="${INK}"/>`;
 }
 function tieArc(x0,x1,y,stub,up,cap){
   /* ══ 弧どうしの間に、必ず隙間を空ける（tab-3.60）══
@@ -6143,6 +6163,11 @@ function engrave(s,bar,o){
      スラー（繋がり）の弧には的があったが、**タイの弧には一つも無かった。**
      同じ形に見える弧で、片方だけ触れない。 */
   const tieHits=[];
+  /* ══ 同じ段でまたぐタイは、ここでは引かない（tab-6.34）══
+     L様——「音符同士を直に弧で繋げばいいじゃん」。
+     小節ひとつを組む段では、**次の小節の音符がどこにあるか分からない。**
+     位置だけ控えて返し、段が組み上がってから `joinCrossTies` が一本で引く。 */
+  const xOut=[], xIn=[];
   const graceHits=[];      /* 装飾音符の的（tab-2.04）。数字を縦になぞって変える */
   /* ══ 装飾音符の弧の的（tab-3.93・L様の実装）══
      見せる弧と同じ道筋で受ける。数字の的とは高さで住み分ける
@@ -7176,10 +7201,25 @@ function engrave(s,bar,o){
            タイは**前の音符が持つ**ので、持ち主はこの音符である */
         if(wantLinkHits&&n.src>=0&&L>=9)
           tieHits.push({x0,x1,y:y-dep/2,up:arcUp,src:n.src,str:(si==null?null:si),kind:'tie',at:null});
-        /* 紡錘形で描く（tab-3.63）。膨らみと太さは、片側の長さに見合わせる */
-        const bg=Math.max(3.5,Math.min(9,2.2+Math.sqrt(L)*0.62));
+        /* 段が変わる所の片側（tab-6.34）。小節線で水平に着く */
         const tk=Math.max(1.05,Math.min(2.0,0.85+Math.sqrt(L)*0.08));
-        g+=tieHalf(x0,y,x1,y-dep,arcUp,bg,tk);
+        const half=tieHalfFlat(x0,y,x1,y-dep,arcUp,tk);
+        if(!o.isRowEnd){
+          /* 同じ段に次の小節がいる——位置だけ控え、一本の弧は段が組み上がってから。
+             繋げなかった時のために、片側の姿も持たせておく */
+          const _st=(n.stops||[]).find(q=>q&&q.s===si)||null;
+          xOut.push({si,x:x0,y,up:arcUp,cap:capMin(bendAt(n,si)?TIE_CAP_BEND:null,vibCap(_st,null)),half});
+          /* 席も取る（小節の中のタイと同じ筋。tab-4.97） */
+          { const _bow=Math.min(9,2.2+Math.sqrt(Math.max(1,L))*0.62);
+            const _apex=y+(arcUp?-_bow:_bow);
+            for(let r=0;r<4;r++){
+              const ry=symRowY(r);
+              if(arcUp?(ry<_apex-2):(ry>_apex+2)) break;
+              symPlace(x0,x1,r);
+            } }
+          return;
+        }
+        g+=half;
       });
     }
     /* ══ 繋がりの掛かり側（tab-3.96）══
@@ -7218,10 +7258,22 @@ function engrave(s,bar,o){
         const y=tieY(si), x0=0.5, x1=cx-tieGap(n), L=x1-x0;
         if(L<=6) return;
         const dep=arcUp?TIE_CROSS_DEP:-TIE_CROSS_DEP;
-        /* 受けは、掛かりを左右に返した形（tab-3.63）。同じ道具を、端を入れ替えて呼ぶ */
-        const bg=Math.max(3.5,Math.min(9,2.2+Math.sqrt(L)*0.62));
+        /* 受けは、掛かりを左右に返した形。小節線で水平に着く（tab-6.34） */
         const tk=Math.max(1.05,Math.min(2.0,0.85+Math.sqrt(L)*0.08));
-        g+=tieHalf(x1,y,x0,y-dep,arcUp,bg,tk);
+        const half=tieHalfFlat(x1,y,x0,y-dep,arcUp,tk);
+        if(!o.isRowStart){
+          const _st=(n.stops||[]).find(q=>q&&q.s===si)||null;
+          xIn.push({si,x:x1,y,up:arcUp,cap:vibCap(_st,null),half});
+          { const _bow=Math.min(9,2.2+Math.sqrt(Math.max(1,L))*0.62);
+            const _apex=y+(arcUp?-_bow:_bow);
+            for(let r=0;r<4;r++){
+              const ry=symRowY(r);
+              if(arcUp?(ry<_apex-2):(ry>_apex+2)) break;
+              symPlace(x0,x1,r);
+            } }
+          return;
+        }
+        g+=half;
       });
     }
 
@@ -8163,7 +8215,7 @@ function engrave(s,bar,o){
          道が二つに分かれる所では、両方に同じ物を置くこと。 */
       g+=extraHitsSVG();
       g+=`</svg>`;
-      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot};
+      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn};
     }
     const _cells=[];
     list.forEach(e=>{
@@ -8188,7 +8240,7 @@ function engrave(s,bar,o){
   }
 
   g+=`</svg>`;
-  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot};
+  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn};
 }
 
 /* 文字幅の実測（コード名の重なり判定用） */
@@ -33646,6 +33698,9 @@ function refreshMeasure(wrap){
     /* 段の桁を継ぐ（tab-6.05）。この小節だけ自前の桁で描くと、そこだけ高さがずれる */
     if(wrap._vbRow)  setVbTop(wrap,wrap._vbRow[0], wrap._vbRow[1], 'tab');
     if(wrap._vbRowS) setVbTop(wrap,wrap._vbRowS[0],wrap._vbRowS[1],'staff');
+    /* またぐタイは両隣と引き直す（tab-6.34）。片方だけ古いと弧が切れる */
+    wrap._xOut=r.xOut||[]; wrap._xIn=r.xIn||[];
+    rejoinAround(wrap);
   }catch(e){}
 }
 
@@ -34157,11 +34212,98 @@ function redrawBar(barId){
     /* 直下の譜面 SVG だけを外す。コード図の SVG は .dgm-row の中なので巻き込まない */
     for(const c of [...wrap.children]) if(c.classList&&c.classList.contains('msvg')) c.remove();
     wrap.insertAdjacentHTML('beforeend',r.svg);
+    /* 両隣との弧を引き直す（tab-6.34） */
+    wrap._xOut=r.xOut||[]; wrap._xIn=r.xIn||[];
+    rejoinAround(wrap);
     did=true;
   });
   return did;
 }
 
+/* ══ 小節をまたぐタイを、音符から音符へ一本で（tab-6.34）══
+   L様——「音符同士を直に弧で繋げばいいじゃん」。これが正解であった。
+
+   今までは小節線で切って両側に半分ずつ引いていた。高さは揃えても、
+   **着く角度が違えば、繋ぎ目で折れて見える**（引き継ぎ書の測り：+0.06 と +0.46）。
+   切らなければ、繋ぎ目そのものが無い。
+
+   ══ なぜ組み上がった後か ══
+   `engrave` は小節ひとつを組む。その時点では**次の小節の音符の位置が無い**。
+   ゆえに `engrave` は位置だけ控え（`xOut`／`xIn`）、ここで両者を突き合わせる。
+
+   ══ どこへ描くか ══
+   **受け側の小節の絵**に、左へはみ出して描く（`overflow:visible`）。
+   絵が小節に付いて動くので、巻いても・幅を変えても（組み直しが走る）・
+   印刷でも（`beginPrintLayout` が組み直す）、弧は小節と離れない。
+   受け側は掛かり側より後に描かれるので、弧が前の小節の下に潜ることもない。
+
+   ══ 座標の直し方 ══
+   掛かり側の点を、画面の座標を経て受け側の座標へ移す。
+   画面の寸法が取れない時（組まれる前・試験の場）は、
+   「1 単位 = 1 px、小節は隙間なく並ぶ」という組み方の約束から出す。
+
+   ══ 繋がない時 ══
+   向きが食い違う（符尾の向きが両側で違う）、相手の弦が無い、高さが合わない——
+   その時は**今まで通り半分ずつ**。嘘の弧を描くより、確かな片側の方がよい。 */
+/* 一本に繋いだ弧の深さの上限（null＝小節の中のタイと同じ） */
+const TIE_JOIN_CAP=null;
+function joinCrossTies(a,b){
+  if(!a||!b) return;
+  const sa=pickSvg(a,'tab'), sb=pickSvg(b,'tab');
+  if(sa) sa.querySelectorAll('.xt-out').forEach(e=>e.remove());
+  if(sb) sb.querySelectorAll('.xt-in').forEach(e=>e.remove());
+  const outs=a._xOut||[], ins=b._xIn||[];
+  if(!outs.length&&!ins.length) return;
+  const vb=svg=>{ const v=((svg&&svg.getAttribute('viewBox'))||'').split(/\s+/).map(Number);
+                  return (v.length===4&&v.every(isFinite))?v:null; };
+  const va=vb(sa), vbb=vb(sb);
+  /* 掛かり側の (x,y) を受け側の座標へ。直せなければ null */
+  let map=null;
+  if(sa&&sb&&va&&vbb){
+    const ra=sa.getBoundingClientRect(), rb=sb.getBoundingClientRect();
+    if(ra.width>0&&rb.width>0){
+      const ka=ra.width/va[2], kb=rb.width/vbb[2];
+      map=(x,y)=>[ (ra.left+x*ka-rb.left)/kb, (ra.top+(y-va[1])*ka-rb.top)/kb+vbb[1] ];
+    }else{
+      map=(x,y)=>[ x-va[2], y-va[1]+vbb[1] ];
+    }
+  }
+  const put=(svg,html,cls)=>{ if(svg&&html) svg.insertAdjacentHTML('beforeend',`<g class="${cls}">${html}</g>`); };
+  const used=new Set();
+  let joined=false;
+  outs.forEach(po=>{
+    const k=ins.findIndex((pi,j)=>!used.has(j)&&pi.si===po.si);
+    const pi=k<0?null:ins[k];
+    if(!pi||!map||pi.up!==po.up){ put(sa,po.half,'xt-out'); return; }
+    const [x0,y0]=map(po.x,po.y);
+    if(!(x0<pi.x-4)||Math.abs(y0-pi.y)>3){ put(sa,po.half,'xt-out'); return; }
+    used.add(k);
+    /* 姿は小節の中のタイと同じ道具で（引き継ぎ書：一本ずつの姿は tieArc と同じ） */
+    put(sb,tieArc(x0,pi.x,pi.y,false,pi.up,capMin(TIE_JOIN_CAP,capMin(po.cap,pi.cap))),'xt-in');
+    joined=true;
+  });
+  ins.forEach((pi,j)=>{ if(!used.has(j)) put(sb,pi.half,'xt-in'); });
+  if(sb){
+    sb.style.overflow=joined?'visible':'';
+    /* はみ出した弧が、前の小節の的を塞がないように */
+    sb.querySelectorAll('.xt-in').forEach(e=>e.style.pointerEvents='none');
+  }
+}
+/* 一小節だけ組み直した時は、両隣との弧も引き直す（tab-6.34） */
+/* 相手の小節が無い時は、控えておいた片側を描く */
+function crossHalves(wrap,side){
+  const sv=pickSvg(wrap,'tab'); if(!sv) return;
+  const cls=(side==='out')?'xt-out':'xt-in';
+  sv.querySelectorAll('.'+cls).forEach(e=>e.remove());
+  ((side==='out'?wrap._xOut:wrap._xIn)||[]).forEach(q=>{
+    if(q.half) sv.insertAdjacentHTML('beforeend',`<g class="${cls}">${q.half}</g>`);
+  });
+}
+function rejoinAround(wrap){
+  if(!wrap) return;
+  if(wrap._xPrev) joinCrossTies(wrap._xPrev,wrap); else crossHalves(wrap,'in');
+  if(wrap._xNext) joinCrossTies(wrap,wrap._xNext); else crossHalves(wrap,'out');
+}
 /* 実幅を測ってから浄書する（1 SVG 単位 = 1 px を保つ） */
 function fillMeasures(){
   const dgmOn=(song.meta.diagram==='first'||song.meta.diagram==='all')&&tuningStd(song);
@@ -34342,6 +34484,7 @@ function fillMeasures(){
       }else p.wrap.insertAdjacentHTML('beforeend',r.svg);
     }else p.wrap.insertAdjacentHTML('beforeend',r.svg);
     p._vb=[(r.vbTop!=null?r.vbTop:-78),(r.vbBot!=null?r.vbBot:152)];
+    p.wrap._xOut=r.xOut||[]; p.wrap._xIn=r.xIn||[];
     p.ctx.prevKey=r.lastChordKey;
     p.ctx.prevChord=r.lastChord||null;
     p.ctx.prevTS=ts;
@@ -34357,6 +34500,18 @@ function fillMeasures(){
   /* ══ 段の中で桁を揃える（tab-6.05）══
      小節ごとの「要る丈」を段でひとつに揃える。**捨てる前に済ませる。** */
   applyRowBox(rowsOf(_pending));
+  /* 段が組み上がり、桁も揃った——ここでまたぐタイを一本に（tab-6.34） */
+  _pending.forEach((p,pi)=>{
+    const nx=_pending[pi+1];
+    const same=!!nx&&!nx.isRowStart;
+    p.wrap._xNext=same?nx.wrap:null;
+    if(nx) nx.wrap._xPrev=same?p.wrap:null;
+    if(pi===0) p.wrap._xPrev=null;
+  });
+  _pending.forEach(p=>{
+    if(!p.wrap._xPrev) crossHalves(p.wrap,'in');
+    if(p.wrap._xNext) joinCrossTies(p.wrap,p.wrap._xNext); else crossHalves(p.wrap,'out');
+  });
   _prevStaffBar=null;
   _pending=[];
   if(stages.size) levelDiagramRows([...stages]);
