@@ -1612,7 +1612,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.31', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.33', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3726,8 +3726,18 @@ function tieHalf(x0,y0,x1,y1,up,bulge,th){
   if(L<=4) return '';
   const k=up?-1:1;
   const b=Math.max(3,bulge)*k, t=Math.max(1.0,th||1.6);
-  /* 音符側（x0,y0）は水平に出て、小節線側（x1,y1）へ向かって膨らむ */
-  const ax=x0+L*0.42, bx=x1-L*0.30;
+  /* ══ 長い弧は、ほぼ水平に（tab-6.33）══
+     L様——全音符のタイが、小節まるごとを斜めに上る束になっていた。
+
+     掛かりと受けは**小節線で同じ高さ**でなければ段差になる（tab-1.41）。
+     ゆえに**端の高さは動かせない**——動かせるのは曲がり方だけである。
+
+     制御点を長さに見合わせ、長い弧は**音符の側で高さを保ったまま伸び、
+     小節線の間際で持ち上がる**形にする。端は今まで通りなので繋ぎ目はずれない。
+
+     短い弧（70px 未満）は今までと寸分変わらない。 */
+  const lg=Math.max(0,Math.min(1,(L-70)/130));
+  const ax=x0+L*(0.42+0.30*lg), bx=x1-L*(0.30-0.22*lg);
   const outer=`M ${x0.toFixed(2)} ${y0.toFixed(2)} C ${ax.toFixed(2)} ${(y0+b).toFixed(2)} `
             + `${bx.toFixed(2)} ${(y1+b*0.55).toFixed(2)} ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   const inner=` C ${bx.toFixed(2)} ${(y1+b*0.55-t*k).toFixed(2)} `
@@ -8855,6 +8865,77 @@ function normalizeBar(s,bar){
    越えた分を次の小節の頭へ置き、タイで繋ぐ。
    **飲み込む恐れがある時（頭に音符がある・休符で埋まっていない）は置かない**——
    tab-1.34 の懸念はそのまま守る。 */
+/* ══════════════════════════════════════════
+   小節をいくつでも越えて伸ばす（tab-6.33）
+
+   L様——「音価が2小節目の終わりまで伸ばしたいのにできない」。
+
+   `setLenAcross` は「隣の小節へ**少しこぼす**」までの道具であった。
+   越えた分が次の小節に丸ごと収まることを求めるので、
+   **次の小節を占め切る**ことも、二つ以上またぐこともできない。
+
+   こちらは越えた分を**小節ごとに割り、順に置いてタイで繋ぐ。**
+   行き先が休符で空いている限り、いくつでも進む。
+
+   > **既にある音は飲み込まない。** 手前で止めて、理由を告げる。
+   黙って止まれば「できない」としか見えない——tab-1.34 の筋は守りつつ、
+   止めた所を呼ぶ側へ返す。
+
+   戻り値 {put, stopped, bars}
+     put     … 実際に越えた長さ
+     stopped … 'none' 行き着いた／'busy' 行き先に音がある／'end' 小節が尽きた
+     bars    … 置いた小節の数 */
+function setLenMulti(s,bar,i,len){
+  const n=bar.notes[i];
+  if(!n||n.kind==='rest') return {put:0,stopped:'none',bars:0};
+  const room=barTicks(s,bar)-n.start;
+  let rest=len-room;
+  if(rest<=0){ setLen(s,bar,i,len); return {put:0,stopped:'none',bars:0}; }
+
+  /* 置ける所を**先に調べ切る**。途中で止めると、半端な姿が残る */
+  const plan=[]; let cur=bar, left=rest, why='none';
+  while(left>0){
+    const nb=nextBarOf(s,cur.id);
+    if(!nb){ why='end'; break; }
+    const tot=barTicks(s,nb);
+    const head=(nb.notes||[]).slice().sort((a,b)=>a.start-b.start)[0];
+    const take=Math.min(left,tot);
+    if(!head||head.kind!=='rest'||head.start!==0||head.len<take){ why='busy'; break; }
+    plan.push({bar:nb,head:head,take:take,tot:tot});
+    left-=take; cur=nb;
+  }
+  if(!plan.length) return {put:0,stopped:why,bars:0};
+  const put=plan.reduce((a,p)=>a+p.take,0);
+
+  /* 手前の音を小節の終いまで伸ばし、順に置いてゆく */
+  setLen(s,bar,i,room);
+  const seed=()=>({stops:(n.stops||[]).map(o=>({s:o.s,f:o.f,t:{}})),
+    chord:null,voicing:null,stroke:null,stem:n.stem||null,
+    accent:false,staccato:false,sym:symHeld?symHeld(n.sym):{},
+    asGrace:'auto',lyric:null,tieOut:false});
+  const got=new Set((n.stops||[]).map(o=>o.s));
+  const tieTo=(b,st)=>{
+    const k=noteIdxIn(b,st); const m=(k>=0)?b.notes[k]:null;
+    if(!m) return;
+    (m.stops||[]).forEach(o=>{ o.t=o.t||{}; if(got.has(o.s)) o.t.tie=true; else delete o.t.tie; });
+    syncTieOut(b);
+  };
+  /* ══ 置いてから繋ぐ（tab-6.33）══
+     置くそばから繋ごうとすると、**次の小節がまだ休符のまま**なので
+     「相手がいない」と判じられ、立てた印がその場で消える。
+     全部置き終えてから、改めて繋ぐ。 */
+  plan.forEach(p=>{
+    const tail=p.head.len-p.take;
+    p.bar.notes=(p.bar.notes||[]).filter(m=>m!==p.head);
+    p.bar.notes.push(mkNote(Object.assign(seed(),{start:0,len:p.take,kind:'chord'})));
+    if(tail>0) p.bar.notes.push(mkNote({start:p.take,len:tail,kind:'rest',stops:null}));
+    normalizeBar(s,p.bar);
+  });
+  tieTo(bar,n.start);
+  for(let k=0;k<plan.length-1;k++) tieTo(plan[k].bar,0);
+  plan.forEach(p=>sanitizeBarLinks(s,p.bar));
+  return {put:put,stopped:(left>0?why:'none'),bars:plan.length};
+}
 function setLenAcross(s,bar,i,len){
   const total=barTicks(s,bar);
   const n=bar.notes[i]; if(!n||n.kind==='rest') return 0;
@@ -24179,6 +24260,8 @@ const HELP=[
     ['弦の線に触れて縦になぞる','触れた線が弦。上へ引けばフレットが上がります。音符の無い所から始めれば、その場に音符が生まれます'],
     ['横になぞる','その音符の長さを変えます。縦と横は先に動いた向きで決まり、一度決まれば指を離すまで入れ替わりません'],
     ['選んだ音を掴めば、まとめて変わります','**選びが掛かっている音を横になぞると、選んだ音すべての音価が変わります。**選んだ所の頭から敷き直し、小節線に掛かる音は割ってタイで繋ぎます。余りは休符になり、入りきらない音は消えます（何音消えたかはお伝えします）。**選びの外の音を掴んだときは、これまで通りその一音だけ**でございます'],
+    ['小節をいくつでも越えて伸ばせます','音価を横になぞって次の小節へ指を進めれば、**その小節の中の位置まで**伸びます。2小節目の終わりまでも、3小節目の途中までも。越えた分は小節ごとに割られ、タイで繋がります。**この先の小節に音符があるときは、その手前で止めて**その旨をお伝えします（書いてある音は飲み込みません）'],
+    ['選んだまま小節線を越えるときは','まとめて変える道は**選んだ範囲の中だけ**を書き換えますので、そのままでは小節線を越えられません。越えたいときは、**選んだ中のいちばん後ろの音**を引いてくださいませ。そこから先は一音ずつの道に切り替わり、越えた分は次の小節へ割ってタイで繋がります。途中の音で越えようとしたときは、その旨をお伝えします'],
     ['数で決めたいときは','選んだ音の板（〈選んだ音にまとめて〉）に【音価をそろえる】【3連符にそろえる】がございます。なぞりは指で測る道、札は数で決める道でございます'],
     ['★ 左へ引けば、頭が前へ伸びます','**右へ引けば末尾が動き、左へ引けば頭が動きます**（tab-4.59）。'
       +'頭より左へ指が出ますと、**末尾は掴んだ所に留めたまま、頭が指の先まで伸びます**。'
@@ -32868,8 +32951,27 @@ function bindPaper(){
        選びの**外**を掴んだ時は、これまで通りその一音だけ——
        選びを掛けたまま別の所を直したい、ということは起こる。 */
     { const n0=bar.notes[src];
-      drag.bulk=!!(n0&&n0.kind!=='rest'&&nsel&&nsel.size
-                   &&nselNotes().some(o=>o.barId===i.barId&&o.n===n0)); }
+      const list=(nsel&&nsel.size)?nselNotes():[];
+      drag.bulk=!!(n0&&n0.kind!=='rest'
+                   &&list.some(o=>o.barId===i.barId&&o.n===n0));
+      /* ══ 末尾を掴んだかどうかを覚えておく（tab-6.32）══
+         L様——「小節をまたいだ場合できないんだけど」。
+
+         tab-6.29 でまとめて敷く枝を足した時、`drag.base` は
+         なぞりの始めに**必ず**取られることを失念していた。ゆえに
+         選びの中を掴めば**常に**そちらへ入り、`return` する——
+         その先にある「小節線を越えた分を次の小節へ割る」処理へは
+         **一度も辿り着かない。** 選びを掛けたまま伸ばそうとすると、
+         理由も告げられずに小節線で止まっていた。
+
+         > **道を一本増やしたなら、元の道が通れるかを確かめねばならない。**
+
+         「伸ばしたい」という意図は、たいてい**束の末尾**に出る。
+         末尾を掴んでいる時だけ、越える道を開ける。
+         途中を掴んで越えようとした時は、黙って止めずに理由を告げる。 */
+      const last=list.length?list[list.length-1]:null;
+      drag.bulkLast=!!(drag.bulk&&last&&last.barId===i.barId&&last.n===n0);
+      drag.bulkTold=false; }
     /* 音程モードの長押しは輪のもの。こちらは名乗り出ない */
     if(mode==='tab') return;
     lp=setTimeout(()=>{
@@ -33005,14 +33107,33 @@ function bindPaper(){
        指が動くたびに、掴んだ姿から引き直して敷き直す。
        下描きのたびに取り消しへ積まない作法は、頭を引く枝（tab-4.59）と同じ。 */
     if(drag.bulk&&drag.base){
-      const want=Math.max(snap,len);
-      if(want===drag.bulkLen) return;
-      drag.bulkLen=want;
-      song=clone(drag.base);
-      const r=nselSetLen(want);
-      drag.bulkDrop=r?r.dropped:0;
-      render();
-      return;
+      /* ══ 越えようとしているなら、まとめての道から降りる（tab-6.32）══
+         まとめて敷く道は「選んだ範囲の中だけを書き換える」と決めた作りで、
+         小節線の向こうへは出られない。越えたい時は**元の道**へ渡す。 */
+      const wr0=drag.wrap.getBoundingClientRect();
+      const crossing=(e.clientX>wr0.right-1)
+                   &&(n.start+Math.max(snap,len))>barTicks(song,bar);
+      if(crossing&&drag.bulkLast){
+        /* 末尾を掴んでいる。いったん掴んだ姿へ戻し、一音の道へ明け渡す */
+        if(drag.bulkLen!=null){ song=clone(drag.base); drag.bulkLen=null; render(); }
+        drag.bulk=false;
+        /* この回は落ちて、下の「越えた分を次の小節へ」へ進む */
+      }else{
+        if(crossing&&!drag.bulkTold){
+          drag.bulkTold=true;
+          toast('選んでいる音をまとめて変える間は、小節線を越えられません。'
+               +'越えるときは、選んだ中のいちばん後ろの音を引いてくださいませ',
+               null,null,5000);
+        }
+        const want=Math.max(snap,len);
+        if(want===drag.bulkLen) return;
+        drag.bulkLen=want;
+        song=clone(drag.base);
+        const r=nselSetLen(want);
+        drag.bulkDrop=r?r.dropped:0;
+        render();
+        return;
+      }
     }
     const total=barTicks(song,bar);
     const room=total-n.start;
@@ -33033,19 +33154,76 @@ function bindPaper(){
        相手がいなければ、越えても何も起きない。 */
     const wr=drag.wrap.getBoundingClientRect();
     const crossed=(e.clientX>wr.right-1);
-    const wantRaw=len;                       /* 丸める前——越えた分を数えるのに要る */
+    let wantRaw=len;                         /* 丸める前——越えた分を数えるのに要る */
+    /* ══ 指の下にある小節で測る（tab-6.33）══
+       L様——「音価が2小節目の終わりまで伸ばしたいのにできない」。
+
+       `tickAt` は**掴んだ小節の枠**で比例計算する。分母がその小節の内幅ゆえ、
+       指を次の小節へ持っていっても、得られる長さはその比で伸びるだけ——
+       **次の小節を占め切ることも、二つ以上またぐこともできない。**
+
+       > **指が別の小節の上にいるなら、その小節の物差しで測れ。**
+
+       掴んだ小節から指の下の小節までを表示順に辿り、
+       間の小節は丸ごと、最後の小節はその中の位置を足す。 */
+    if(crossed){
+      let el=null;
+      try{ el=document.elementFromPoint(e.clientX,e.clientY); }catch(_){ el=null; }
+      const w2=el&&el.closest?el.closest('.mwrap'):null;
+      if(w2&&w2!==drag.wrap){
+        const idxOf=(si,pos)=>_disp.findIndex(x=>x.si===si&&x.pos===pos);
+        const i0=idxOf(drag.si,drag.pos);
+        const i1=idxOf(+w2.getAttribute('data-si'),+w2.getAttribute('data-pos'));
+        if(i0>=0&&i1>i0){
+          let acc=barTicks(song,bar)-n.start;      /* 掴んだ小節の残り */
+          for(let k=i0+1;k<i1;k++){
+            const bb=findBar(song,_disp[k].barId);
+            if(bb) acc+=barTicks(song,bb);
+          }
+          const bb1=findBar(song,_disp[i1].barId);
+          if(bb1){
+            const inT=Math.max(0,Math.min(barTicks(song,bb1),tickAt(w2,e.clientX,bb1)));
+            wantRaw=acc+inT;
+          }
+        }
+      }
+    }
     len=Math.max(snap,Math.min(room,len));
     /* ══ 越えた分は、割って次の小節へ（tab-4.53）══
        小節線で止めるのではなく、記譜の作法どおり**割ってタイで繋ぐ**。
        置ける時（次の小節の頭が休符で、越えた分が収まる）だけ置く——
        既にある音を飲み込まないという tab-1.34 の懸念はそのまま守る。 */
-    if(crossed&&wantRaw>room&&nbar){
+    /* ══ いくつ越えてもよい（tab-6.33）══
+       `setLenAcross` は隣の小節一つぶんが上限であった。
+       いまは `setLenMulti` が小節ごとに割って順に置く。
+       指を動かすたびに**掴んだ姿から引き直す**ので、戻す・伸ばすが自在になる。
+       行き先に音があれば手前で止め、**その理由を一度だけ告げる。** */
+    if(crossed&&wantRaw>room&&nbar&&drag.base){
       const over=Math.max(snap,Math.round((wantRaw-room)/snap)*snap);
-      if(over>0&&over<=nroom&&over!==drag.spilled){
-        const put=setLenAcross(song,bar,drag.src,room+over);
-        if(put>0){ drag.spilled=over; refreshMeasure(drag.wrap); render(); return; }
+      if(over>0&&over!==drag.spilled){
+        drag.spilled=over;
+        song=clone(drag.base);
+        const b2=findBar(song,drag.barId);
+        let r=null;
+        if(b2) r=setLenMulti(song,b2,drag.src,room+over);
+        if(r&&r.stopped!=='none'&&r.stopped!==drag.stopTold){
+          drag.stopTold=r.stopped;
+          toast(r.stopped==='busy'
+            ?'この先の小節に音符がありますので、そこまでで止めました'
+            :'これ以上は小節がありませんので、そこまでで止めました',null,null,4500);
+        }
+        if(r&&r.stopped==='none') drag.stopTold=null;
+        render(); return;
       }
       if(drag.spilled) return;               /* 既に割ってある。二重に置かない */
+    }
+    /* 小節の内へ戻ってきたら、こぼした分を取り消す */
+    if(drag.spilled&&!crossed&&drag.base){
+      drag.spilled=0; drag.stopTold=null;
+      song=clone(drag.base);
+      const b2=findBar(song,drag.barId);
+      if(b2) setLen(song,b2,drag.src,Math.max(snap,Math.min(room,len)));
+      render(); return;
     }
     const tieTo=crossed?tieTargetAcross(song,bar,n):null;
     /* 印を立てるのは、相手のいる弦だけ（tab-6.31） */
@@ -33094,6 +33272,8 @@ function bindPaper(){
       try{ paper.releasePointerCapture(e.pointerId); }catch(_){}
       suppressClick=true; setTimeout(()=>{ suppressClick=false; },400);
       /* まとめて敷いていたなら、そちらの始末（tab-6.29） */
+      /* 途中で一音の道へ明け渡した時（tab-6.32）は `drag.bulk` が倒れており、
+         下描きも戻してある。その場合はこちらを通らず、一音の始末に任せる */
       if(drag.bulk&&drag.base&&drag.bulkLen!=null){
         const want=drag.bulkLen;
         song=drag.base;
@@ -33105,6 +33285,23 @@ function bindPaper(){
             +(r.dropped?('。入りきらない'+r.dropped+'音は消えました'):''),
             null,null,r.dropped?6000:3000);
         }
+        drag=null; return;
+      }
+      /* 小節を越えて伸ばしていたなら、そちらの始末（tab-6.33）。
+         なぞっている間は下描きなので、掴んだ姿から引き直してひと組にまとめる */
+      if(drag.spilled&&drag.base){
+        const id0=drag.barId, i0=drag.src, over=drag.spilled;
+        const b0=findBar(drag.base,id0);
+        const st0=(b0&&b0.notes[i0])?b0.notes[i0].start:0;
+        const room0=b0?(barTicks(drag.base,b0)-st0):0;
+        song=drag.base;
+        let r=null;
+        tx('音符を小節の先まで伸ばす',()=>{
+          const b=findBar(song,id0); if(b) r=setLenMulti(song,b,i0,room0+over);
+        });
+        if(r&&r.bars>0) toast('小節'+(r.bars+1)+'つ分に伸ばし、タイで繋ぎました'
+          +(r.stopped==='busy'?'（この先に音符がありますので、そこまでで止めました）':''),
+          null,null,r.stopped==='busy'?5000:3000);
         drag=null; return;
       }
       /* 頭を引いていたなら、そちらの始末（tab-4.59） */
@@ -39498,7 +39695,10 @@ window.UTADORI={
   nselRegions, regNotes, layRegion, nselSetLen, valLabel, VAL_STRAIGHT, VAL_TRIPLET,
   clone, nkey, newBar, mkNote, barTicks, get nsel(){ return nsel; },
   setLenAcross, setLen, noteTieOut, syncTieOut,
-  tieTargetAcross, tieStrsAcross, sanitizeTiesAcross,   /* saveLibrary は下の library の節に一つだけ置く */
+  setLenMulti, tieHalf,
+  tieTargetAcross, tieStrsAcross, sanitizeTiesAcross,
+  nselNotes,
+  engrave,   /* saveLibrary は下の library の節に一つだけ置く */
   checkSong, checkSong2, openCheckSong, staleCheckSheet,
 
   /* ── 描く ── */
