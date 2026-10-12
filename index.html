@@ -1586,6 +1586,71 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 @media (max-width:700px){ #tb-amp{display:none!important} #bb-tr .bb-btn.bb-amp{display:flex} }
 @media print{ #amp-wrap,.amp-open,.bb-amp{display:none!important} }
 
+/* ══════════════════════════════════════════
+   ミキサー（tab-6.45）——スタジオの卓（夜）
+   ══════════════════════════════════════════ */
+#mx{position:fixed;inset:0;z-index:62;display:flex;flex-direction:column;color:#e9e3d6;background:#101113;
+  font-family:var(--ds-font,system-ui,sans-serif);padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#mx .top{display:flex;align-items:center;gap:12px;padding:12px 16px}
+#mx .ttl{font:700 18px/1 var(--ds-font,system-ui,sans-serif);letter-spacing:.12em;color:#f1e7d2}
+#mx .sp{flex:1}
+#mx .cls{height:36px;padding:0 14px;border-radius:8px;border:0;cursor:pointer;font:700 13px/1 var(--ds-font,system-ui,sans-serif);
+  background:linear-gradient(180deg,#2c2a27,#1a1918);color:#e6dccb;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000}
+#mx .desk{flex:1;min-height:0;margin:0 14px;border-radius:10px;display:flex;justify-content:safe center;align-items:stretch;gap:10px;
+  padding:14px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px),linear-gradient(180deg,#26282b,#1b1c1f);
+  box-shadow:inset 0 0 0 1px #000,inset 0 2px 0 rgba(255,255,255,.05)}
+#mx .note{font-size:12px;text-align:center;padding:10px 16px 14px;margin:0;color:#a9a194;line-height:1.5}
+.mx-strip{width:104px;flex:0 0 auto;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 8px;
+  background:linear-gradient(180deg,#2f3135,#232528);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #000,0 4px 10px rgba(0,0,0,.45)}
+.mx-strip.master{background:linear-gradient(180deg,#3a3326,#2a251c);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000,0 0 0 2px rgba(255,179,64,.25)}
+.mx-gap{width:14px;flex:0 0 auto}
+.mx-name{width:100%;text-align:center;font:700 13px/1.1 'Segoe Print','Bradley Hand','Comic Sans MS',var(--ds-font,sans-serif);padding:7px 4px;
+  color:#1d2a44;background:#f3ecd9;border-radius:2px;transform:rotate(-1.2deg);box-shadow:0 1px 2px rgba(0,0,0,.5);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mx-kwrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;height:64px}
+.mx-kspace{height:64px}
+.mx-mspace{height:26px}
+.mx-kscale{position:absolute;top:2px;width:68px;display:flex;justify-content:space-between;font:700 9px/1 var(--ds-font,system-ui,sans-serif);color:#cfc7b6;opacity:.75}
+.mx-knob{--s:40px;position:relative;width:var(--s);height:var(--s);border-radius:50%;touch-action:none;cursor:ew-resize;
+  background:radial-gradient(circle at 50% 50%,#2a2a2c 0 46%,transparent 47%),repeating-conic-gradient(from 0deg,#141415 0 4deg,#3a3a3d 4deg 8deg);
+  box-shadow:0 2px 3px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.6)}
+.mx-knob::before{content:'';position:absolute;inset:22%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9d6cf,#8d8a84 55%,#55534f)}
+.mx-knob i{position:absolute;left:50%;top:7%;width:2px;height:38%;margin-left:-1px;border-radius:1px;transform-origin:50% 110%;background:#f6f1e6;z-index:1}
+.mx-knob:focus-visible,.mx-fader:focus-visible{outline:2px solid #ffb340;outline-offset:3px}
+.mx-klab{font-size:11px;color:#cfc7b6;white-space:nowrap}
+.mx-mute{height:26px;padding:0 10px;border-radius:5px;border:0;cursor:pointer;display:flex;align-items:center;gap:6px;
+  font:700 11.5px/1 var(--ds-font,system-ui,sans-serif);color:#e6dccb;
+  background:linear-gradient(180deg,#3a3835,#24221f);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000}
+.mx-mute .led{width:7px;height:7px;border-radius:50%;background:#3a2a20}
+.mx-mute.on{color:#ffb39f}
+.mx-mute.on .led{background:#ff5a3c;box-shadow:0 0 6px #ff5a3c}
+.mx-fz{flex:1;min-height:140px;width:100%;display:flex;justify-content:center;gap:10px;position:relative}
+.mx-meter{width:9px;border-radius:3px;position:relative;overflow:hidden;background:#07080a;box-shadow:inset 0 0 0 1px #000}
+.mx-meter b{position:absolute;left:0;right:0;top:0;bottom:0;clip-path:inset(100% 0 0 0);
+  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.65) 3px 4px),
+    linear-gradient(0deg,#3fdc8a 0,#3fdc8a 60%,#ffcf4a 80%,#ff5a3c 100%)}
+.mx-fader{position:relative;width:46px;touch-action:none;cursor:ns-resize}
+.mx-track{position:absolute;left:50%;top:6px;bottom:6px;width:6px;margin-left:-3px;border-radius:3px;background:#050506;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.06)}
+.mx-tick{position:absolute;left:4px;right:4px;height:1px;background:rgba(255,255,255,.18)}
+.mx-tn{position:absolute;right:-16px;font:600 9px/1 var(--ds-font,system-ui,sans-serif);transform:translateY(-50%);color:#bdb6a8;opacity:.7}
+.mx-cap{position:absolute;left:50%;width:40px;height:22px;margin:-11px 0 0 -20px;border-radius:4px;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px),linear-gradient(180deg,#e9e9e9,#b4b4b4 45%,#8a8a8a 55%,#c9c9c9);
+  box-shadow:0 3px 6px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.7)}
+.mx-cap::after{content:'';position:absolute;left:5px;right:5px;top:50%;height:2px;margin-top:-1px;background:#ff9d2e;box-shadow:0 0 4px rgba(255,157,46,.7)}
+.mx-val{min-width:44px;text-align:center;font:700 14px/1 'Courier New',monospace;padding:5px 6px;border-radius:4px;
+  background:#0a0b0c;color:#7cf0b0;text-shadow:0 0 6px rgba(124,240,176,.45);box-shadow:inset 0 1px 3px rgba(0,0,0,.9)}
+@media (max-width:520px){
+  .mx-strip{width:86px;padding:8px 6px;gap:8px}
+  #mx .desk{margin:0 8px;padding:10px;gap:8px}
+  .mx-name{font-size:12px}
+}
+#tb-mix{gap:6px}
+#bb-tr .bb-btn.bb-mix{display:none}
+@media (max-width:700px){ #tb-mix{display:none!important} #bb-tr .bb-btn.bb-mix{display:flex} }
+@media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
+
 </style>
 </head>
 <body>
@@ -1705,7 +1770,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.44', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.45', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -1719,6 +1784,8 @@ const ICONS={
   loop:'<path d="M4.2 8.6a5.8 5.8 0 0 1 9.9-3M15.8 11.4a5.8 5.8 0 0 1-9.9 3"/>'
       +'<path d="M13.6 2.4v3.4h-3.4M6.4 17.6v-3.4h3.4"/>',
   rec:'<circle cx="10" cy="10" r="4.6" fill="currentColor" stroke="none"/>',
+  mix:'<path d="M5 3v14M10 3v14M15 3v14"/><rect x="3.2" y="10.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/>'
+     +'<rect x="8.2" y="5.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/><rect x="13.2" y="12.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/>',
   amp:'<rect x="2.6" y="4.2" width="14.8" height="11.6" rx="1.6"/><path d="M2.6 8.2h14.8"/>'
      +'<circle cx="6" cy="6.2" r=".7" fill="currentColor"/><circle cx="9" cy="6.2" r=".7" fill="currentColor"/>'
      +'<circle cx="12" cy="6.2" r=".7" fill="currentColor"/><path d="M5.2 10.8h9.6M5.2 13h9.6" stroke-width="1"/>',
@@ -2552,6 +2619,7 @@ function mkPart(o){
   /* カポはパートごと（tab-6.39）。持っていなければ書かない——
      古い曲は `alignParts` が曲のカポを写す */
   if(Number.isInteger(o.capo)) p.capo=Math.max(0,Math.min(12,o.capo));
+  if(o.mix&&typeof o.mix==='object') p.mix=normMix(o.mix,true);   /* 音量・パン・消音（tab-6.45） */
   return p;
 }
 /* 小節に「いまのパートの音符」という窓を開ける。
@@ -15043,7 +15111,10 @@ function backingStrum(s,ev,at){
   /* 撫でる幅は音価から。速い曲ほど狭く（tab-6.10） */
   const spt=(60/Math.max(20,(s.play&&s.play.bpm)||96))/T.QUARTER;
   const spread=Math.min(0.030,Math.max(0.008,(ev.len*spt)*0.10));
-  const vol=(ev.accent?0.26:0.19)*(ev.brush?0.55:1);
+  /* 伴奏のフェーダーを掛ける（tab-6.45）。消音なら弾かない */
+  const mg=mixGain('back'); if(mg<=0) return;
+  mixPulse('back',ev.accent?0.8:0.6);
+  const vol=(ev.accent?0.26:0.19)*(ev.brush?0.55:1)*mg;
   ev.notes.forEach((o,i)=>{
     const t=at+spread*(i/Math.max(1,n-1));
     /* ブラッシングは短く、音程を持たせない代わりに弱く撫でる */
@@ -16469,6 +16540,7 @@ function audioReady(){
      潰れて曖昧になるより始末がよい（数字の色で 200% 超は申し上げている）。 */
   RECG=AC.createGain(); RECG.gain.value=recVolOf(); RECG.connect(MASTER);
   DRUMG=AC.createGain(); DRUMG.gain.value=DRUM_MIX; DRUMG.connect(MASTER);
+  try{ mixApplyAll(); }catch(_){}     /* ミキサーの値を出口へ（tab-6.45） */
   /* iOS の無音対策：長さ0のバッファを一度鳴らして解錠する */
   try{ const b=AC.createBuffer(1,1,22050); const src=AC.createBufferSource();
        src.buffer=b; src.connect(MASTER); src.start(0); }catch(e){}
@@ -16745,7 +16817,7 @@ function playClick(at,accent){
   g.gain.setValueAtTime(0.0001,at);
   g.gain.exponentialRampToValueAtTime(v,at+0.001);
   g.gain.exponentialRampToValueAtTime(0.0001,at+d);
-  o.connect(f); f.connect(g); g.connect(MASTER);
+  o.connect(f); f.connect(g); g.connect(metroOut());
   o.start(at); o.stop(at+d+0.02);
 }
 /* ══ カウントインの合図（tab-5.70 で立ち上がりを揃えた）══
@@ -16796,7 +16868,7 @@ function playCount(at,accent){
   g.gain.setValueAtTime(0.0001,at);
   g.gain.exponentialRampToValueAtTime(accent?0.3:0.2,at+0.001);   /* 曲の拍と同じ鋭さ */
   g.gain.exponentialRampToValueAtTime(0.0001,at+0.10);
-  o.connect(g); g.connect(MASTER);
+  o.connect(g); g.connect(metroOut());
   o.start(at); o.stop(at+0.13);
 }
 
@@ -17255,10 +17327,12 @@ let GLP2=null,GPRE2=null,GSHP2=null,_shpK2=null;   /* 二段目の潰し（tab-1
    **部品一式をパートごとに控えて、鳴らすパートの物と差し替える**（`busUse`）。
    作り方・配り方（`guitarBus`／`fxChain`／`fxApply`）は一行も変えずに済む。
    出口（`MASTER`）だけは全パートで共有する。 */
+/* 出口の音量・パン・目盛り（tab-6.45）。これもパートごとの部品として差し替える */
+let PMIX=null, PPAN=null, PMET=null;
 const _BUSES=new Map(); let _busCur=0;
-function busFresh(){ return {GBUS:null, GDRY:null, GWET:null, GCONV:null, GTRIM:null, _gbId:null, FXIN:null, FXOUT:null, _fxId:null, _fxLFO:[], FXCOMP:null, FXCOMP_DRY:null, FXCOMP_WET:null, FXWAH:null, FXWAH_DRY:null, FXWAH_WET:null, FXWAH_LFO:null, FXWAH_DEPTH:null, FXWAH_UP:null, FXPH_DRY:null, FXPH_WET:null, FXPH_LFO:null, FXPH_DEPTH:null, FXPH_FB:null, FXCH_DRY:null, FXCH_WET:null, FXCH_LFO:[], FXCH_DEPTH:[], FXFL_DRY:null, FXFL_WET:null, FXFL_LFO:null, FXFL_DEPTH:null, FXFL_FB:null, FXTR:null, FXTR_LFO:null, FXTR_DEPTH:null, FXDL_DRY:null, FXDL_WET:null, FXDL_D:null, FXDL_FB:null, FXDL_LP:null, FXRV_DRY:null, FXRV_WET:null, FXRV_CONV:null, FXRV_PRE:null, FXTRIM:null, FXCOMP_SEND:null, FXWAH_SEND:null, FXPH_SEND:null, FXDL_SEND:null, FXRV_SEND:null, _fxWired:false, FXTR_START:null, _trHz:5, _trWave:'sine', FXWAH_START:null, GPRE:null, GSHP:null, GCAB:null, GMID:null, GDIRT:null, GCLEAN:null, _shpK:null, GHP:null, GRECT:null, _shpR:null, GLP2:null, GPRE2:null, GSHP2:null, _shpK2:null}; }
-function busSave(){ return {GBUS:GBUS, GDRY:GDRY, GWET:GWET, GCONV:GCONV, GTRIM:GTRIM, _gbId:_gbId, FXIN:FXIN, FXOUT:FXOUT, _fxId:_fxId, _fxLFO:_fxLFO, FXCOMP:FXCOMP, FXCOMP_DRY:FXCOMP_DRY, FXCOMP_WET:FXCOMP_WET, FXWAH:FXWAH, FXWAH_DRY:FXWAH_DRY, FXWAH_WET:FXWAH_WET, FXWAH_LFO:FXWAH_LFO, FXWAH_DEPTH:FXWAH_DEPTH, FXWAH_UP:FXWAH_UP, FXPH_DRY:FXPH_DRY, FXPH_WET:FXPH_WET, FXPH_LFO:FXPH_LFO, FXPH_DEPTH:FXPH_DEPTH, FXPH_FB:FXPH_FB, FXCH_DRY:FXCH_DRY, FXCH_WET:FXCH_WET, FXCH_LFO:FXCH_LFO, FXCH_DEPTH:FXCH_DEPTH, FXFL_DRY:FXFL_DRY, FXFL_WET:FXFL_WET, FXFL_LFO:FXFL_LFO, FXFL_DEPTH:FXFL_DEPTH, FXFL_FB:FXFL_FB, FXTR:FXTR, FXTR_LFO:FXTR_LFO, FXTR_DEPTH:FXTR_DEPTH, FXDL_DRY:FXDL_DRY, FXDL_WET:FXDL_WET, FXDL_D:FXDL_D, FXDL_FB:FXDL_FB, FXDL_LP:FXDL_LP, FXRV_DRY:FXRV_DRY, FXRV_WET:FXRV_WET, FXRV_CONV:FXRV_CONV, FXRV_PRE:FXRV_PRE, FXTRIM:FXTRIM, FXCOMP_SEND:FXCOMP_SEND, FXWAH_SEND:FXWAH_SEND, FXPH_SEND:FXPH_SEND, FXDL_SEND:FXDL_SEND, FXRV_SEND:FXRV_SEND, _fxWired:_fxWired, FXTR_START:FXTR_START, _trHz:_trHz, _trWave:_trWave, FXWAH_START:FXWAH_START, GPRE:GPRE, GSHP:GSHP, GCAB:GCAB, GMID:GMID, GDIRT:GDIRT, GCLEAN:GCLEAN, _shpK:_shpK, GHP:GHP, GRECT:GRECT, _shpR:_shpR, GLP2:GLP2, GPRE2:GPRE2, GSHP2:GSHP2, _shpK2:_shpK2}; }
-function busLoad(o){ GBUS=o.GBUS; GDRY=o.GDRY; GWET=o.GWET; GCONV=o.GCONV; GTRIM=o.GTRIM; _gbId=o._gbId; FXIN=o.FXIN; FXOUT=o.FXOUT; _fxId=o._fxId; _fxLFO=o._fxLFO; FXCOMP=o.FXCOMP; FXCOMP_DRY=o.FXCOMP_DRY; FXCOMP_WET=o.FXCOMP_WET; FXWAH=o.FXWAH; FXWAH_DRY=o.FXWAH_DRY; FXWAH_WET=o.FXWAH_WET; FXWAH_LFO=o.FXWAH_LFO; FXWAH_DEPTH=o.FXWAH_DEPTH; FXWAH_UP=o.FXWAH_UP; FXPH_DRY=o.FXPH_DRY; FXPH_WET=o.FXPH_WET; FXPH_LFO=o.FXPH_LFO; FXPH_DEPTH=o.FXPH_DEPTH; FXPH_FB=o.FXPH_FB; FXCH_DRY=o.FXCH_DRY; FXCH_WET=o.FXCH_WET; FXCH_LFO=o.FXCH_LFO; FXCH_DEPTH=o.FXCH_DEPTH; FXFL_DRY=o.FXFL_DRY; FXFL_WET=o.FXFL_WET; FXFL_LFO=o.FXFL_LFO; FXFL_DEPTH=o.FXFL_DEPTH; FXFL_FB=o.FXFL_FB; FXTR=o.FXTR; FXTR_LFO=o.FXTR_LFO; FXTR_DEPTH=o.FXTR_DEPTH; FXDL_DRY=o.FXDL_DRY; FXDL_WET=o.FXDL_WET; FXDL_D=o.FXDL_D; FXDL_FB=o.FXDL_FB; FXDL_LP=o.FXDL_LP; FXRV_DRY=o.FXRV_DRY; FXRV_WET=o.FXRV_WET; FXRV_CONV=o.FXRV_CONV; FXRV_PRE=o.FXRV_PRE; FXTRIM=o.FXTRIM; FXCOMP_SEND=o.FXCOMP_SEND; FXWAH_SEND=o.FXWAH_SEND; FXPH_SEND=o.FXPH_SEND; FXDL_SEND=o.FXDL_SEND; FXRV_SEND=o.FXRV_SEND; _fxWired=o._fxWired; FXTR_START=o.FXTR_START; _trHz=o._trHz; _trWave=o._trWave; FXWAH_START=o.FXWAH_START; GPRE=o.GPRE; GSHP=o.GSHP; GCAB=o.GCAB; GMID=o.GMID; GDIRT=o.GDIRT; GCLEAN=o.GCLEAN; _shpK=o._shpK; GHP=o.GHP; GRECT=o.GRECT; _shpR=o._shpR; GLP2=o.GLP2; GPRE2=o.GPRE2; GSHP2=o.GSHP2; _shpK2=o._shpK2; }
+function busFresh(){ return {GBUS:null, GDRY:null, GWET:null, GCONV:null, GTRIM:null, _gbId:null, FXIN:null, FXOUT:null, _fxId:null, _fxLFO:[], FXCOMP:null, FXCOMP_DRY:null, FXCOMP_WET:null, FXWAH:null, FXWAH_DRY:null, FXWAH_WET:null, FXWAH_LFO:null, FXWAH_DEPTH:null, FXWAH_UP:null, FXPH_DRY:null, FXPH_WET:null, FXPH_LFO:null, FXPH_DEPTH:null, FXPH_FB:null, FXCH_DRY:null, FXCH_WET:null, FXCH_LFO:[], FXCH_DEPTH:[], FXFL_DRY:null, FXFL_WET:null, FXFL_LFO:null, FXFL_DEPTH:null, FXFL_FB:null, FXTR:null, FXTR_LFO:null, FXTR_DEPTH:null, FXDL_DRY:null, FXDL_WET:null, FXDL_D:null, FXDL_FB:null, FXDL_LP:null, FXRV_DRY:null, FXRV_WET:null, FXRV_CONV:null, FXRV_PRE:null, FXTRIM:null, FXCOMP_SEND:null, FXWAH_SEND:null, FXPH_SEND:null, FXDL_SEND:null, FXRV_SEND:null, _fxWired:false, FXTR_START:null, _trHz:5, _trWave:'sine', FXWAH_START:null, GPRE:null, GSHP:null, GCAB:null, GMID:null, GDIRT:null, GCLEAN:null, _shpK:null, GHP:null, GRECT:null, _shpR:null, GLP2:null, GPRE2:null, GSHP2:null, _shpK2:null, PMIX:null, PPAN:null, PMET:null}; }
+function busSave(){ return {GBUS:GBUS, GDRY:GDRY, GWET:GWET, GCONV:GCONV, GTRIM:GTRIM, _gbId:_gbId, FXIN:FXIN, FXOUT:FXOUT, _fxId:_fxId, _fxLFO:_fxLFO, FXCOMP:FXCOMP, FXCOMP_DRY:FXCOMP_DRY, FXCOMP_WET:FXCOMP_WET, FXWAH:FXWAH, FXWAH_DRY:FXWAH_DRY, FXWAH_WET:FXWAH_WET, FXWAH_LFO:FXWAH_LFO, FXWAH_DEPTH:FXWAH_DEPTH, FXWAH_UP:FXWAH_UP, FXPH_DRY:FXPH_DRY, FXPH_WET:FXPH_WET, FXPH_LFO:FXPH_LFO, FXPH_DEPTH:FXPH_DEPTH, FXPH_FB:FXPH_FB, FXCH_DRY:FXCH_DRY, FXCH_WET:FXCH_WET, FXCH_LFO:FXCH_LFO, FXCH_DEPTH:FXCH_DEPTH, FXFL_DRY:FXFL_DRY, FXFL_WET:FXFL_WET, FXFL_LFO:FXFL_LFO, FXFL_DEPTH:FXFL_DEPTH, FXFL_FB:FXFL_FB, FXTR:FXTR, FXTR_LFO:FXTR_LFO, FXTR_DEPTH:FXTR_DEPTH, FXDL_DRY:FXDL_DRY, FXDL_WET:FXDL_WET, FXDL_D:FXDL_D, FXDL_FB:FXDL_FB, FXDL_LP:FXDL_LP, FXRV_DRY:FXRV_DRY, FXRV_WET:FXRV_WET, FXRV_CONV:FXRV_CONV, FXRV_PRE:FXRV_PRE, FXTRIM:FXTRIM, FXCOMP_SEND:FXCOMP_SEND, FXWAH_SEND:FXWAH_SEND, FXPH_SEND:FXPH_SEND, FXDL_SEND:FXDL_SEND, FXRV_SEND:FXRV_SEND, _fxWired:_fxWired, FXTR_START:FXTR_START, _trHz:_trHz, _trWave:_trWave, FXWAH_START:FXWAH_START, GPRE:GPRE, GSHP:GSHP, GCAB:GCAB, GMID:GMID, GDIRT:GDIRT, GCLEAN:GCLEAN, _shpK:_shpK, GHP:GHP, GRECT:GRECT, _shpR:_shpR, GLP2:GLP2, GPRE2:GPRE2, GSHP2:GSHP2, _shpK2:_shpK2, PMIX:PMIX, PPAN:PPAN, PMET:PMET}; }
+function busLoad(o){ GBUS=o.GBUS; GDRY=o.GDRY; GWET=o.GWET; GCONV=o.GCONV; GTRIM=o.GTRIM; _gbId=o._gbId; FXIN=o.FXIN; FXOUT=o.FXOUT; _fxId=o._fxId; _fxLFO=o._fxLFO; FXCOMP=o.FXCOMP; FXCOMP_DRY=o.FXCOMP_DRY; FXCOMP_WET=o.FXCOMP_WET; FXWAH=o.FXWAH; FXWAH_DRY=o.FXWAH_DRY; FXWAH_WET=o.FXWAH_WET; FXWAH_LFO=o.FXWAH_LFO; FXWAH_DEPTH=o.FXWAH_DEPTH; FXWAH_UP=o.FXWAH_UP; FXPH_DRY=o.FXPH_DRY; FXPH_WET=o.FXPH_WET; FXPH_LFO=o.FXPH_LFO; FXPH_DEPTH=o.FXPH_DEPTH; FXPH_FB=o.FXPH_FB; FXCH_DRY=o.FXCH_DRY; FXCH_WET=o.FXCH_WET; FXCH_LFO=o.FXCH_LFO; FXCH_DEPTH=o.FXCH_DEPTH; FXFL_DRY=o.FXFL_DRY; FXFL_WET=o.FXFL_WET; FXFL_LFO=o.FXFL_LFO; FXFL_DEPTH=o.FXFL_DEPTH; FXFL_FB=o.FXFL_FB; FXTR=o.FXTR; FXTR_LFO=o.FXTR_LFO; FXTR_DEPTH=o.FXTR_DEPTH; FXDL_DRY=o.FXDL_DRY; FXDL_WET=o.FXDL_WET; FXDL_D=o.FXDL_D; FXDL_FB=o.FXDL_FB; FXDL_LP=o.FXDL_LP; FXRV_DRY=o.FXRV_DRY; FXRV_WET=o.FXRV_WET; FXRV_CONV=o.FXRV_CONV; FXRV_PRE=o.FXRV_PRE; FXTRIM=o.FXTRIM; FXCOMP_SEND=o.FXCOMP_SEND; FXWAH_SEND=o.FXWAH_SEND; FXPH_SEND=o.FXPH_SEND; FXDL_SEND=o.FXDL_SEND; FXRV_SEND=o.FXRV_SEND; _fxWired=o._fxWired; FXTR_START=o.FXTR_START; _trHz=o._trHz; _trWave=o._trWave; FXWAH_START=o.FXWAH_START; GPRE=o.GPRE; GSHP=o.GSHP; GCAB=o.GCAB; GMID=o.GMID; GDIRT=o.GDIRT; GCLEAN=o.GCLEAN; _shpK=o._shpK; GHP=o.GHP; GRECT=o.GRECT; _shpR=o._shpR; GLP2=o.GLP2; GPRE2=o.GPRE2; GSHP2=o.GSHP2; _shpK2=o._shpK2; PMIX=o.PMIX; PPAN=o.PPAN; PMET=o.PMET; }
 function busUse(pi){
   pi=(pi|0);
   if(pi===_busCur) return;
@@ -18130,7 +18204,7 @@ function guitarBus(){
        組めなければ `GTRIM→MASTER` で直に繋がれ、以後どれだけ
        列を組み直しても**音は通らない。**
        ゆえに繋ぎは外へ出し、組めた時に一度だけ差し替える。 */
-    GTRIM.connect(MASTER);
+    GTRIM.connect(busOut());          /* パートの出口へ（tab-6.45） */
     _fxWired=false;
     /* ══ 組んだら、その場で配る（tab-3.21）══
        L様——「起動してすぐと何かをいじった後だと聞こえ方が違う」。
@@ -18157,8 +18231,8 @@ function guitarBus(){
       const fx=fxChain();
       /* 組めた時に一度だけ、素通りの道から列へ差し替える（tab-3.25） */
       if(fx&&!_fxWired){
-        try{ GTRIM.disconnect(MASTER); }catch(_){}
-        GTRIM.connect(fx); FXOUT.connect(MASTER);
+        try{ GTRIM.disconnect(busOut()); }catch(_){}
+        GTRIM.connect(fx); FXOUT.connect(busOut());
         _fxWired=true;
       }
       fxApply(); _fxId=fk;
@@ -21563,6 +21637,7 @@ function playStart(){
       try{ if(FXWAH_START) FXWAH_START(TP.t0); }catch(_){}
     });
     _sndNow=_keepS; busUse(song.part||0);
+    mixApplyAll();                    /* ミキサーの値を出口へ（tab-6.45） */
   }catch(_){}
 
   TP.timer=setInterval(schedTick,POLL_MS);
@@ -21999,7 +22074,8 @@ window.SL_TAB={
   now:()=>AC?AC.currentTime:0, playing:()=>TP.playing, disp:()=>_disp, song:()=>song,
   loop:()=>{ try{ return TP.loop?loopIdx():null; }catch(_){ return null; } },
   follow:(el)=>{ try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){} },
-  ampButton:()=>$('tb-amp')||ampTopButton()
+  ampButton:()=>$('tb-amp')||ampTopButton(),
+  mixButton:()=>$('tb-mix')||mixTopButton()
 };
 function setPlayhead(barId){
   if(TP.curBar===barId) return;
@@ -30132,6 +30208,7 @@ function renderPlayBar(){
     if(REC.on) b.classList.add('rec-on');
     /* 〈アンプ〉（tab-6.43）。狭い画面では上の帯に置けないので、ここに出す */
     { const a=mk(tg,'amp','アンプ（ギターの音を変えます）',ampIsOpen(),ampToggle,'bb-amp'); a.classList.add('bb-amp'); }
+    { const m=mk(tg,'mix','ミキサー（パートごとの音量・パン）',mixIsOpen(),mixToggle,'bb-mix'); m.classList.add('bb-mix'); }
     let lp=null;
     b.addEventListener('pointerdown',()=>{ if(REC.on||!recHas()) return;
       lp=setTimeout(()=>{ lp=null; recClear(); toast('録音を消しました'); renderPlayBar(); },650); });
@@ -34217,6 +34294,7 @@ const _dispNo=new Map();
 function render(){
   renderTopbar();
   if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
+  if(MXEL) mixRender();        /* ミキサーも同じ（tab-6.45） */
   renderModeBar();
   const paper=$('paper'); if(!paper) return;
   /* ══ 組み直しても、見ている所を失わない（tab-1.48）══
@@ -39861,6 +39939,7 @@ function ampIsOpen(){ return !!AMP.el; }
 function ampToggle(){ if(AMP.el) ampClose(); else ampOpen(); }
 function ampOpen(){
   if(AMP.el) return;
+  if(typeof mixClose==='function') mixClose();
   const w=document.createElement('div'); w.id='amp-wrap';
   document.body.appendChild(w); AMP.el=w;
   ampRender(); ampMarks();
@@ -40020,13 +40099,256 @@ function ampTopButton(){
 window.addEventListener('resize',()=>ampPlace());
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&AMP.el&&!$('pop-ov')){ ampClose(); } });
 
+/* ══════════════════════════════════════════
+   ミキサー（tab-6.45）
+   L様——「パートごとに音量をいじったりパンを振る機能欲しい。フェーダーで」。
+   ScoreLineCompass のミキサーを手本に、スタジオの卓（夜）の姿で組んだ。
+
+   並べる帯——パートごと（音量・パン・消音）、伴奏・ドラム・メトロノーム（音量・消音）、全体。
+   値は曲ごとに覚える。パートの値はパートが持ち（`part.mix`）、ほかは `song.play.mix`。
+   音量は 0〜100、80 が今までの大きさ（等倍）。
+
+   音の道——パートの通り道（tab-6.44）の出口に、音量（PMIX）とパン（PPAN）を一段ずつ挟んだ。
+   伴奏はギターの通り道を借りて弾くので、弾く強さにフェーダーを掛ける。
+   ドラムは DRUMG、メトロノームは METG、全体は MASTER の音量を動かす。
+   ══════════════════════════════════════════ */
+var METG=null, MIXAN={}, MIXPULSE={back:0}, MIXTMP={}, MXEL=null, MXRAF=null;
+function normMix(o,pan){
+  o=o||{};
+  const v=Number.isFinite(+o.vol)?Math.max(0,Math.min(100,Math.round(+o.vol))):80;
+  const r={vol:v,mute:!!o.mute};
+  if(pan) r.pan=Number.isFinite(+o.pan)?Math.max(-50,Math.min(50,Math.round(+o.pan))):0;
+  return r;
+}
+function mixGainOf(m){ return m.mute?0:Math.pow(m.vol/80,2); }
+function mixOther(k){
+  if(MIXTMP[k]) return MIXTMP[k];
+  const m=(typeof song!=='undefined'&&song&&song.play&&song.play.mix&&song.play.mix[k])||null;
+  return normMix(m,false);
+}
+function mixGain(k){ try{ return mixGainOf(mixOther(k)); }catch(_){ return 1; } }
+function mixPartOf(pi){
+  if(MIXTMP['p'+pi]) return MIXTMP['p'+pi];
+  const pt=(typeof song!=='undefined'&&song&&song.parts)?song.parts[pi]:null;
+  return normMix(pt&&pt.mix,true);
+}
+function mixPulse(k,v){ MIXPULSE[k]=Math.max(MIXPULSE[k]||0,v); }
+/* パートの通り道の出口。初めて呼ばれた時に組む */
+function busOut(){
+  if(!PMIX){
+    PMIX=AC.createGain();
+    PPAN=AC.createStereoPanner?AC.createStereoPanner():null;
+    if(PPAN){ PMIX.connect(PPAN); PPAN.connect(MASTER); } else PMIX.connect(MASTER);
+    try{ PMET=AC.createAnalyser(); PMET.fftSize=1024; PMIX.connect(PMET); }catch(_){ PMET=null; }
+    mixApplyNode(_busCur,PMIX,PPAN);
+  }
+  return PMIX;
+}
+function busObj(pi){ return (pi===_busCur)?{PMIX,PPAN,PMET}:_BUSES.get(pi); }
+function mixSet(param,v){
+  try{ param.setTargetAtTime(v,AC.currentTime,0.02); }catch(_){ try{ param.value=v; }catch(__){} }
+}
+function mixApplyNode(pi,g,pn){
+  const m=mixPartOf(pi);
+  if(g) mixSet(g.gain,mixGainOf(m));
+  if(pn) mixSet(pn.pan,m.pan/50);
+}
+function metroOut(){
+  if(!METG){
+    METG=AC.createGain(); METG.gain.value=mixGain('metro'); METG.connect(MASTER);
+    try{ MIXAN.metro=AC.createAnalyser(); MIXAN.metro.fftSize=512; METG.connect(MIXAN.metro); }catch(_){}
+  }
+  return METG;
+}
+function mixApplyAll(){
+  if(!AC||typeof song==='undefined'||!song) return;
+  for(let i=0;i<partCount(song);i++){ const o=busObj(i); if(o&&o.PMIX) mixApplyNode(i,o.PMIX,o.PPAN); }
+  if(DRUMG) mixSet(DRUMG.gain,DRUM_MIX*mixGain('drum'));
+  if(METG) mixSet(METG.gain,mixGain('metro'));
+  if(MASTER) mixSet(MASTER.gain,0.9*mixGain('master'));
+}
+/* 値を書く（離した時・消音を押した時）。取り消しは一手で戻る */
+function mixCommit(key,m){
+  delete MIXTMP[key];
+  tx(m._label||'ミキサーを変える',()=>{
+    if(key[0]==='p'&&/^p\d+$/.test(key)){
+      const pt=song.parts[+key.slice(1)]; if(pt) pt.mix=normMix(m,true);
+    }else{
+      song.play.mix=Object.assign({},song.play.mix||{});
+      song.play.mix[key]=normMix(m,false);
+    }
+  },FREE);
+  try{ audioReady(); mixApplyAll(); }catch(_){}
+}
+function mixIsOpen(){ return !!MXEL; }
+function mixToggle(){ if(MXEL) mixClose(); else mixOpen(); }
+function mixOpen(){
+  if(MXEL) return;
+  try{ audioReady(); }catch(_){}
+  if(typeof ampClose==='function') ampClose();
+  MXEL=document.createElement('div'); MXEL.id='mx';
+  MXEL.setAttribute('role','dialog'); MXEL.setAttribute('aria-label','ミキサー');
+  document.body.appendChild(MXEL);
+  mixRender(); mixMarks();
+  if(!MXRAF) MXRAF=requestAnimationFrame(mixTick);
+}
+function mixClose(){
+  if(!MXEL) return;
+  MXEL.remove(); MXEL=null; MIXTMP={};
+  if(MXRAF){ cancelAnimationFrame(MXRAF); MXRAF=null; }
+  mixMarks();
+}
+function mixMarks(){
+  document.querySelectorAll('.mx-open,.bb-mix').forEach(b=>b.classList.toggle('on',!!MXEL));
+}
+/* フェーダー一本 */
+function mixFader(key,get,onLive,onEnd){
+  const f=document.createElement('div'); f.className='mx-fader';
+  f.tabIndex=0; f.setAttribute('role','slider'); f.setAttribute('aria-valuemin','0'); f.setAttribute('aria-valuemax','100');
+  f.innerHTML='<div class="mx-track"></div>'+[100,75,50,25,0].map(n=>{
+    const y='calc(6px + (100% - 12px)*'+((100-n)/100)+')';
+    return '<div class="mx-tick" style="top:'+y+'"></div><span class="mx-tn" style="top:'+y+'">'+n+'</span>';
+  }).join('')+'<div class="mx-cap"></div>';
+  const cap=f.querySelector('.mx-cap');
+  const show=v=>{ cap.style.top='calc(6px + (100% - 12px)*'+((100-v)/100)+')'; f.setAttribute('aria-valuenow',String(v)); };
+  show(get());
+  let drag=false;
+  const at=e=>{ const r=f.getBoundingClientRect(); const y=Math.max(0,Math.min(1,(e.clientY-r.top-6)/Math.max(1,r.height-12)));
+                return Math.round((1-y)*100); };
+  f.addEventListener('pointerdown',e=>{ e.preventDefault(); drag=true; try{ f.setPointerCapture(e.pointerId); }catch(_){}
+    const v=at(e); show(v); onLive(v); });
+  f.addEventListener('pointermove',e=>{ if(!drag) return; const v=at(e); show(v); onLive(v); });
+  const end=e=>{ if(!drag) return; drag=false; onEnd(at(e)); };
+  f.addEventListener('pointerup',end);
+  f.addEventListener('pointercancel',()=>{ if(drag){ drag=false; onEnd(get()); } });
+  f.addEventListener('keydown',e=>{
+    const d={ArrowUp:5,ArrowDown:-5,PageUp:10,PageDown:-10}[e.key]; if(!d) return;
+    e.preventDefault(); e.stopPropagation();
+    const v=Math.max(0,Math.min(100,get()+d)); show(v); onEnd(v);
+  });
+  return {el:f,show};
+}
+/* パンのつまみ。左右（または上下）になぞる。二度押すと中央 */
+function mixPan(get,onLive,onEnd){
+  const w=document.createElement('div'); w.className='mx-kwrap';
+  w.innerHTML='<div class="mx-kscale"><span>左</span><span>右</span></div>'
+    +'<div class="mx-knob" tabindex="0" role="slider" aria-label="パン"><i></i></div><span class="mx-klab"></span>';
+  const k=w.querySelector('.mx-knob'), ptr=k.querySelector('i'), lab=w.querySelector('.mx-klab');
+  const show=v=>{ ptr.style.transform='rotate('+(v/50*135)+'deg)';
+    lab.textContent='パン '+(v===0?'中央':(v<0?'左 '+(-v):'右 '+v)); k.setAttribute('aria-valuetext',lab.textContent); };
+  show(get());
+  let st=null, lastTap=0;
+  k.addEventListener('pointerdown',e=>{ e.preventDefault(); st={x:e.clientX,y:e.clientY,v0:get(),v:get(),moved:false};
+    try{ k.setPointerCapture(e.pointerId); }catch(_){} });
+  k.addEventListener('pointermove',e=>{ if(!st) return;
+    const d=(e.clientX-st.x)-(e.clientY-st.y);
+    if(Math.abs(d)>3) st.moved=true;
+    const v=Math.max(-50,Math.min(50,Math.round(st.v0+d/2)));
+    if(v!==st.v){ st.v=v; show(v); onLive(v); } });
+  k.addEventListener('pointerup',()=>{ if(!st) return; const s0=st; st=null;
+    if(!s0.moved){ const now=Date.now(); if(now-lastTap<350){ lastTap=0; show(0); onEnd(0); } else lastTap=now; return; }
+    onEnd(s0.v); });
+  k.addEventListener('pointercancel',()=>{ if(st){ show(st.v0); st=null; } });
+  k.addEventListener('keydown',e=>{
+    const d={ArrowRight:5,ArrowLeft:-5}[e.key]; if(!d) return;
+    e.preventDefault(); e.stopPropagation();
+    const v=Math.max(-50,Math.min(50,get()+d)); show(v); onEnd(v); });
+  return w;
+}
+function mixRender(){
+  if(!MXEL||typeof song==='undefined'||!song) return;
+  MXEL.innerHTML='<div class="top"><span class="ttl">ミキサー</span><span class="sp"></span>'
+    +'<button class="cls" type="button">閉じる</button></div><div class="desk"></div>'
+    +'<p class="note">フェーダーを上下に動かすと音量、パンのつまみをなぞると左右の振り分けが変わります。つまみを二度押すと中央に戻ります。鳴らしながら変えられます。</p>';
+  MXEL.querySelector('.cls').onclick=mixClose;
+  const desk=MXEL.querySelector('.desk');
+  const strip=(key,name,opt)=>{
+    opt=opt||{};
+    const el=document.createElement('div'); el.className='mx-strip'+(opt.master?' master':''); el.dataset.k=key;
+    const nm=document.createElement('div'); nm.className='mx-name'; nm.textContent=name; el.appendChild(nm);
+    const cur=()=>opt.part!=null?mixPartOf(opt.part):mixOther(key);
+    const val=document.createElement('div'); val.className='mx-val';
+    const live=(patch)=>{
+      const m=Object.assign({},cur(),patch); MIXTMP[key]=m;
+      try{ audioReady(); mixApplyAll(); }catch(_){}
+      if(patch.vol!=null) val.textContent=m.vol;
+    };
+    const end=(patch,label)=>{ const m=Object.assign({},cur(),patch,{_label:label}); mixCommit(key,m); };
+    if(opt.part!=null){
+      el.appendChild(mixPan(()=>cur().pan,v=>live({pan:v}),v=>end({pan:v},'パンを変える')));
+    }else{
+      const sp=document.createElement('div'); sp.className='mx-kspace'; el.appendChild(sp);
+    }
+    if(!opt.master){
+      const mb=document.createElement('button'); mb.type='button';
+      mb.className='mx-mute'+(cur().mute?' on':'');
+      mb.innerHTML='<span class="led"></span>消音';
+      mb.setAttribute('aria-pressed',cur().mute?'true':'false');
+      mb.onclick=()=>end({mute:!cur().mute},cur().mute?'消音を戻す':'消音にする');
+      el.appendChild(mb);
+    }else{
+      const sp=document.createElement('div'); sp.className='mx-mspace'; el.appendChild(sp);
+    }
+    const fz=document.createElement('div'); fz.className='mx-fz';
+    const met=document.createElement('div'); met.className='mx-meter'; met.innerHTML='<b></b>';
+    fz.appendChild(met);
+    const fd=mixFader(key,()=>cur().vol,v=>live({vol:v}),v=>end({vol:v},'音量を変える'));
+    fd.el.setAttribute('aria-label',name+'の音量');
+    fz.appendChild(fd.el); el.appendChild(fz);
+    val.textContent=cur().vol; el.appendChild(val);
+    desk.appendChild(el);
+  };
+  for(let i=0;i<partCount(song);i++) strip('p'+i,partLabel(song,i),{part:i});
+  const gap=()=>{ const g=document.createElement('div'); g.className='mx-gap'; desk.appendChild(g); };
+  gap();
+  strip('back','伴奏'); strip('drum','ドラム'); strip('metro','メトロノーム');
+  gap();
+  strip('master','全体',{master:true});
+}
+/* 目盛り。鳴っている大きさを光らせる */
+function mixTick(){
+  if(!MXEL){ MXRAF=null; return; }
+  const buf=new Float32Array(512);
+  const lv=an=>{ if(!an) return 0; try{ an.getFloatTimeDomainData(buf); }catch(_){ return 0; }
+    let pk=0; for(let i=0;i<buf.length;i++){ const a=Math.abs(buf[i]); if(a>pk) pk=a; }
+    if(pk<1e-5) return 0;
+    /* 目盛りは dB で並べる（-54dB〜0dB）。小さな音も見えるように */
+    return Math.max(0,Math.min(1,(20*Math.log10(pk)+54)/54)); };
+  try{
+    if(AC){
+      if(DRUMG&&!MIXAN.drum){ MIXAN.drum=AC.createAnalyser(); MIXAN.drum.fftSize=512; DRUMG.connect(MIXAN.drum); }
+      if(MASTER&&!MIXAN.master){ MIXAN.master=AC.createAnalyser(); MIXAN.master.fftSize=512; MASTER.connect(MIXAN.master); }
+    }
+  }catch(_){}
+  MXEL.querySelectorAll('.mx-strip').forEach(el=>{
+    const k=el.dataset.k; let v=0;
+    if(/^p\d+$/.test(k)){ const o=busObj(+k.slice(1)); v=lv(o&&o.PMET); }
+    else if(k==='back'){ v=MIXPULSE.back||0; MIXPULSE.back=Math.max(0,(MIXPULSE.back||0)*0.9-0.01); }
+    else v=lv(MIXAN[k]);
+    const b=el.querySelector('.mx-meter b'); if(b){ const cur=+(b.dataset.v||0); const nv=Math.max(v,cur*0.88); b.dataset.v=nv; b.style.clipPath='inset('+((1-nv)*100).toFixed(1)+'% 0 0 0)'; }
+  });
+  MXRAF=requestAnimationFrame(mixTick);
+}
+function mixTopButton(){
+  const b=document.createElement('button'); b.className='mx-open amp-open'+(MXEL?' on':''); b.id='tb-mix';
+  b.type='button'; b.title='ミキサー（パートごとの音量・パン）';
+  b.innerHTML='<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">'
+    +'<path d="M5 3v14M10 3v14M15 3v14"/><rect x="3.2" y="10.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/>'
+    +'<rect x="8.2" y="5.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/><rect x="13.2" y="12.5" width="3.6" height="2.6" rx=".6" fill="currentColor"/></svg>'
+    +'<span>ミキサー</span>';
+  b.onclick=mixToggle;
+  return b;
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&MXEL&&!$('pop-ov')) mixClose(); });
+
 function bindUI(){
   $('tb-song').onclick=()=>{ renderSongList(); openSheet('ov-songs'); };
   setIco($('tb-set'),'gear'); setIco($('tb-print'),'print');
   $('tb-set').onclick=()=>{ renderSettings(); openSheet('ov-set'); };
   $('tb-help').onclick=openHelp;
   /* 〈アンプ〉の札（tab-6.43）。共通部品が読めた時は、中央の表示の隣へ移る */
-  { const t=document.querySelector('.topbar .tb-tools'); if(t&&!$('tb-amp')) t.insertBefore(ampTopButton(),t.firstChild); }
+  { const t=document.querySelector('.topbar .tb-tools'); if(t&&!$('tb-amp')) t.insertBefore(ampTopButton(),t.firstChild);
+    if(t&&!$('tb-mix')) t.insertBefore(mixTopButton(),$('tb-amp')?$('tb-amp').nextSibling:t.firstChild); }
   unlockAudioOnce();
   /* ══ 札に焦点を残さない（tab-2.73）══
      L様——「たまにスペースボタン押したら音符が消えるんだけど」。
@@ -40583,8 +40905,8 @@ else boot();
   }
   setTimeout(sync,0);window.addEventListener('load',function(){setTimeout(sync,50);});
   /* 〈アンプ〉の札を中央の表示の隣へ（tab-6.43）。表示が組み直しても外れないよう、見張っておく */
-  function putAmp(){try{var a=T.ampButton&&T.ampButton();if(a&&a.parentNode!==el)el.appendChild(a);}catch(e){}}
-  putAmp();new MutationObserver(function(){if(!document.getElementById('tb-amp')||document.getElementById('tb-amp').parentNode!==el)putAmp();}).observe(el,{childList:true});
+  function putAmp(){try{var a=T.ampButton&&T.ampButton();if(a&&a.parentNode!==el)el.appendChild(a);var m=T.mixButton&&T.mixButton();if(m&&m.parentNode!==el)el.appendChild(m);}catch(e){}}
+  putAmp();new MutationObserver(function(){var a=document.getElementById('tb-amp'),m=document.getElementById('tb-mix');if(!a||a.parentNode!==el||!m||m.parentNode!==el)putAmp();}).observe(el,{childList:true});
 })();
 </script>
 </body>
