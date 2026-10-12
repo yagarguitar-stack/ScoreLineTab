@@ -1659,6 +1659,11 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 .mx-send .mx-knob{--s:30px;cursor:ns-resize}
 .mx-send span{font-size:10.5px;color:#cfc7b6;white-space:nowrap}
 .mx-sspace{height:50px}
+
+/* 無段階の横棒（tab-6.50） */
+.cont-range{display:flex;align-items:center;gap:10px;width:100%}
+.cont-range input[type=range]{flex:1;min-width:0;accent-color:#e0a54a;height:28px}
+.cont-val{min-width:2.6em;text-align:right;font:700 13px/1 'Courier New',monospace;color:inherit}
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1780,7 +1785,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.49', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.50', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3540,6 +3545,7 @@ function tx(label,fn,opt){
   return r;
 }
 function doUndo(){
+  setTimeout(()=>{ try{ if(typeof soundRefresh==='function'&&AC) soundRefresh(); }catch(_){} },0);   /* 戻した音をすぐ鳴りへ（tab-6.50） */
   /* ══ 取り消しは tx を通らない（tab-3.41）══
      控えを丸ごと差し替える道なので、関門の外にある。
      **通り道が一本でない物は、その本数だけ塞ぐ。**
@@ -3552,6 +3558,7 @@ function doUndo(){
   toast('取り消しました：'+it.label);
 }
 function doRedo(){
+  setTimeout(()=>{ try{ if(typeof soundRefresh==='function'&&AC) soundRefresh(); }catch(_){} },0);   /* 戻した音をすぐ鳴りへ（tab-6.50） */
   if(isLocked()){ lockRefuse('やり直し'); return; }
   if(!hist.redo.length){ toast('やり直す操作がありません'); return; }
   const it=hist.redo.pop();
@@ -35255,7 +35262,9 @@ function syncSettings(){
   const box=$('set-fields');
   if(box&&box.childElementCount) renderSettings();
 }
-function openSheet(id){ $(id).classList.add('open'); }
+function openSheet(id){
+  /* 設定などの面を開く時は、アンプとミキサーを閉じる（重なって読めなくなるため。tab-6.50） */
+  try{ if(typeof AMP!=='undefined'&&AMP.el) ampClose(); if(typeof MXEL!=='undefined'&&MXEL) mixClose(); }catch(_){} $(id).classList.add('open'); }
 function closeSheet(id){ $(id).classList.remove('open'); }
 
 /* ══════════════════════════════════════════
@@ -37851,7 +37860,7 @@ function renderSettings(){
   /* パートごとの欄には、どのパートの設定かを添える（tab-6.48） */
   const PART_FLD=new Set(['チューニング','コード図','図の点の中身','ピッキング記号の形','ピッキング記号の自動割り当て',
     'ピッキング記号を付けるか','定型に付けるピッキング記号','定型の符尾の向き','五線譜を出す','コードを入れた時',
-    'アルペジオの着地','アルペジオの広がり','音の消え方']);
+    'アルペジオの着地','アルペジオの広がり','音の消え方','弦の伸び（サスティーン）','胴の鳴り','歪みの強さ']);
   const _pfTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
   const fld=(label,el,wide,note)=>{
     const d=document.createElement('div'); d.className='fld'+(wide?' wide':'');
@@ -37999,20 +38008,17 @@ function renderSettings(){
     +'〈音符に書いた長さで切る〉は、書いたとおりに切ります。譜面と音を突き合わせたい時に。'
     +'〈切らずに…〉は生のギターに近い鳴り方でございます。'
     +'なお **let ring とタイの音は、どれを選んでも消えません**——伸ばすと書いてあるものは伸びます');
-  fld('弦の伸び（サスティーン）',sel(SUSTAIN_AMT,String(sustainAmt(song)),
-    v=>{ tx('弦の伸びを変える',()=>{setSnd(song,'sustain',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),false,
+  fld('弦の伸び（サスティーン）',contRange('sustain'),false,
     '音色ごとの伸びに掛ける加減でございます。太い弦ほど、低い音ほど長く伸び、'
     +'歪ませるほど伸びるという関係はそのままに、全体を伸び縮みさせます。'
     +'長くするほど和音は重なって濁りますので、速い曲では短めが聴き取りやすうございます。'
     +'ハンマリング・プリングを繋ぐか弾き直すかの分かれ目も、これに従います');
-  fldOn('胴の鳴り',sel(BODY_AMT,String(bodyAmt(song)),
-    v=>{ tx('胴の鳴りを変える',()=>{setSnd(song,'body',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),bodyAmt(song),false,
+  fldOn('胴の鳴り',contRange('body'),bodyAmt(song),false,
     '箱の響きの量です。エレキには元から胴がありません');
   /* 歪みの摘みは、歪む音色を選んでいる時だけ出す。
      効かない摘みが並んでいるのが、設定画面でいちばん惑わせる */
   if((toneOf(song)||{}).drive)
-    fld('歪みの強さ',sel(DRIVE_AMT,String(driveAmt(song)),
-      v=>{ tx('歪みの強さを変える',()=>{setSnd(song,'drive',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),false,
+    fld('歪みの強さ',contRange('drive'),false,
       '全部の弦を混ぜてから潰しております。一音ずつ歪ませると音どうしが混じり合わず、和音が濁らないためでございます。※強くするほど弦そのものの伸びは短くしてございます（tab-3.05）——潰しが深くなると痩せた尾まで持ち上がりますので、そのままでは書いた音価の何倍も鳴り続けてしまうためでございます');
 
   /* ══ エフェクト（tab-2.99）══
@@ -40098,6 +40104,83 @@ function boot(){
 var AMP={el:null,last:{}};   /* var：読み込みの途中で描画が走っても落ちないように */
 const AMP_CH=[['steel','アコギ'],['nylon','ナイロン'],['clean','クリーン'],
               ['crunch','クランチ'],['metal','ハイゲイン'],['insane','超ハイゲイン']];
+/* ══ 無段階のつまみ（tab-6.50）══
+   L様——「歪みをつまみでシームレスにできない？」。
+   歪み・胴の鳴り・弦の伸びは、音の仕組みがもともと細かい値を受け付ける
+   （歪み 0.2〜2.5・胴 0〜2・伸び 0.5〜1.8）。選択肢を段に絞っていただけなので、
+   つまみを無段階にし、目盛りは実物のアンプと同じ 0〜10 で見せる。
+   回している間は書き換えだけで鳴らし（取り消しは積まない）、離した所で一手に収める。 */
+var CONT_KNOBS={
+  drive:  {min:0.3,max:2.5,label:'歪み',    tx:'歪みの強さを変える',list:()=>DRIVE_AMT,  get:()=>driveAmt(song)},
+  body:   {min:0,  max:2,  label:'胴の鳴り',tx:'胴の鳴りを変える',  list:()=>BODY_AMT,   get:()=>bodyAmt(song)},
+  sustain:{min:0.5,max:1.8,label:'弦の伸び',tx:'弦の伸びを変える',  list:()=>SUSTAIN_AMT,get:()=>sustainAmt(song)}
+};
+function contToDial(k,v){ const c=CONT_KNOBS[k]; return Math.max(0,Math.min(10,Math.round((v-c.min)/(c.max-c.min)*100)/10)); }
+function contFromDial(k,d){ const c=CONT_KNOBS[k]; return +(c.min+(c.max-c.min)*Math.max(0,Math.min(10,d))/10).toFixed(3); }
+/* 表のパートの今の値（欄・アンプの外から読む時も、表のパートの音で） */
+function contGet(k){ const keep=_sndNow; _sndNow=partSound(song); try{ return CONT_KNOBS[k].get(); } finally{ _sndNow=keep; } }
+/* 回している間の書き換え。取り消しには積まないので、始めの形を控えて戻せるようにする */
+function contSnap(){ const pt=song.parts&&song.parts[song.part||0];
+  return {toPart:sndToPart(song), part:pt&&pt.sound?JSON.stringify(pt.sound):null,
+          play:JSON.stringify({drive:song.play.drive,body:song.play.body,sustain:song.play.sustain})}; }
+function contRestore(sn){
+  if(!sn) return;
+  if(sn.toPart){ const pt=song.parts[song.part||0]; if(pt) pt.sound=sn.part?JSON.parse(sn.part):null; }
+  else{ const o=JSON.parse(sn.play); ['drive','body','sustain'].forEach(k=>{ if(o[k]===undefined) delete song.play[k]; else song.play[k]=o[k]; }); }
+}
+function contLive(k,v){ setSnd(song,k,v); try{ clearSndCache(); soundRefresh(); }catch(_){} }
+function contCommit(k,v,sn){
+  contRestore(sn);
+  tx(CONT_KNOBS[k].tx,()=>setSnd(song,k,v),FREE);
+  try{ soundRefresh(); }catch(_){}
+  if(typeof AMP!=='undefined'&&AMP.el) ampRender();
+}
+/* アンプの無段階つまみ */
+function ampDial(k,opt){
+  opt=opt||{};
+  const c=CONT_KNOBS[k];
+  let d=contToDial(k,contGet(k));
+  const cell=document.createElement('div'); cell.className='amp-cell';
+  const kn=document.createElement('div'); kn.className='amp-knob'+(opt.dim?' dim':'');
+  kn.tabIndex=opt.dim?-1:0; kn.setAttribute('role','slider'); kn.setAttribute('aria-label',c.label);
+  kn.setAttribute('aria-valuemin','0'); kn.setAttribute('aria-valuemax','10');
+  const ptr=document.createElement('i'); kn.appendChild(ptr);
+  const lab=document.createElement('span'); lab.className='amp-lab'; lab.textContent=c.label;
+  const val=document.createElement('span'); val.className='amp-val';
+  const show=()=>{ ptr.style.transform='rotate('+(-135+27*d)+'deg)'; val.textContent=d.toFixed(1);
+                   kn.setAttribute('aria-valuenow',d.toFixed(1)); };
+  show();
+  cell.appendChild(kn); cell.appendChild(lab); cell.appendChild(val);
+  if(opt.dim){ kn.title=opt.dimTip||''; return cell; }
+  kn.title=c.label+'：上下になぞると回ります（細かく変えられます）／押すと一覧から選べます';
+  let st=null;
+  kn.addEventListener('pointerdown',e=>{ e.preventDefault(); st={y:e.clientY,d0:d,moved:false,sn:contSnap()};
+    try{ kn.setPointerCapture(e.pointerId); }catch(_){} });
+  kn.addEventListener('pointermove',e=>{ if(!st) return;
+    const dy=st.y-e.clientY; if(Math.abs(dy)>3) st.moved=true; if(!st.moved) return;
+    const nd=Math.max(0,Math.min(10,Math.round((st.d0+dy/15)*10)/10));
+    if(nd!==d){ d=nd; show(); contLive(k,contFromDial(k,d)); } });
+  kn.addEventListener('pointerup',()=>{ if(!st) return; const s0=st; st=null;
+    if(!s0.moved){ ampChoose(c.label,c.list(),String(contFromDial(k,s0.d0)),v=>contCommit(k,parseFloat(v),contSnap())); return; }
+    contCommit(k,contFromDial(k,d),s0.sn); });
+  kn.addEventListener('pointercancel',()=>{ if(!st) return; contRestore(st.sn); d=st.d0; st=null; show(); try{ soundRefresh(); }catch(_){} });
+  kn.addEventListener('keydown',e=>{ const dd={ArrowUp:0.5,ArrowDown:-0.5}[e.key]; if(!dd) return;
+    e.preventDefault(); e.stopPropagation(); d=Math.max(0,Math.min(10,d+dd)); show(); contCommit(k,contFromDial(k,d),contSnap()); });
+  return cell;
+}
+/* 〈曲の設定〉の無段階の横棒（0〜10） */
+function contRange(k){
+  const w=document.createElement('div'); w.className='cont-range';
+  const r=document.createElement('input'); r.type='range'; r.min='0'; r.max='10'; r.step='0.1';
+  r.setAttribute('aria-label',CONT_KNOBS[k].label);
+  const v=document.createElement('span'); v.className='cont-val';
+  const d0=contToDial(k,contGet(k)); r.value=String(d0); v.textContent=d0.toFixed(1);
+  let sn=null;
+  r.addEventListener('input',()=>{ if(!sn) sn=contSnap(); const d=parseFloat(r.value); v.textContent=d.toFixed(1); contLive(k,contFromDial(k,d)); });
+  r.addEventListener('change',()=>{ const d=parseFloat(r.value); contCommit(k,contFromDial(k,d),sn||contSnap()); sn=null; });
+  w.appendChild(r); w.appendChild(v);
+  return w;
+}
 function ampFxList(){
   return [['comp','コンプ',FX_COMP,'0.7'],['wah','ワウ',FX_WAH,'auto'],['phaser','フェイザー',FX_PHASER,'0.7'],
           ['chorus','コーラス',FX_CHORUS,'0.7'],['flange','フランジャー',FX_FLANGE,'0.7'],['trem','トレモロ',FX_TREM,'0.6'],
@@ -40224,10 +40307,10 @@ function ampRender(){
   const chList=AMP_CH.filter(([id])=>TONES.some(t=>t.id===id));
   panel.appendChild(ampKnob(chList,tone,'音色',v=>ampApply('音色を変える',()=>setSnd(song,'tone',v)),
     {top:win,noVal:true,onShow:i=>{ win.textContent=(chList[i]||[])[1]||''; }}));
-  panel.appendChild(ampKnob(DRIVE_AMT,drv,'歪み',v=>ampApply('歪みの強さを変える',()=>setSnd(song,'drive',parseFloat(v))),
-    {dim:!hasDrive,dimTip:'歪みは、エレキの歪む音色（クランチ・ハイゲイン）の時に効きます'}));
-  panel.appendChild(ampKnob(BODY_AMT,bod,'胴の鳴り',v=>ampApply('胴の鳴りを変える',()=>setSnd(song,'body',parseFloat(v)))));
-  panel.appendChild(ampKnob(SUSTAIN_AMT,sus,'弦の伸び',v=>ampApply('弦の伸びを変える',()=>setSnd(song,'sustain',parseFloat(v)))));
+  /* 歪み・胴の鳴り・弦の伸びは無段階（tab-6.50） */
+  panel.appendChild(ampDial('drive',{dim:!hasDrive,dimTip:'歪みは、エレキの歪む音色（クランチ・ハイゲイン）の時に効きます'}));
+  panel.appendChild(ampDial('body'));
+  panel.appendChild(ampDial('sustain'));
   const gr=document.createElement('span'); gr.className='grow'; panel.appendChild(gr);
   /* エフェクトの踏み台 */
   const row=box.querySelector('.fxrow');
