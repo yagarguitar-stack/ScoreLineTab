@@ -1664,6 +1664,17 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 .cont-range{display:flex;align-items:center;gap:10px;width:100%}
 .cont-range input[type=range]{flex:1;min-width:0;accent-color:#e0a54a;height:28px}
 .cont-val{min-width:2.6em;text-align:right;font:700 13px/1 'Courier New',monospace;color:inherit}
+
+/* アンプの「変える範囲」（tab-6.51） */
+.ampB .amp-scope{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;
+  background:linear-gradient(180deg,#1c1b1a,#141312);border-bottom:1px solid #000}
+.ampB .amp-sc{height:26px;padding:0 10px;border-radius:5px;border:0;cursor:pointer;font:700 11.5px/1 var(--ds-font,system-ui,sans-serif);
+  color:#cfc5b2;background:linear-gradient(180deg,#3a3835,#24221f);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #000}
+.ampB .amp-sc.on{color:#1d1407;background:linear-gradient(180deg,#f1dca2,#c9a560)}
+.ampB .amp-clr{margin-left:auto}
+.ampB .amp-secsel{height:26px;border-radius:5px;border:0;background:#0a0b0c;color:#ffcf7a;font:700 11.5px/1 var(--ds-font,system-ui,sans-serif);
+  padding:0 6px;box-shadow:inset 0 1px 3px rgba(0,0,0,.9);max-width:11em}
+.ampB .amp-scmsg{font:600 11px/1.3 var(--ds-font,system-ui,sans-serif);color:#ffcf7a;min-width:0}
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1785,7 +1796,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.50', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.51', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3060,6 +3071,15 @@ function bindSecSound(s){
       get(){ const p=s.parts[curPartIdx(s)]||s.parts[0]; return (p&&sec.psnd&&sec.psnd[p.id])||null; },
       set(v){ const p=s.parts[s.part||0]; if(!p) return; sec.psnd=sec.psnd||{}; sec.psnd[p.id]=v||null; }});
   });
+}
+/* 音の束を重ねる。b で決めた所だけ a を上書きする（エフェクトは一つずつ）（tab-6.51） */
+function mergeSound(a,b){
+  if(!a&&!b) return null;
+  const out=Object.assign({},a||{});
+  ['tone','body','drive','sustain'].forEach(k=>{ if(b&&b[k]!=null) out[k]=b[k]; });
+  const fx=Object.assign({},(a&&a.fx)||{},(b&&b.fx)||{});
+  if(Object.keys(fx).length) out.fx=fx; else delete out.fx;
+  return normSound(out);
 }
 /* 鳴らす時は、そのパートのセクションの音を直に引く（窓は「いま」のパートを見るため） */
 function secSoundOf(s,sec,pi){
@@ -9077,7 +9097,7 @@ function openSectionSound(si){
   const sec=song.sections[si]; if(!sec) return;
   openSoundSheet({
     title:'このセクションの音',
-    sub:so=>(sec.name||'（名前なし）')+((partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'')+' … '+(so?'独自の音':'曲ぜんたいに従う'),
+    sub:so=>(sec.name||'（名前なし）')+((partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'')+' … '+(so?'この区間だけの音あり':'パートの音のまま'),
     get:()=>song.sections[si]&&song.sections[si].sound,
     set:v=>{ song.sections[si].sound=v; try{ clearSndCache(); }catch(_){} },
     again:()=>openSectionSound(si),
@@ -17298,9 +17318,9 @@ let _sndNow=null;
 /* 摘みを変えた後、表のパートの通り道へ配り直す（tab-6.44）。
    素の `guitarBus()` は「いま差してある通り道」に「曲の設定」を配ってしまうので、
    鳴っている最中だと別のパートの音を一瞬書き換えてしまう */
-function soundRefresh(){
+function soundRefresh(view){
   audioReady();
-  const keep=_sndNow; _sndNow=partSound(song);
+  const keep=_sndNow; _sndNow=(view!==undefined)?view:((typeof AMP!=='undefined'&&AMP.el&&AMP.scope==='sec')?ampViewSound():partSound(song));
   try{ busUse((song&&song.part)||0); guitarBus(); } finally { _sndNow=keep; }
 }
 function partSound(s){
@@ -21870,9 +21890,15 @@ function sndForBar(barId,pi){
      セクション → パート → 曲 の順に、**書いてある物が勝つ。**
      書いてなければ一つ上に従う。`null` は「上に任せる」であって「なし」ではない */
   const pt=(song&&song.parts&&song.parts[p])||null;
+  /* ══ セクションの音は、パートの音に重ねる（tab-6.51）══
+     L様——「だからエフェクトが共通にかかってる」。
+     以前はセクションの音がある区間ではパートの音を丸ごと使わず、
+     しかも tab-6.48 で今までのセクションの音を全パートへ同じ物として写したため、
+     アンプでパートのエフェクトを切っても、区間の中では同じエフェクトが被さっていた。
+     **セクションで決めた所だけを、パートの音の上に書く。** 決めていない所はパートの音のまま。 */
   const ss=secSoundOf(song,sec,p);
-  const sd=ss?soundAt(song,{sound:ss})
-          :((pt&&pt.sound)?soundAt(song,pt):null);
+  const ms=ss?mergeSound(pt&&pt.sound,ss):((pt&&pt.sound)||null);
+  const sd=ms?soundAt(song,{sound:ms}):null;
   _secSndCache.set(key,sd);
   return sd;
 }
@@ -40118,20 +40144,23 @@ var CONT_KNOBS={
 function contToDial(k,v){ const c=CONT_KNOBS[k]; return Math.max(0,Math.min(10,Math.round((v-c.min)/(c.max-c.min)*100)/10)); }
 function contFromDial(k,d){ const c=CONT_KNOBS[k]; return +(c.min+(c.max-c.min)*Math.max(0,Math.min(10,d))/10).toFixed(3); }
 /* 表のパートの今の値（欄・アンプの外から読む時も、表のパートの音で） */
-function contGet(k){ const keep=_sndNow; _sndNow=partSound(song); try{ return CONT_KNOBS[k].get(); } finally{ _sndNow=keep; } }
+function contGet(k,view){ const keep=_sndNow; _sndNow=(view!==undefined)?view:partSound(song); try{ return CONT_KNOBS[k].get(); } finally{ _sndNow=keep; } }
 /* 回している間の書き換え。取り消しには積まないので、始めの形を控えて戻せるようにする */
 function contSnap(){ const pt=song.parts&&song.parts[song.part||0];
+  const sec=(typeof AMP!=='undefined'&&AMP.scope==='sec')?ampSec():null;
   return {toPart:sndToPart(song), part:pt&&pt.sound?JSON.stringify(pt.sound):null,
-          play:JSON.stringify({drive:song.play.drive,body:song.play.body,sustain:song.play.sustain})}; }
+          play:JSON.stringify({drive:song.play.drive,body:song.play.body,sustain:song.play.sustain}),
+          sec:sec, secSnd:sec?JSON.stringify(sec.psnd||{}):null}; }
 function contRestore(sn){
   if(!sn) return;
+  if(sn.sec){ try{ sn.sec.psnd=JSON.parse(sn.secSnd); }catch(_){} }
   if(sn.toPart){ const pt=song.parts[song.part||0]; if(pt) pt.sound=sn.part?JSON.parse(sn.part):null; }
   else{ const o=JSON.parse(sn.play); ['drive','body','sustain'].forEach(k=>{ if(o[k]===undefined) delete song.play[k]; else song.play[k]=o[k]; }); }
 }
-function contLive(k,v){ setSnd(song,k,v); try{ clearSndCache(); soundRefresh(); }catch(_){} }
-function contCommit(k,v,sn){
+function contLive(k,v,setter){ (setter||((kk,vv)=>setSnd(song,kk,vv)))(k,v); try{ clearSndCache(); soundRefresh(); }catch(_){} }
+function contCommit(k,v,sn,setter){
   contRestore(sn);
-  tx(CONT_KNOBS[k].tx,()=>setSnd(song,k,v),FREE);
+  tx(CONT_KNOBS[k].tx,()=>(setter||((kk,vv)=>setSnd(song,kk,vv)))(k,v),FREE);
   try{ soundRefresh(); }catch(_){}
   if(typeof AMP!=='undefined'&&AMP.el) ampRender();
 }
@@ -40139,7 +40168,8 @@ function contCommit(k,v,sn){
 function ampDial(k,opt){
   opt=opt||{};
   const c=CONT_KNOBS[k];
-  let d=contToDial(k,contGet(k));
+  const SET=(kk,vv)=>ampSet(kk,vv);
+  let d=contToDial(k,contGet(k,ampViewSound()));
   const cell=document.createElement('div'); cell.className='amp-cell';
   const kn=document.createElement('div'); kn.className='amp-knob'+(opt.dim?' dim':'');
   kn.tabIndex=opt.dim?-1:0; kn.setAttribute('role','slider'); kn.setAttribute('aria-label',c.label);
@@ -40159,13 +40189,13 @@ function ampDial(k,opt){
   kn.addEventListener('pointermove',e=>{ if(!st) return;
     const dy=st.y-e.clientY; if(Math.abs(dy)>3) st.moved=true; if(!st.moved) return;
     const nd=Math.max(0,Math.min(10,Math.round((st.d0+dy/15)*10)/10));
-    if(nd!==d){ d=nd; show(); contLive(k,contFromDial(k,d)); } });
+    if(nd!==d){ d=nd; show(); contLive(k,contFromDial(k,d),SET); } });
   kn.addEventListener('pointerup',()=>{ if(!st) return; const s0=st; st=null;
-    if(!s0.moved){ ampChoose(c.label,c.list(),String(contFromDial(k,s0.d0)),v=>contCommit(k,parseFloat(v),contSnap())); return; }
-    contCommit(k,contFromDial(k,d),s0.sn); });
+    if(!s0.moved){ ampChoose(c.label,c.list(),String(contFromDial(k,s0.d0)),v=>contCommit(k,parseFloat(v),contSnap(),SET)); return; }
+    contCommit(k,contFromDial(k,d),s0.sn,SET); });
   kn.addEventListener('pointercancel',()=>{ if(!st) return; contRestore(st.sn); d=st.d0; st=null; show(); try{ soundRefresh(); }catch(_){} });
   kn.addEventListener('keydown',e=>{ const dd={ArrowUp:0.5,ArrowDown:-0.5}[e.key]; if(!dd) return;
-    e.preventDefault(); e.stopPropagation(); d=Math.max(0,Math.min(10,d+dd)); show(); contCommit(k,contFromDial(k,d),contSnap()); });
+    e.preventDefault(); e.stopPropagation(); d=Math.max(0,Math.min(10,d+dd)); show(); contCommit(k,contFromDial(k,d),contSnap(),SET); });
   return cell;
 }
 /* 〈曲の設定〉の無段階の横棒（0〜10） */
@@ -40181,6 +40211,52 @@ function contRange(k){
   w.appendChild(r); w.appendChild(v);
   return w;
 }
+/* ══ アンプの「変える範囲」（tab-6.51）══
+   〈パート全体〉——パートの音（どの区間でも土台になる音）。
+   〈セクション〉——その区間だけ上に書く音。決めた所だけが土台を上書きする。
+   どちらで見ても、**アンプに出る音＝その区間で鳴る音**になるように読む。 */
+function ampHereBarId(){
+  if(typeof TP!=='undefined'&&TP.playing&&TP.curBar) return TP.curBar;
+  if(typeof curCell!=='undefined'&&curCell&&curCell.barId) return curCell.barId;
+  try{ for(const k of nsel){ const id=String(k).split(':')[0]; if(id) return id; } }catch(_){}
+  const s0=(song.sections||[])[0]; const it=s0&&s0.items&&s0.items[0]; return it?it.barId:null;
+}
+function ampSec(){
+  const ss=song.sections||[];
+  if(AMP.secIdx==null||!ss[AMP.secIdx]){
+    const id=ampHereBarId(); const sec=id?sectionOfBar(song,id):null;
+    AMP.secIdx=Math.max(0,sec?ss.indexOf(sec):0);
+  }
+  return ss[AMP.secIdx]||null;
+}
+/* アンプが見せる音。セクションを選んでいれば、土台に重ねた音 */
+function ampViewSound(){
+  if(AMP.scope!=='sec') return partSound(song);
+  const pt=song.parts&&song.parts[song.part||0];
+  const sec=ampSec();
+  const m=mergeSound(pt&&pt.sound,sec&&sec.sound);
+  return m?soundAt(song,{sound:m}):null;
+}
+/* セクションで決めた所の名前（知らせの文に使う） */
+function secOverrideNames(so){
+  if(!so) return [];
+  const nm={tone:'音色',drive:'歪み',body:'胴の鳴り',sustain:'弦の伸び'};
+  const fxn={comp:'コンプ',wah:'ワウ',phaser:'フェイザー',chorus:'コーラス',flange:'フランジャー',trem:'トレモロ',delay:'ディレイ',room:'残響'};
+  const out=[]; Object.keys(nm).forEach(k=>{ if(so[k]!=null) out.push(nm[k]); });
+  Object.keys(so.fx||{}).forEach(k=>{ if(fxn[k]) out.push(fxn[k]); });
+  return out;
+}
+function ampSet(k,v){
+  if(AMP.scope!=='sec') return setSnd(song,k,v);
+  const sec=ampSec(); if(!sec) return;
+  sec.sound=normSound(Object.assign({},sec.sound||{},{[k]:v}));
+}
+function ampSetFx(k,v){
+  if(AMP.scope!=='sec') return setSndFx(song,k,v);
+  const sec=ampSec(); if(!sec) return;
+  const so=Object.assign({},sec.sound||{}); so.fx=Object.assign({},so.fx||{},{[k]:v});
+  sec.sound=normSound(so);
+}
 function ampFxList(){
   return [['comp','コンプ',FX_COMP,'0.7'],['wah','ワウ',FX_WAH,'auto'],['phaser','フェイザー',FX_PHASER,'0.7'],
           ['chorus','コーラス',FX_CHORUS,'0.7'],['flange','フランジャー',FX_FLANGE,'0.7'],['trem','トレモロ',FX_TREM,'0.6'],
@@ -40193,6 +40269,7 @@ function ampOpen(){
   if(typeof mixClose==='function') mixClose();
   const w=document.createElement('div'); w.id='amp-wrap';
   document.body.appendChild(w); AMP.el=w;
+  AMP.scope=AMP.scope||'part'; AMP.secIdx=null;      /* 開くたびに「今いるセクション」から */
   ampRender(); ampMarks();
 }
 function ampClose(){
@@ -40282,7 +40359,7 @@ function ampKnob(list,cur,label,onSet,opt){
 function ampRender(){
   if(!AMP.el||!song) return;
   ampPlace();
-  const keep=_sndNow; _sndNow=partSound(song);
+  const keep=_sndNow; _sndNow=ampViewSound();
   let tone,drv,bod,sus,fxv={},hasDrive;
   try{
     tone=String(sndPick(song,'tone',null)||TONE_DEF);
@@ -40295,8 +40372,34 @@ function ampRender(){
   box.innerHTML='<div class="piping"><div class="face">'
     +'<div class="grille"><span class="logo">ScoreLine</span><span class="part"><span class="pn"></span>'
     +'<button class="close" title="閉じる" aria-label="アンプを閉じる">✕</button></span></div>'
-    +'<div class="panel amp-plate"></div><div class="fxrow"></div></div></div>';
+    +'<div class="amp-scope"></div><div class="panel amp-plate"></div><div class="fxrow"></div></div></div>';
   w.appendChild(box);
+  /* 変える範囲の切り替え（tab-6.51） */
+  { const sc=box.querySelector('.amp-scope');
+    const ss=song.sections||[]; const sec=ampSec();
+    const bP=document.createElement('button'); bP.type='button'; bP.className='amp-sc'+(AMP.scope!=='sec'?' on':''); bP.textContent='パート全体';
+    bP.onclick=()=>{ AMP.scope='part'; ampRender(); };
+    const bS=document.createElement('button'); bS.type='button'; bS.className='amp-sc'+(AMP.scope==='sec'?' on':''); bS.textContent='セクション';
+    bS.onclick=()=>{ AMP.scope='sec'; ampRender(); };
+    const sl=document.createElement('select'); sl.className='amp-secsel'; sl.setAttribute('aria-label','セクションを選ぶ');
+    ss.forEach((x,i)=>{ const o=document.createElement('option'); o.value=String(i);
+      o.textContent=(x.name||('セクション'+(i+1)))+(x.sound?' ●':''); if(i===AMP.secIdx) o.selected=true; sl.appendChild(o); });
+    sl.onchange=()=>{ AMP.secIdx=+sl.value; AMP.scope='sec'; ampRender(); };
+    const msg=document.createElement('span'); msg.className='amp-scmsg';
+    const own=secOverrideNames(sec&&sec.sound);
+    const secName=sec?(sec.name||('セクション'+(AMP.secIdx+1))):'';
+    if(AMP.scope==='sec'){
+      msg.textContent=own.length?('この区間だけの音：'+own.join('・')):'パート全体の音のまま。変えた所だけ、この区間の音になります';
+      if(own.length){ const clr=document.createElement('button'); clr.type='button'; clr.className='amp-sc amp-clr';
+        clr.textContent='この区間の音をやめる';
+        clr.onclick=()=>ampApply('セクションの音をやめる',()=>{ sec.sound=null; });
+        sc.appendChild(bP); sc.appendChild(bS); sc.appendChild(sl); sc.appendChild(msg); sc.appendChild(clr); }
+      else{ sc.appendChild(bP); sc.appendChild(bS); sc.appendChild(sl); sc.appendChild(msg); }
+    }else{
+      msg.textContent=own.length?('「'+secName+'」ではセクションの音が優先：'+own.join('・')):'';
+      sc.appendChild(bP); sc.appendChild(bS); sc.appendChild(sl); sc.appendChild(msg);
+    }
+  }
   box.querySelector('.pn').textContent=ampPartName();
   box.querySelector('.close').onclick=ampClose;
   const panel=box.querySelector('.panel');
@@ -40305,7 +40408,7 @@ function ampRender(){
   /* 音色：窓に名前、つまみで回す */
   const win=document.createElement('span'); win.className='amp-win';
   const chList=AMP_CH.filter(([id])=>TONES.some(t=>t.id===id));
-  panel.appendChild(ampKnob(chList,tone,'音色',v=>ampApply('音色を変える',()=>setSnd(song,'tone',v)),
+  panel.appendChild(ampKnob(chList,tone,'音色',v=>ampApply('音色を変える',()=>ampSet('tone',v)),
     {top:win,noVal:true,onShow:i=>{ win.textContent=(chList[i]||[])[1]||''; }}));
   /* 歪み・胴の鳴り・弦の伸びは無段階（tab-6.50） */
   panel.appendChild(ampDial('drive',{dim:!hasDrive,dimTip:'歪みは、エレキの歪む音色（クランチ・ハイゲイン）の時に効きます'}));
@@ -40324,7 +40427,7 @@ function ampRender(){
     nb.querySelector('.nm').textContent=name; nb.querySelector('.lv').textContent=lv;
     nb.onclick=()=>ampChoose(name,list,cur,v=>{
       if(String(v)!=='0') AMP.last[key]=String(v);
-      ampApply('エフェクトを変える',()=>setSndFx(song,key,String(v)));
+      ampApply('エフェクトを変える',()=>ampSetFx(key,String(v)));
     },pop=>{
       const g=pgrp(pop,null);
       pbtn(g,'くわしい設定（速さ・量など）を開く',false,()=>{ closePop(); renderSettings(); openSheet('ov-set'); },'wide');
@@ -40333,8 +40436,8 @@ function ampRender(){
     ft.title=name+'：押すと'+(on?'切ります':'入ります');
     ft.setAttribute('aria-label',name+(on?'を切る':'を入れる'));
     ft.onclick=()=>{
-      if(on){ AMP.last[key]=cur; ampApply('エフェクトを切る',()=>setSndFx(song,key,'0')); }
-      else{ const v=AMP.last[key]||def; ampApply('エフェクトを入れる',()=>setSndFx(song,key,v)); }
+      if(on){ AMP.last[key]=cur; ampApply('エフェクトを切る',()=>ampSetFx(key,'0')); }
+      else{ const v=AMP.last[key]||def; ampApply('エフェクトを入れる',()=>ampSetFx(key,v)); }
     };
     st.appendChild(nb); st.appendChild(ft); row.appendChild(st);
   });
