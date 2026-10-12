@@ -1675,6 +1675,27 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 .ampB .amp-secsel{height:26px;border-radius:5px;border:0;background:#0a0b0c;color:#ffcf7a;font:700 11.5px/1 var(--ds-font,system-ui,sans-serif);
   padding:0 6px;box-shadow:inset 0 1px 3px rgba(0,0,0,.9);max-width:11em}
 .ampB .amp-scmsg{font:600 11px/1.3 var(--ds-font,system-ui,sans-serif);color:#ffcf7a;min-width:0}
+
+/* コードの扇（tab-6.54） */
+.cfan{position:fixed;z-index:80;padding:10px;border-radius:12px;background:linear-gradient(180deg,#24221f,#191816);
+  box-shadow:0 14px 34px rgba(0,0,0,.6),0 0 0 1px #000,inset 0 1px 0 rgba(255,255,255,.07)}
+.cfan .cf-lbl{font:700 10.5px/1 var(--font-ui,system-ui,sans-serif);color:#bfb4a0;letter-spacing:.06em;margin:2px 2px 6px}
+.cfan .cf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.cfan .cf-bass{grid-template-columns:repeat(6,1fr)}
+.cfan .cf-it{min-height:40px;padding:0 2px;border-radius:8px;border:1px solid #000;cursor:pointer;
+  background:linear-gradient(180deg,#3a3835,#2a2825);color:#ece3d2;font:700 13.5px/1 var(--font-ui,system-ui,sans-serif);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.cfan .cf-bass .cf-it{min-height:34px;font-size:12px}
+.cfan .cf-it.tone{color:#ffd27a}
+.cfan .cf-it.on{background:var(--indigo,#4f46e5);color:#fff}
+.cfan .cf-it.hv,.cfan .cf-it:hover{background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407}
+.dk-ch{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.dk-adv{flex:0 0 auto;height:32px;border-radius:7px;border:1px solid var(--ink-line);background:var(--ink3);color:var(--on-ink);
+  font:600 12px/1 var(--font-ui,system-ui,sans-serif);padding:0 6px;max-width:11.5em}
+/* 狭い画面では、送りの選びを二段目へ（左右の矢印と ✕ が押し出されないように） */
+@media (max-width:520px){ .dk-head{flex-wrap:wrap;row-gap:6px} .dk-adv{order:9;flex:1 1 100%;max-width:none;font-size:12px} .dk-pos{display:none} }
+/* お知らせの文が細い柱に押し込まれないように（狭い画面で一文字ずつ縦に並んでいた） */
+.toast{width:max-content;flex-wrap:wrap}
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1796,7 +1817,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.53', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.54', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -31053,15 +31074,20 @@ function applyChordToDock(patch,label,advance,sig){
       render();
     },7000);
   }
-  if(advance&&!dock.multi){
-    const nx=nextTarget(dock.targets[0]);
+  const _am=chordAdvMode();
+  if(advance&&!dock.multi&&_am!=='off'){
+    /* 送り先は選べる（tab-6.54）：次の音符／次の小節 */
+    let nx=null;
+    if(_am==='bar'){ const nm=nextMeasure(dock.targets[0]);
+      if(nm){ const b2=findBar(song,nm.barId); nx={si:nm.si,pos:nm.pos,barId:nm.barId,noteIdx:firstNoteIdx(b2)}; } }
+    else nx=nextTarget(dock.targets[0]);
     if(nx){ dock.targets=[nx]; render(); scrollToTarget(); }
-    else{ toast('最後の音符です'); render(); }
+    else{ toast(_am==='bar'?'最後の小節です':'最後の音符です'); render(); }
   } else render();
 }
 function setWholeChord(c){
-  applyChordToDock(n=>{ n.kind='chord'; n.chord={root:c.root,type:c.type,bass:null}; },
-    'コードを入れる',true,'chord:'+c.root+'|'+c.type);
+  applyChordToDock(n=>{ n.kind='chord'; n.chord={root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}; },
+    'コードを入れる',true,'chord:'+c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass));
 }
 
 
@@ -31435,6 +31461,135 @@ function dockChordGrids(d,cur,on,lockWhenEmpty){
 /* ══ コードの帯の盤（tab-2.97）══
    音符に触れず、小節の控えだけを書く。ゆえにブラシ・休符・リズム・
    押さえの類は一切出さない——**その段でできることだけを出す。** */
+/* ══════════════════════════════════════════
+   コードの帯を速く（tab-6.54）
+   L様——「基本を長押しで種類を出したり、必要なタップ数を減らせるアイデア」。
+
+   ① 長押しで扇——札を長押しすると、そのルートの種類（m・7・M7…）と
+      分数コードのベース音が開く。指を滑らせて離せば決まる（一動作）。
+      滑らせずに離せば扇は開いたまま残り、押して選べる。
+   ② この曲で使ったコード——曲に出てくる順に並べた段を一番上に置く。
+   ③ 入れたら次へ——「次の音符（帯なら次の拍）／次の小節／その場」を選べる。
+   ══════════════════════════════════════════ */
+var FAN_TYPES=['maj','min','dom7','maj7','min7','sus4','add9','dom6','min6','sus2','dom7sus4','m7b5','dim','dim7','aug','dom9'];
+var _fanEl=null;
+function chordFanClose(){ if(_fanEl){ _fanEl.remove(); _fanEl=null; document.removeEventListener('pointerdown',_fanOutside,true); } }
+function _fanOutside(e){ if(_fanEl&&!_fanEl.contains(e.target)){ chordFanClose(); } }
+function chordFanOpen(btn,c,apply){
+  chordFanClose();
+  const f=document.createElement('div'); f.className='cfan'; f.setAttribute('role','menu');
+  const mk=(cc,lbl,cls)=>{ const b=document.createElement('button'); b.type='button'; b.className='cf-it'+(cls?' '+cls:'');
+    b.textContent=lbl; b.dataset.c=JSON.stringify(cc); b.onclick=()=>{ chordFanClose(); apply(cc); }; return b; };
+  const h1=document.createElement('div'); h1.className='cf-lbl'; h1.textContent=noteName(c.root,false)+' の種類'; f.appendChild(h1);
+  const g1=document.createElement('div'); g1.className='cf-grid';
+  FAN_TYPES.filter(k=>CD[k]).forEach(k=>{ const cc={root:c.root,type:k,bass:null};
+    g1.appendChild(mk(cc,chordName(cc,song.meta),(k===c.type&&c.bass==null)?'on':'')); });
+  f.appendChild(g1);
+  /* 分数コード——構成音を先に、残りを後ろに */
+  const iv=((CD[c.type]||CD.maj).iv||[0,4,7]).map(x=>(c.root+x)%12).filter(p=>p!==c.root);
+  const rest=[]; for(let p=0;p<12;p++){ if(p!==c.root&&iv.indexOf(p)<0) rest.push(p); }
+  const h2=document.createElement('div'); h2.className='cf-lbl'; h2.textContent='ベース音（分数コード）'; f.appendChild(h2);
+  const g2=document.createElement('div'); g2.className='cf-grid cf-bass';
+  iv.concat(rest).forEach((p,i)=>{ const cc={root:c.root,type:c.type,bass:p};
+    g2.appendChild(mk(cc,chordName(cc,song.meta),i<iv.length?'tone':'')); });
+  f.appendChild(g2);
+  document.body.appendChild(f);
+  const r=btn.getBoundingClientRect(), vw=window.innerWidth;
+  const w=Math.min(440,vw-16); f.style.width=w+'px';
+  const left=Math.max(8,Math.min(vw-w-8,r.left+r.width/2-w/2));
+  f.style.left=left+'px';
+  const h=f.offsetHeight;
+  f.style.top=Math.max(8,r.top-h-8)+'px';
+  _fanEl=f;
+  setTimeout(()=>document.addEventListener('pointerdown',_fanOutside,true),0);
+  return f;
+}
+/* 札に長押しの扇を付ける。軽く押せば今まで通り */
+function chordFanAttach(b,c,apply){
+  let t=null, open=false, st=null, hover=null;
+  b.addEventListener('pointerdown',e=>{
+    if(e.button&&e.button!==0) return;
+    st={x:e.clientX,y:e.clientY,id:e.pointerId};
+    t=setTimeout(()=>{ t=null; open=true; chordFanOpen(b,c,apply);
+      try{ b.setPointerCapture(st.id); }catch(_){}
+      try{ navigator.vibrate&&navigator.vibrate(8); }catch(_){} },380);
+  });
+  b.addEventListener('pointermove',e=>{
+    if(!st) return;
+    if(!open){ if(Math.hypot(e.clientX-st.x,e.clientY-st.y)>10){ clearTimeout(t); t=null; st=null; } return; }
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const it=el&&el.closest?el.closest('.cfan .cf-it'):null;
+    if(hover!==it){ if(hover) hover.classList.remove('hv'); hover=it; if(it) it.classList.add('hv'); }
+  });
+  b.addEventListener('touchmove',e=>{ if(open) e.preventDefault(); },{passive:false});
+  b.addEventListener('pointerup',e=>{
+    if(t){ clearTimeout(t); t=null; }
+    if(open){
+      b._eat=Date.now();
+      const it=hover; hover=null; open=false;
+      if(it){ const cc=JSON.parse(it.dataset.c); chordFanClose(); apply(cc); }
+      /* 何も選ばずに離したら、扇は開いたまま残す（押して選べる） */
+    }
+    st=null;
+  });
+  b.addEventListener('pointercancel',()=>{ if(t){ clearTimeout(t); t=null; } if(open){ open=false; } st=null; });
+  b.addEventListener('click',e=>{ if(b._eat&&Date.now()-b._eat<600){ e.stopImmediatePropagation(); e.preventDefault(); } },true);
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+  b.title=(b.title?b.title+'／':'')+'長押しで種類・分数コード';
+}
+/* この曲で使ったコード（曲に出てくる順、重ねない） */
+function songChordsUsed(max){
+  const out=[], seen=new Set();
+  const add=c=>{ if(!c||c.root==null) return; const k=c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass);
+    if(seen.has(k)) return; seen.add(k); out.push({root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}); };
+  try{
+    (song.sections||[]).forEach(sec=>(sec.items||[]).forEach(it=>{
+      const b=findBar(song,it.barId); if(!b) return;
+      const ev=[];
+      (b.notes||[]).forEach(n=>{ if(n&&n.chord) ev.push([n.start|0,n.chord]); });
+      if(b.chordAt) Object.keys(b.chordAt).forEach(k=>ev.push([+k,b.chordAt[k]]));
+      ev.sort((x,y)=>x[0]-y[0]).forEach(e=>add(e[1]));
+    }));
+  }catch(_){}
+  return out.slice(0,max||8);
+}
+/* 入れたら次へ——どこへ送るか（library に持つ。曲ではなく弾き手の好み） */
+function chordAdvMode(){ const v=library&&library.chordAdv; return (v==='bar'||v==='off')?v:'note'; }
+function chordAdvSelect(band){
+  const s=document.createElement('select'); s.className='dk-adv'; s.setAttribute('aria-label','入れた後の送り');
+  [['note',band?'入れたら：次の拍':'入れたら：次の音符'],['bar','入れたら：次の小節'],['off','入れたら：その場']].forEach(([v,l])=>{
+    const o=document.createElement('option'); o.value=v; o.textContent=l; if(chordAdvMode()===v) o.selected=true; s.appendChild(o); });
+  s.onchange=()=>{ library.chordAdv=s.value; try{ saveLibrary(); }catch(_){} };
+  return s;
+}
+/* 帯の盤の送り */
+function bandAdvance(){
+  if(!dock||!dock.band) return;
+  const m=chordAdvMode(); if(m==='off') return;
+  const t0=dock.targets[0], b=findBar(song,t0.barId); if(!b) return;
+  if(m==='note'){
+    const nx=bandTickStep(b,dock.bandTick,false);
+    if(nx!=null){ dock.bandTick=nx; return; }
+  }
+  const nm=nextMeasure(t0);
+  if(nm){ dock.targets=[{si:nm.si,pos:nm.pos,barId:nm.barId,noteIdx:-1}]; dock.bandTick=0; }
+  else toast('最後の小節です');
+}
+/* 盤の一段を作る（帯・音符の盤で共通） */
+function dockChordRow(d,label,list,curKey,apply){
+  const r=document.createElement('div'); r.className='dk-row';
+  const l=document.createElement('span'); l.className='dk-rlbl'; l.textContent=label; r.appendChild(l);
+  list.forEach(c=>{
+    const b=document.createElement('button');
+    const k=c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass);
+    b.className='dk-ch'+((curKey===k)?' on':'');
+    b.textContent=chordName(c,song.meta);
+    b.onclick=()=>apply(c);
+    chordFanAttach(b,c,apply);
+    r.appendChild(b);
+  });
+  d.appendChild(r);
+}
 function renderBandDock(bar){
   const cur=bandChordNow();
   const d=document.createElement('div'); d.className='dock no-print'; d.id='dock';
@@ -31478,20 +31633,13 @@ function renderBandDock(bar){
   hd.appendChild(nav);
   d.appendChild(hd);
 
-  const curKey=cur?(cur.root+'|'+cur.type):null;
-  padRows(song.meta).forEach((row,ri)=>{
-    const r=document.createElement('div'); r.className='dk-row';
-    const l=document.createElement('span'); l.className='dk-rlbl'; l.textContent=PAD_LABELS[ri];
-    r.appendChild(l);
-    row.forEach(c=>{
-      const b=document.createElement('button');
-      b.className='dk-ch'+((curKey===c.root+'|'+c.type)?' on':'');
-      b.textContent=chordName(c,song.meta);
-      b.onclick=()=>applyBandChord(c,'コードを入れる');
-      r.appendChild(b);
-    });
-    d.appendChild(r);
-  });
+  const curKey=cur?(cur.root+'|'+cur.type+'|'+(cur.bass==null?'':cur.bass)):null;
+  /* 入れたら次へ（tab-6.54） */
+  const bApply=c=>{ applyBandChord(c,'コードを入れる'); bandAdvance(); render(); };
+  hd.insertBefore(chordAdvSelect(true),nav);
+  const used=songChordsUsed(7);
+  if(used.length) dockChordRow(d,'この曲',used,curKey,bApply);
+  padRows(song.meta).forEach((row,ri)=>dockChordRow(d,PAD_LABELS[ri],row,curKey,bApply));
 
   const r4=document.createElement('div'); r4.className='dk-row';
   const l4=document.createElement('span'); l4.className='dk-rlbl'; l4.textContent='';
@@ -31601,21 +31749,12 @@ function renderDock(){
 
   /* コード盤 */
   const rows=padRows(song.meta);
-  const curKey=(n.chord&&n.chord.root!=null)?(n.chord.root+'|'+n.chord.type):null;
-  rows.forEach((row,ri)=>{
-    const r=document.createElement('div'); r.className='dk-row';
-    const l=document.createElement('span'); l.className='dk-rlbl'; l.textContent=PAD_LABELS[ri];
-    r.appendChild(l);
-    row.forEach(c=>{
-      const b=document.createElement('button');
-      const on=(curKey===c.root+'|'+c.type);
-      b.className='dk-ch'+(on?' on':'');
-      b.textContent=chordName(c,song.meta);
-      b.onclick=()=>setWholeChord(c);
-      r.appendChild(b);
-    });
-    d.appendChild(r);
-  });
+  const curKey=(n.chord&&n.chord.root!=null)?(n.chord.root+'|'+n.chord.type+'|'+(n.chord.bass==null?'':n.chord.bass)):null;
+  /* 送りの選び（tab-6.54） */
+  if(dock.tab!=='rhythm'&&!dock.multi) hd.insertBefore(chordAdvSelect(false),nav);
+  const used=songChordsUsed(7);
+  if(used.length) dockChordRow(d,'この曲',used,curKey,c=>setWholeChord(c));
+  rows.forEach((row,ri)=>dockChordRow(d,PAD_LABELS[ri],row,curKey,c=>setWholeChord(c)));
 
   /* その他 */
   const r4=document.createElement('div'); r4.className='dk-row';
