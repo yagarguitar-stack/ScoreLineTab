@@ -1780,7 +1780,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.47', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.48', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2630,13 +2630,21 @@ function mkPart(o){
      古い曲は `alignParts` が曲のカポを写す */
   if(Number.isInteger(o.capo)) p.capo=Math.max(0,Math.min(12,o.capo));
   if(o.mix&&typeof o.mix==='object') p.mix=normMix(o.mix,true);   /* 音量・パン・消音（tab-6.45） */
+  /* パートごとの設定（tab-6.48）。中身は alignParts が窓を通して読み書きする */
+  if(o.cfg&&typeof o.cfg==='object'){ try{ p.cfg=JSON.parse(JSON.stringify(o.cfg)); }catch(_){ p.cfg={}; } }
   return p;
 }
 /* 小節に「いまのパートの音符」という窓を開ける。
    既に開いていれば何もしない（二度呼ばれても壊れない） */
 function mkBarMark(o){
   o=o||{};
-  return { rhythm:o.rhythm||null, noAutoStroke:!!o.noAutoStroke };
+  const r={ rhythm:o.rhythm||null, noAutoStroke:!!o.noAutoStroke };
+  /* 刻みと小節の記号（P.M.・let ring・〃）もパートごと（tab-6.48） */
+  if(o.snap!==undefined) r.snap=o.snap;
+  if(o.snapAt!==undefined) r.snapAt=o.snapAt;
+  if(o.evenAt!==undefined) r.evenAt=o.evenAt;
+  if(o.mk&&typeof o.mk==='object') r.mk={pm:!!o.mk.pm,ring:!!o.mk.ring,simile:!!o.mk.simile};
+  return r;
 }
 function bindBar(bar){
   if(!bar||typeof bar!=='object') return bar;
@@ -2674,7 +2682,42 @@ function bindBar(bar){
     get(){ return mk(this).noAutoStroke; },
     set(v){ mk(this).noAutoStroke=!!v; }
   });
+  bindBarPartOpts(bar);
   return bar;
+}
+/* ══ 小節の刻み・記号もパートごと（tab-6.48）══
+   L様——「パートごとに独立させるべきところがそうなっているか洗い出せ」。
+   入力の刻み（`snap`／`snapAt`／`evenAt`）と、小節に付ける P.M.・let ring・〃 は、
+   **そのパートの弾き方**の性質である。1本目を3連で刻み、2本目を16分で刻む——
+   共通では、片方を直すともう片方の刻みが崩れていた。
+   値は印の束（`pm[パート]`）が持ち、`bar.snap` や `bar.marks.pm` はその窓。
+   古い曲の値は全パートへ写して引き継ぐ。 */
+var BAR_PART_KEYS=['snap','snapAt','evenAt'];
+var MARK_PART_KEYS=['pm','ring','simile'];
+function bindBarPartOpts(bar){
+  const mk=b=>{ const i=b._pi||0; return b.pm[i]||(b.pm[i]=mkBarMark()); };
+  BAR_PART_KEYS.forEach(k=>{
+    const d=Object.getOwnPropertyDescriptor(bar,k);
+    if(d&&d.get) return;
+    const legacy=d?d.value:undefined;
+    if(legacy!==undefined) bar.pm.forEach(m=>{ if(m&&m[k]===undefined) m[k]=(legacy&&typeof legacy==='object')?JSON.parse(JSON.stringify(legacy)):legacy; });
+    delete bar[k];
+    Object.defineProperty(bar,k,{enumerable:false,configurable:true,
+      get(){ const v=mk(this)[k]; return v===undefined?null:v; },
+      set(v){ mk(this)[k]=v; }});
+  });
+  if(!bar.marks||typeof bar.marks!=='object') return;
+  const mm=bar.marks;
+  MARK_PART_KEYS.forEach(k=>{
+    const d=Object.getOwnPropertyDescriptor(mm,k);
+    if(d&&d.get) return;
+    const legacy=d?!!d.value:false;
+    bar.pm.forEach(m=>{ if(!m) return; m.mk=m.mk||{}; if(m.mk[k]===undefined) m.mk[k]=legacy; });
+    delete mm[k];
+    Object.defineProperty(mm,k,{enumerable:false,configurable:true,
+      get(){ const m=mk(bar); return !!(m.mk&&m.mk[k]); },
+      set(v){ const m=mk(bar); m.mk=m.mk||{}; m.mk[k]=!!v; }});
+  });
 }
 function mkBar(o){
   o=o||{};
@@ -2737,6 +2780,8 @@ function mkSection(o){
               「なし」ではない。既にある曲を開いた時に音が変わってはならない。
               持てるのは音色と摘み一式（歪み・胴の鳴り・弦の伸び・エフェクト）。 */
            sound:normSound(o.sound),
+           /* パートごとのセクションの音（tab-6.48）。鍵はパートの id。`sound` はその窓 */
+           psnd:(o.psnd&&typeof o.psnd==='object')?Object.fromEntries(Object.keys(o.psnd).map(k=>[k,normSound(o.psnd[k])])):null,
            items:o.items||[] };
 }
 function mkSong(o){
@@ -2902,6 +2947,7 @@ function alignParts(s){
   const n=s.parts.length;
   s.part=Math.min(Math.max(0,(+s.part)||0),n-1);
   bindCapo(s);
+  bindPartOpts(s);                       /* パートごとの設定（tab-6.48） */
   (s.bars||[]).forEach(b=>{
     bindBar(b);
     if(!Array.isArray(b.np)) b.np=[[]];
@@ -2922,6 +2968,8 @@ function alignParts(s){
     if(!Array.isArray(b.pm)||!b.pm.length) b.pm=[mkBarMark()];
     while(b.pm.length<n) b.pm.push(mkBarMark());
     if(b.pm.length>n) b.pm.length=n;
+    /* 足したパートの記号は「なし」から（tab-6.48） */
+    b.pm.forEach(m=>{ if(m&&!m.mk) m.mk={pm:false,ring:false,simile:false}; });
     b._pi=s.part;
   });
   return s;
@@ -2939,7 +2987,82 @@ function alignParts(s){
    古い曲は `meta.capo` を値として持っている。持っていないパートへ写して引き継ぐ
    （全パートに同じ値＝開いた時の音は変わらない）。
    保存の形には `meta.capo` も残す（表のパートの値）——外の道具が読めるように。 */
-var CAPO_PT=null;   /* var：読み込みの途中で曲を組んでも落ちないように */
+var CAPO_PT=null;
+/* ══ パートごとの設定（tab-6.48）══
+   L様——「こういうのがそもそも多すぎる。パートごとに独立させるべきところがそうなっているか洗い出せ」。
+   洗い出した結果、**弾き手ごとに違って当然の設定**が曲に一つだった。
+   カポ（tab-6.39）と同じ仕組みで、まとめて窓にする——
+     読む：いま見ている（鳴らしている時はそのパートの）値
+     書く：表に出ているパートの値だけ
+   値はパートが持つ（`part.cfg.meta`／`part.cfg.play`／`part.cfg.top`）。
+   保存の形には、従来の場所にも表のパートの値を残す（外の道具が読めるように）。
+   古い曲は今の値を全パートへ写して引き継ぐ。足したパートは、表のパートの値から始める。
+
+   分けた物——
+     音：チューニング・音の消え方・チョーキングの鳴らし方・アルペジオの着地と広がり・コードの押さえ
+     書き方：コード図・図の数字・押さえ名/実音名・ピッキング記号と矢印・定型の向きと符尾・
+             五線譜の表示・入力の刻み・新しい小節の刻み・コードをTABへ書くか
+   （小節の刻みと記号は `bindBarPartOpts`、セクションの音は `bindSecSound`） */
+var PART_META_KEYS=['tuning','diagram','diagramLabel','capoName','strokeGlyph','strokeAuto','pickMark',
+  'rhythmDir','slashStem','staffView','snap','defaultRhythm','chordToTab','arpLand','arpLandSet','arpWidth'];
+var PART_PLAY_KEYS=['ring'];    /* bend は rit./accel. の効き＝時間の物なので曲に一つ */
+function curPartIdx(s){ return (CAPO_PT!=null)?CAPO_PT:((s&&s.part)||0); }
+function _cfgCopy(v){ return (v&&typeof v==='object')?JSON.parse(JSON.stringify(v)):v; }
+function bindPartKeys(s,obj,grp,keys){
+  if(!s||!obj||!Array.isArray(s.parts)) return;
+  keys.forEach(k=>{
+    const d=Object.getOwnPropertyDescriptor(obj,k);
+    const isAcc=!!(d&&d.get);
+    let src;
+    if(isAcc){ const cur=s.parts[s.part||0]; const c=cur&&cur.cfg&&cur.cfg[grp]; src=(c&&(k in c))?c[k]:undefined; }
+    else src=d?d.value:undefined;
+    s.parts.forEach(p=>{
+      if(!p) return; p.cfg=p.cfg||{}; p.cfg[grp]=p.cfg[grp]||{};
+      if(!(k in p.cfg[grp])&&src!==undefined) p.cfg[grp][k]=_cfgCopy(src);
+    });
+    if(isAcc) return;
+    Object.defineProperty(obj,k,{enumerable:true,configurable:true,
+      get(){ const p=s.parts[curPartIdx(s)]||s.parts[s.part||0]||s.parts[0];
+             const c=p&&p.cfg&&p.cfg[grp];
+             if(k==='voicings'){ if(!c) return {}; if(!c.voicings||typeof c.voicings!=='object') c.voicings={}; return c.voicings; }
+             return c?c[k]:undefined; },
+      set(v){ const p=s.parts[s.part||0]; if(!p) return; p.cfg=p.cfg||{}; p.cfg[grp]=p.cfg[grp]||{}; p.cfg[grp][k]=v; }});
+  });
+}
+function bindPartOpts(s){
+  bindPartKeys(s,s.meta,'meta',PART_META_KEYS);
+  bindPartKeys(s,s.play,'play',PART_PLAY_KEYS);
+  bindPartKeys(s,s,'top',['voicings']);
+  bindSecSound(s);
+}
+/* ══ セクションの音もパートごと（tab-6.48）══
+   L様——「別パートなのにセクションの音が連動してない？」。
+   セクションの音は曲に一つで、全パートに同じ音を被せていた。
+   パートの id を鍵に持たせ、`sec.sound` は表のパート（鳴らす時はそのパート）の窓にする。
+   効き方は今まで通り（セクションの音がある区間は、それで鳴る）。 */
+function bindSecSound(s){
+  (s.sections||[]).forEach(sec=>{
+    if(!sec) return;
+    const d=Object.getOwnPropertyDescriptor(sec,'sound');
+    const isAcc=!!(d&&d.get);
+    let src;
+    if(isAcc){ const cur=s.parts[s.part||0]; src=(sec.psnd&&cur)?sec.psnd[cur.id]:undefined; }
+    else src=d?d.value:null;
+    if(!sec.psnd||typeof sec.psnd!=='object') sec.psnd={};
+    s.parts.forEach(p=>{ if(p&&!(p.id in sec.psnd)) sec.psnd[p.id]=src?_cfgCopy(src):null; });
+    if(isAcc) return;
+    Object.defineProperty(sec,'sound',{enumerable:false,configurable:true,
+      get(){ const p=s.parts[curPartIdx(s)]||s.parts[0]; return (p&&sec.psnd&&sec.psnd[p.id])||null; },
+      set(v){ const p=s.parts[s.part||0]; if(!p) return; sec.psnd=sec.psnd||{}; sec.psnd[p.id]=v||null; }});
+  });
+}
+/* 鳴らす時は、そのパートのセクションの音を直に引く（窓は「いま」のパートを見るため） */
+function secSoundOf(s,sec,pi){
+  if(!sec) return null;
+  const p=s&&s.parts&&s.parts[pi];
+  if(sec.psnd&&p) return sec.psnd[p.id]||null;
+  return sec.sound||null;
+}   /* var：読み込みの途中で曲を組んでも落ちないように */
 function bindCapo(s){
   if(!s||!s.meta||!Array.isArray(s.parts)) return;
   const d=Object.getOwnPropertyDescriptor(s.meta,'capo');
@@ -8928,9 +9051,9 @@ function openSectionSound(si){
   const sec=song.sections[si]; if(!sec) return;
   openSoundSheet({
     title:'このセクションの音',
-    sub:so=>(sec.name||'（名前なし）')+' … '+(so?'独自の音':'曲ぜんたいに従う'),
+    sub:so=>(sec.name||'（名前なし）')+((partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'')+' … '+(so?'独自の音':'曲ぜんたいに従う'),
     get:()=>song.sections[si]&&song.sections[si].sound,
-    set:v=>{ song.sections[si].sound=v; },
+    set:v=>{ song.sections[si].sound=v; try{ clearSndCache(); }catch(_){} },
     again:()=>openSectionSound(si),
     setLabel:'このセクションの音を変える',
     resetLabel:'このセクションの音を曲に戻す',
@@ -21721,7 +21844,8 @@ function sndForBar(barId,pi){
      セクション → パート → 曲 の順に、**書いてある物が勝つ。**
      書いてなければ一つ上に従う。`null` は「上に任せる」であって「なし」ではない */
   const pt=(song&&song.parts&&song.parts[p])||null;
-  const sd=(sec&&sec.sound)?soundAt(song,sec)
+  const ss=secSoundOf(song,sec,p);
+  const sd=ss?soundAt(song,{sound:ss})
           :((pt&&pt.sound)?soundAt(song,pt):null);
   _secSndCache.set(key,sd);
   return sd;
@@ -37699,9 +37823,14 @@ function renderSettings(){
   /* ══ 入れ先を差し替えられるようにする（tab-3.13）══
      エフェクトの段だけは枠の中へ入れるので、置き場所を持ち回る。 */
   let host=box;
+  /* パートごとの欄には、どのパートの設定かを添える（tab-6.48） */
+  const PART_FLD=new Set(['チューニング','コード図','図の点の中身','ピッキング記号の形','ピッキング記号の自動割り当て',
+    'ピッキング記号を付けるか','定型に付けるピッキング記号','定型の符尾の向き','五線譜を出す','コードを入れた時',
+    'アルペジオの着地','アルペジオの広がり','音の消え方']);
+  const _pfTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
   const fld=(label,el,wide,note)=>{
     const d=document.createElement('div'); d.className='fld'+(wide?' wide':'');
-    const l=document.createElement('label'); l.textContent=label;
+    const l=document.createElement('label'); l.textContent=label+(PART_FLD.has(label)?_pfTag:'');
     d.appendChild(l); d.appendChild(el);
     if(note){ const n=document.createElement('div'); n.className='note'; n.textContent=note; d.appendChild(n); }
     host.appendChild(d); return d;
