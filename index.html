@@ -1705,7 +1705,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.43', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.44', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -9390,7 +9390,7 @@ function previewStop(str,fret){
     hushVoice(str,AC.currentTime+0.005,20);
     /* 表のパートの音で鳴らす（tab-6.40） */
     const _k=_sndNow; _sndNow=partSound(song);
-    try{ pluck(AC.currentTime+0.01,midi,0.26,0.55,{str:str}); } finally { _sndNow=_k; }
+    try{ busUse(song.part||0); pluck(AC.currentTime+0.01,midi,0.26,0.55,{str:str}); } finally { _sndNow=_k; }
   }catch(e){}
 }
 
@@ -14928,7 +14928,12 @@ function setRecVol(v){
 }
 function setPlayVol(v){
   v=Math.max(0,Math.min(MIX_MAX,v));
+  const _old=(library&&library.playVol!=null)?library.playVol:null;
   library.playVol=v; saveLibrary();
+  /* 他のパートの通り道にも、同じ割合で掛け直す（tab-6.44） */
+  try{ if(_old>0) _BUSES.forEach((o,k)=>{ if(k!==_busCur&&o.GTRIM){ const g=o.GTRIM.gain.value*v/_old;
+         if(AC) o.GTRIM.gain.setTargetAtTime(g,AC.currentTime,0.02); o.GTRIM.gain.value=g; } });
+       else busDirtyAll(); }catch(_){}
   /* 音色の補正を保ったまま、混ぜ具合だけを掛け直す（tab-6.12） */
   /* いまの音色の補正を保つ。`TONES` は配列なので id で引く（tab-6.12） */
   if(GTRIM){ const id=(song&&song.play&&song.play.tone);
@@ -17055,6 +17060,14 @@ let _sndNow=null;
      ・パートが2本以上ある、または表のパートが自分の音を持つ → 表のパート
      ・それ以外（パート1本の曲） → これまで通り曲ぜんたい
    欄に出す値も、表のパートの音（`partSound`）を見る。 */
+/* 摘みを変えた後、表のパートの通り道へ配り直す（tab-6.44）。
+   素の `guitarBus()` は「いま差してある通り道」に「曲の設定」を配ってしまうので、
+   鳴っている最中だと別のパートの音を一瞬書き換えてしまう */
+function soundRefresh(){
+  audioReady();
+  const keep=_sndNow; _sndNow=partSound(song);
+  try{ busUse((song&&song.part)||0); guitarBus(); } finally { _sndNow=keep; }
+}
 function partSound(s){
   const pt=s&&s.parts&&s.parts[s.part||0];
   return (pt&&pt.sound)?soundAt(s,pt):null;
@@ -17229,6 +17242,35 @@ let GPRE=null, GSHP=null, GCAB=null, GMID=null, GDIRT=null, GCLEAN=null, _shpK=n
 let GHP=null;                     /* 歪ませる前の低音切り（tab-1.75） */
 let GRECT=null,_shpR=null;        /* 潰す前の整流（tab-4.80） */
 let GLP2=null,GPRE2=null,GSHP2=null,_shpK2=null;   /* 二段目の潰し（tab-1.75） */
+
+/* ══ 通り道はパートごとに一本ずつ（tab-6.44）══
+   L様——「再生音に違和感。他のパートがあるとタイで途切れる」。
+
+   アンプとエフェクトの通り道（胴・歪み・エフェクトの列）は**曲に一本**だった。
+   パートごとの音（tab-6.40）は、その一本の設定を出来事のたびに書き換えて鳴らし分けていた。
+   ゆえに、クランチ＋ディレイで和音を伸ばしている最中にクリーンのパートが鳴ると、
+   **通り道ごと切り替わり、伸ばしている和音の歪みとディレイが途中で消えていた。**
+
+   通り道の部品はここより上の `let` に散っている。作り替えるのではなく、
+   **部品一式をパートごとに控えて、鳴らすパートの物と差し替える**（`busUse`）。
+   作り方・配り方（`guitarBus`／`fxChain`／`fxApply`）は一行も変えずに済む。
+   出口（`MASTER`）だけは全パートで共有する。 */
+const _BUSES=new Map(); let _busCur=0;
+function busFresh(){ return {GBUS:null, GDRY:null, GWET:null, GCONV:null, GTRIM:null, _gbId:null, FXIN:null, FXOUT:null, _fxId:null, _fxLFO:[], FXCOMP:null, FXCOMP_DRY:null, FXCOMP_WET:null, FXWAH:null, FXWAH_DRY:null, FXWAH_WET:null, FXWAH_LFO:null, FXWAH_DEPTH:null, FXWAH_UP:null, FXPH_DRY:null, FXPH_WET:null, FXPH_LFO:null, FXPH_DEPTH:null, FXPH_FB:null, FXCH_DRY:null, FXCH_WET:null, FXCH_LFO:[], FXCH_DEPTH:[], FXFL_DRY:null, FXFL_WET:null, FXFL_LFO:null, FXFL_DEPTH:null, FXFL_FB:null, FXTR:null, FXTR_LFO:null, FXTR_DEPTH:null, FXDL_DRY:null, FXDL_WET:null, FXDL_D:null, FXDL_FB:null, FXDL_LP:null, FXRV_DRY:null, FXRV_WET:null, FXRV_CONV:null, FXRV_PRE:null, FXTRIM:null, FXCOMP_SEND:null, FXWAH_SEND:null, FXPH_SEND:null, FXDL_SEND:null, FXRV_SEND:null, _fxWired:false, FXTR_START:null, _trHz:5, _trWave:'sine', FXWAH_START:null, GPRE:null, GSHP:null, GCAB:null, GMID:null, GDIRT:null, GCLEAN:null, _shpK:null, GHP:null, GRECT:null, _shpR:null, GLP2:null, GPRE2:null, GSHP2:null, _shpK2:null}; }
+function busSave(){ return {GBUS:GBUS, GDRY:GDRY, GWET:GWET, GCONV:GCONV, GTRIM:GTRIM, _gbId:_gbId, FXIN:FXIN, FXOUT:FXOUT, _fxId:_fxId, _fxLFO:_fxLFO, FXCOMP:FXCOMP, FXCOMP_DRY:FXCOMP_DRY, FXCOMP_WET:FXCOMP_WET, FXWAH:FXWAH, FXWAH_DRY:FXWAH_DRY, FXWAH_WET:FXWAH_WET, FXWAH_LFO:FXWAH_LFO, FXWAH_DEPTH:FXWAH_DEPTH, FXWAH_UP:FXWAH_UP, FXPH_DRY:FXPH_DRY, FXPH_WET:FXPH_WET, FXPH_LFO:FXPH_LFO, FXPH_DEPTH:FXPH_DEPTH, FXPH_FB:FXPH_FB, FXCH_DRY:FXCH_DRY, FXCH_WET:FXCH_WET, FXCH_LFO:FXCH_LFO, FXCH_DEPTH:FXCH_DEPTH, FXFL_DRY:FXFL_DRY, FXFL_WET:FXFL_WET, FXFL_LFO:FXFL_LFO, FXFL_DEPTH:FXFL_DEPTH, FXFL_FB:FXFL_FB, FXTR:FXTR, FXTR_LFO:FXTR_LFO, FXTR_DEPTH:FXTR_DEPTH, FXDL_DRY:FXDL_DRY, FXDL_WET:FXDL_WET, FXDL_D:FXDL_D, FXDL_FB:FXDL_FB, FXDL_LP:FXDL_LP, FXRV_DRY:FXRV_DRY, FXRV_WET:FXRV_WET, FXRV_CONV:FXRV_CONV, FXRV_PRE:FXRV_PRE, FXTRIM:FXTRIM, FXCOMP_SEND:FXCOMP_SEND, FXWAH_SEND:FXWAH_SEND, FXPH_SEND:FXPH_SEND, FXDL_SEND:FXDL_SEND, FXRV_SEND:FXRV_SEND, _fxWired:_fxWired, FXTR_START:FXTR_START, _trHz:_trHz, _trWave:_trWave, FXWAH_START:FXWAH_START, GPRE:GPRE, GSHP:GSHP, GCAB:GCAB, GMID:GMID, GDIRT:GDIRT, GCLEAN:GCLEAN, _shpK:_shpK, GHP:GHP, GRECT:GRECT, _shpR:_shpR, GLP2:GLP2, GPRE2:GPRE2, GSHP2:GSHP2, _shpK2:_shpK2}; }
+function busLoad(o){ GBUS=o.GBUS; GDRY=o.GDRY; GWET=o.GWET; GCONV=o.GCONV; GTRIM=o.GTRIM; _gbId=o._gbId; FXIN=o.FXIN; FXOUT=o.FXOUT; _fxId=o._fxId; _fxLFO=o._fxLFO; FXCOMP=o.FXCOMP; FXCOMP_DRY=o.FXCOMP_DRY; FXCOMP_WET=o.FXCOMP_WET; FXWAH=o.FXWAH; FXWAH_DRY=o.FXWAH_DRY; FXWAH_WET=o.FXWAH_WET; FXWAH_LFO=o.FXWAH_LFO; FXWAH_DEPTH=o.FXWAH_DEPTH; FXWAH_UP=o.FXWAH_UP; FXPH_DRY=o.FXPH_DRY; FXPH_WET=o.FXPH_WET; FXPH_LFO=o.FXPH_LFO; FXPH_DEPTH=o.FXPH_DEPTH; FXPH_FB=o.FXPH_FB; FXCH_DRY=o.FXCH_DRY; FXCH_WET=o.FXCH_WET; FXCH_LFO=o.FXCH_LFO; FXCH_DEPTH=o.FXCH_DEPTH; FXFL_DRY=o.FXFL_DRY; FXFL_WET=o.FXFL_WET; FXFL_LFO=o.FXFL_LFO; FXFL_DEPTH=o.FXFL_DEPTH; FXFL_FB=o.FXFL_FB; FXTR=o.FXTR; FXTR_LFO=o.FXTR_LFO; FXTR_DEPTH=o.FXTR_DEPTH; FXDL_DRY=o.FXDL_DRY; FXDL_WET=o.FXDL_WET; FXDL_D=o.FXDL_D; FXDL_FB=o.FXDL_FB; FXDL_LP=o.FXDL_LP; FXRV_DRY=o.FXRV_DRY; FXRV_WET=o.FXRV_WET; FXRV_CONV=o.FXRV_CONV; FXRV_PRE=o.FXRV_PRE; FXTRIM=o.FXTRIM; FXCOMP_SEND=o.FXCOMP_SEND; FXWAH_SEND=o.FXWAH_SEND; FXPH_SEND=o.FXPH_SEND; FXDL_SEND=o.FXDL_SEND; FXRV_SEND=o.FXRV_SEND; _fxWired=o._fxWired; FXTR_START=o.FXTR_START; _trHz=o._trHz; _trWave=o._trWave; FXWAH_START=o.FXWAH_START; GPRE=o.GPRE; GSHP=o.GSHP; GCAB=o.GCAB; GMID=o.GMID; GDIRT=o.GDIRT; GCLEAN=o.GCLEAN; _shpK=o._shpK; GHP=o.GHP; GRECT=o.GRECT; _shpR=o._shpR; GLP2=o.GLP2; GPRE2=o.GPRE2; GSHP2=o.GSHP2; _shpK2=o._shpK2; }
+function busUse(pi){
+  pi=(pi|0);
+  if(pi===_busCur) return;
+  _BUSES.set(_busCur,busSave());
+  busLoad(_BUSES.get(pi)||busFresh());
+  _busCur=pi;
+}
+/* 全パートの通り道に、配り直しを促す（音量の摘みなど、全体に効く物を変えた時） */
+function busDirtyAll(){
+  _gbId=null; _fxId=null;
+  _BUSES.forEach((o,k)=>{ if(k!==_busCur){ o._gbId=null; o._fxId=null; } });
+}
 
 /* ══ 潰しの曲線 ══
    x/(1+k|x|) の形。k が大きいほど頭打ちが早く、倍音が増える。
@@ -21506,9 +21548,22 @@ function playStart(){
      ただの不規則な揺らぎに聞こえる。曲の頭を位相 0 にする。 */
   /* **順が大事。** 先に `guitarBus()` で摘みを配り（`_trHz`／`_trWave` が定まる）、
      それから揺れを組み直す。逆にすると**一つ前の設定で組んだ揺れ**が鳴る（tab-3.22） */
-  try{ audioReady(); guitarBus(); }catch(_){}
-  try{ if(FXTR_START) FXTR_START(TP.t0); }catch(_){}
-  try{ if(FXWAH_START) FXWAH_START(TP.t0); }catch(_){}
+  /* 通り道はパートごと（tab-6.44）。鳴らすパートすべてに配り、揺れを拍に合わせる */
+  try{
+    audioReady();
+    const _keepS=_sndNow;
+    const _pis=(partCount(song)>1&&!(song.play&&song.play.allParts===false))
+      ?[...Array(partCount(song)).keys()]:[song.part||0];
+    _pis.forEach(pi=>{
+      const pt=song.parts&&song.parts[pi];
+      _sndNow=(pt&&pt.sound)?soundAt(song,pt):null;
+      busUse(pi);
+      try{ guitarBus(); }catch(_){}
+      try{ if(FXTR_START) FXTR_START(TP.t0); }catch(_){}
+      try{ if(FXWAH_START) FXWAH_START(TP.t0); }catch(_){}
+    });
+    _sndNow=_keepS; busUse(song.part||0);
+  }catch(_){}
 
   TP.timer=setInterval(schedTick,POLL_MS);
   TP.raf=requestAnimationFrame(paintTick);
@@ -21595,6 +21650,7 @@ function fireEvent(e,at){
   if(needSnd) _sndNow=sndForBar(e.barId,e._pt)||null;
   const prevDV=DAMP_VB; DAMP_VB=VK_BASE;      /* 止める手は、このパートの手（tab-6.37） */
   const prevCP=CAPO_PT; if(e._pt!=null) CAPO_PT=e._pt;   /* カポもこのパートの物（tab-6.39） */
+  if(e._pt!=null) busUse(e._pt);                         /* 通り道もこのパートの物（tab-6.44） */
   try{ _fireEvent(e,at); } finally { if(needSnd) _sndNow=prevSnd; VK_BASE=prevVK; DAMP_VB=prevDV; CAPO_PT=prevCP; }
 }
 function _fireEvent(e,at){
@@ -37681,7 +37737,7 @@ function renderSettings(){
   const _sndKeep=_sndNow; _sndNow=partSound(song);
   const _ptTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
   fld('ギターの音色'+_ptTag,sel(TONES.map(t=>[t.id,t.label]),sndPick(song,'tone',TONE_DEF),
-    v=>{ tx('音色を変える',()=>{setSnd(song,'tone',v);},FREE); try{ audioReady(); guitarBus(); }catch(_){} renderSettings(); }),false,
+    v=>{ tx('音色を変える',()=>{setSnd(song,'tone',v);},FREE); try{ soundRefresh(); }catch(_){} renderSettings(); }),false,
     '音源は持たず、その場で弦の振動を計算しています。端末によって鳴り方が少し変わります');
   fld('置いた音を鳴らす',sel([['on','鳴らす'],['off','鳴らさない']],
     (song.play.preview===false)?'off':'on',
@@ -37698,19 +37754,19 @@ function renderSettings(){
     +'〈切らずに…〉は生のギターに近い鳴り方でございます。'
     +'なお **let ring とタイの音は、どれを選んでも消えません**——伸ばすと書いてあるものは伸びます');
   fld('弦の伸び（サスティーン）',sel(SUSTAIN_AMT,String(sustainAmt(song)),
-    v=>{ tx('弦の伸びを変える',()=>{setSnd(song,'sustain',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
+    v=>{ tx('弦の伸びを変える',()=>{setSnd(song,'sustain',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),false,
     '音色ごとの伸びに掛ける加減でございます。太い弦ほど、低い音ほど長く伸び、'
     +'歪ませるほど伸びるという関係はそのままに、全体を伸び縮みさせます。'
     +'長くするほど和音は重なって濁りますので、速い曲では短めが聴き取りやすうございます。'
     +'ハンマリング・プリングを繋ぐか弾き直すかの分かれ目も、これに従います');
   fldOn('胴の鳴り',sel(BODY_AMT,String(bodyAmt(song)),
-    v=>{ tx('胴の鳴りを変える',()=>{setSnd(song,'body',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),bodyAmt(song),false,
+    v=>{ tx('胴の鳴りを変える',()=>{setSnd(song,'body',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),bodyAmt(song),false,
     '箱の響きの量です。エレキには元から胴がありません');
   /* 歪みの摘みは、歪む音色を選んでいる時だけ出す。
      効かない摘みが並んでいるのが、設定画面でいちばん惑わせる */
   if((toneOf(song)||{}).drive)
     fld('歪みの強さ',sel(DRIVE_AMT,String(driveAmt(song)),
-      v=>{ tx('歪みの強さを変える',()=>{setSnd(song,'drive',parseFloat(v));},FREE); try{ audioReady(); guitarBus(); }catch(_){} }),false,
+      v=>{ tx('歪みの強さを変える',()=>{setSnd(song,'drive',parseFloat(v));},FREE); try{ soundRefresh(); }catch(_){} }),false,
       '全部の弦を混ぜてから潰しております。一音ずつ歪ませると音どうしが混じり合わず、和音が濁らないためでございます。※強くするほど弦そのものの伸びは短くしてございます（tab-3.05）——潰しが深くなると痩せた尾まで持ち上がりますので、そのままでは書いた音価の何倍も鳴り続けてしまうためでございます');
 
   /* ══ エフェクト（tab-2.99）══
@@ -37740,7 +37796,7 @@ function renderSettings(){
        `fxApply` は音を出す時（`guitarBus`）にしか呼ばれないので、
        **鳴らしている最中に動かしても、次の音まで効かなかった。**
        試しながら決める摘みなので、その場で届かねば手応えが無い。 */
-    try{ audioReady(); guitarBus(); }catch(_){}
+    try{ soundRefresh(); }catch(_){}
     renderSettings(); };
   fldOn('コンプレッサー',sel(FX_COMP,String(fxOf(song,'comp','0')),v=>fxSet('comp',v)),fxOf(song,'comp','0'),false,
     '音の粒を揃えます。歪みより前に置いてございますので、強くすると後段の歪みが均一に掛かります。カッティングの練習にお使いくださいませ');
@@ -39827,7 +39883,7 @@ function ampPlace(){
 /* 音を変えて、すぐ鳴りに効かせる */
 function ampApply(label,fn){
   tx(label,fn,FREE);
-  try{ audioReady(); guitarBus(); }catch(_){}
+  try{ soundRefresh(); }catch(_){}
   ampRender();
 }
 function ampChoose(title,list,cur,onPick,extra){
