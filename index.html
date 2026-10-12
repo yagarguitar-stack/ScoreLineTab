@@ -1696,6 +1696,32 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 @media (max-width:520px){ .dk-head{flex-wrap:wrap;row-gap:6px} .dk-adv{order:9;flex:1 1 100%;max-width:none;font-size:12px} .dk-pos{display:none} }
 /* お知らせの文が細い柱に押し込まれないように（狭い画面で一文字ずつ縦に並んでいた） */
 .toast{width:max-content;flex-wrap:wrap}
+
+/* 進行のひな形の一覧（tab-6.55） */
+.prog-list{display:flex!important;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto}
+.prog-it{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;padding:9px 12px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--ink-line);background:var(--ink3);color:var(--on-ink);font-family:var(--font-ui,system-ui,sans-serif)}
+.prog-it:hover{background:var(--ink-line)}
+.prog-it .pn{font-weight:800;font-size:13.5px}
+.prog-it .pc{font-size:12.5px;color:#ffcf7a;white-space:normal;line-height:1.4}
+
+/* コードの札の列・ドラッグ・スタンプ（tab-6.56） */
+.botbar .cpal{gap:8px;align-items:center}
+.cpal .cp-scroll{display:flex;gap:6px;flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:2px 0}
+.cpal .cp-scroll::-webkit-scrollbar{display:none}
+.cp-chip{flex:0 0 auto;min-width:54px;height:36px;padding:0 12px;border-radius:9px;cursor:grab;touch-action:pan-x;
+  border:1px solid #000;background:linear-gradient(180deg,#3a3835,#2a2825);color:#ece3d2;font:800 14px/1 var(--font-ui,system-ui,sans-serif);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.cp-chip.on{background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407}
+.cpal .cp-state{flex:0 1 auto;font:600 11.5px/1.3 var(--font-ui,system-ui,sans-serif);color:#bfb4a0;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.cpal .cp-x{flex:0 0 auto;height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--ink-line);background:var(--ink3);color:var(--on-ink);
+  font:600 12px/1 var(--font-ui,system-ui,sans-serif);cursor:pointer}
+.cp-ghost{position:fixed;z-index:95;transform:translate(-50%,-140%);pointer-events:none;padding:8px 14px;border-radius:10px;
+  background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407;font:800 16px/1 var(--font-ui,system-ui,sans-serif);box-shadow:0 8px 20px rgba(0,0,0,.45)}
+.cp-hi{position:fixed;z-index:94;pointer-events:none;border-radius:6px;background:rgba(255,190,80,.22);box-shadow:inset 0 0 0 2px rgba(255,170,40,.85)}
+body.cp-dragging,body.cp-dragging *{cursor:grabbing!important;-webkit-user-select:none!important;user-select:none!important}
+body.stamping #paper .mwrap{cursor:copy}
+@media (max-width:700px){ .cpal .cp-state{display:none} body.stamping .cpal .cp-state{display:flex} body.stamping .cpal .cp-state>span{display:none} }
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1817,7 +1843,7 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.54', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.56', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -31507,6 +31533,7 @@ function chordFanOpen(btn,c,apply){
 /* 札に長押しの扇を付ける。軽く押せば今まで通り */
 function chordFanAttach(b,c,apply){
   let t=null, open=false, st=null, hover=null;
+  b._fanCancel=()=>{ if(t){ clearTimeout(t); t=null; } st=null; };   /* 引きずりが始まったら扇は開かない（tab-6.56） */
   b.addEventListener('pointerdown',e=>{
     if(e.button&&e.button!==0) return;
     st={x:e.clientX,y:e.clientY,id:e.pointerId};
@@ -31590,6 +31617,211 @@ function dockChordRow(d,label,list,curKey,apply){
   });
   d.appendChild(r);
 }
+
+/* ══ 進行のひな形（tab-6.55）══
+   L様の案⑤——よく使う進行を一押しで、いま指している小節から順に入れる。
+   度数は長調の主音から数える。短調の曲は平行調（短3度上）を主音として読む——
+   Am の曲で王道進行なら F → G → Em → Am になる。
+   小節が足りなければ、そのセクションの終わりに足す。取り消しは一手で戻る。 */
+var PROG_TEMPLATES=[
+  {name:'王道進行',      bars:[[[5,'maj7']],[[7,'dom7']],[[4,'min7']],[[9,'min']]]},
+  {name:'カノン進行',    bars:[[[0,'maj']],[[7,'maj']],[[9,'min']],[[4,'min']],[[5,'maj']],[[0,'maj']],[[5,'maj']],[[7,'maj']]]},
+  {name:'小室進行',      bars:[[[9,'min']],[[5,'maj']],[[7,'maj']],[[0,'maj']]]},
+  {name:'ポップスの定番（1-5-6-4）',bars:[[[0,'maj']],[[7,'maj']],[[9,'min']],[[5,'maj']]]},
+  {name:'1-6-4-5',       bars:[[[0,'maj']],[[9,'min']],[[5,'maj']],[[7,'maj']]]},
+  {name:'循環（1-6-2-5）',bars:[[[0,'maj']],[[9,'min']],[[2,'min7']],[[7,'dom7']]]},
+  {name:'ツーファイブワン',bars:[[[2,'min7']],[[7,'dom7']],[[0,'maj7']],[[0,'maj7']]]},
+  {name:'丸サ進行',      bars:[[[5,'maj7']],[[4,'dom7']],[[9,'min7']],[[7,'min7'],[0,'dom7']]]},
+  {name:'下りの進行（6-5-4-3）',bars:[[[9,'min']],[[7,'maj']],[[5,'maj']],[[4,'dom7']]]},
+  {name:'12小節ブルース',bars:[[[0,'dom7']],[[0,'dom7']],[[0,'dom7']],[[0,'dom7']],[[5,'dom7']],[[5,'dom7']],[[0,'dom7']],[[0,'dom7']],[[7,'dom7']],[[5,'dom7']],[[0,'dom7']],[[7,'dom7']]]}
+];
+function progTonic(){
+  const k=song.meta.key||{}; const r=(k.root==null)?0:k.root;
+  return (k.qual==='min')?(r+3)%12:r;
+}
+function progChords(tpl){ const t=progTonic();
+  return tpl.bars.map(bar=>bar.map(([iv,type])=>({root:(t+iv)%12,type,bass:null}))); }
+function progLabel(tpl){
+  return progChords(tpl).map(b=>b.map(c=>chordName(c,song.meta)).join('・')).join(' → ');
+}
+/* 刻へコードを置く（音符があれば音符へ、無ければ控えへ。applyBandChord と同じ決まり） */
+function putChordAt(bar,t,ch){
+  const ni=(bar.notes||[]).findIndex(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0));
+  if(ni>=0){ bar.notes[ni].kind='chord'; bar.notes[ni].chord=ch;
+    if(bar.chordAt){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; } }
+  else{ bar.chordAt=bar.chordAt||{}; bar.chordAt[t]=ch; }
+}
+function applyProgression(tpl){
+  if(!dock) return;
+  const t0=dock.targets[0]; const sec=song.sections[t0.si]; if(!sec) return;
+  const cs=progChords(tpl), need=cs.length;
+  let added=0;
+  tx(tpl.name+'を入れる',()=>{
+    while(sec.items.length-t0.pos<need){
+      const b=newBar(song,{});
+      if(song.meta.defaultRhythm) applyRhythm(song,b,song.meta.defaultRhythm,rhythmDirOf());
+      song.bars.push(b); sec.items.push({barId:b.id,link:false}); added++;
+    }
+    for(let k=0;k<need;k++){
+      const it=sec.items[t0.pos+k]; const bar=it&&findBar(song,it.barId); if(!bar) continue;
+      /* その小節のコードを入れ替える（前のコードが残って混ざらないように） */
+      bar.chordAt=null;
+      (bar.notes||[]).forEach(n=>{ if(n&&n.chord){ n.chord=null; n.voicing=null; } });
+      const half=Math.floor(barTicks(song,bar)/2);
+      cs[k].forEach((c,j)=>putChordAt(bar,j===0?0:half,{root:c.root,type:c.type,bass:null}));
+    }
+  });
+  render();
+  toast(tpl.name+'を'+need+'小節に入れました'+(added?('（'+added+'小節を足しました）'):'')+'。取り消しで戻せます');
+}
+function openProgressions(){
+  const pop=popup('進行のひな形','いま指している小節から順に入れます（Key '+(song.meta.key&&song.meta.key.root!=null?noteName(song.meta.key.root,false)+(song.meta.key.qual==='min'?'m':''):'C')+'）');
+  const g=pgrp(pop,null); g.classList.add('prog-list');
+  PROG_TEMPLATES.forEach(tpl=>{
+    const b=document.createElement('button'); b.type='button'; b.className='prog-it';
+    const n=document.createElement('span'); n.className='pn'; n.textContent=tpl.name+'（'+tpl.bars.length+'小節）';
+    const c=document.createElement('span'); c.className='pc'; c.textContent=progLabel(tpl);
+    b.appendChild(n); b.appendChild(c);
+    b.onclick=()=>{ closePop(); applyProgression(tpl); };
+    g.appendChild(b);
+  });
+  popClose(pop);
+}
+/* ══════════════════════════════════════════
+   常に出すコードの札・ドラッグで置く・スタンプ（tab-6.56）
+   L様——「コード入力の帯は常に出してドロップで好きな箇所にコードを入力できたりする？」。
+
+   〈コード〉の間は、下の帯のいちばん上に札の列を出しておく（盤を開いている間は盤が代わる）。
+     ・札を譜面へ引きずる → 置ける拍が光り、離した所に入る
+     ・札を軽く押す       → 「持った」状態。譜面の拍を押すたびに入る（スタンプ）
+     ・札を長押し         → 種類・分数コードの扇。選んだコードを持つ
+   置き場所は、譜面のコード名の段に並ぶ拍の的（`.hit-mark[data-zone=chord]`）で決める——
+   コード名の段を押して入れる道（tab-2.93）と、同じ物差しを使う。
+   ══════════════════════════════════════════ */
+var STAMP={chord:null}, _cpDrag=null, _cpHi=null, _cpGhost=null;
+function cpalOn(){ return mode==='edit'&&!dock&&!(library&&library.cpalHide); }
+function cpalChords(){
+  const out=[], seen=new Set();
+  const add=c=>{ const k=c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass); if(seen.has(k)) return; seen.add(k); out.push(c); };
+  songChordsUsed(8).forEach(add);
+  (padRows(song.meta)[0]||[]).forEach(add);
+  return out;
+}
+/* 押した所（画面の座標）から、小節と拍を求める */
+function cpalTargetAt(x,y){
+  const el=document.elementFromPoint(x,y); if(!el||!el.closest) return null;
+  const w=el.closest('#paper .mwrap'); if(!w) return null;
+  const rs=[...w.querySelectorAll('.hit-mark[data-zone="chord"]')]; if(!rs.length) return null;
+  let best=null, bd=1e9;
+  rs.forEach(r=>{ const b=r.getBoundingClientRect(); const d=(x<b.left)?(b.left-x):((x>b.right)?(x-b.right):0);
+    if(d<bd){ bd=d; best={r,b}; } });
+  if(!best) return null;
+  return {barId:w.getAttribute('data-bar'),si:+w.getAttribute('data-si'),pos:+w.getAttribute('data-pos'),
+          st:+best.r.getAttribute('data-st'),box:best.b,wrap:w};
+}
+function cpalHilite(t){
+  if(!t){ if(_cpHi){ _cpHi.remove(); _cpHi=null; } return; }
+  if(!_cpHi){ _cpHi=document.createElement('div'); _cpHi.className='cp-hi'; document.body.appendChild(_cpHi); }
+  const wb=t.wrap.getBoundingClientRect();
+  _cpHi.style.left=t.box.left+'px'; _cpHi.style.width=Math.max(10,t.box.width)+'px';
+  _cpHi.style.top=wb.top+'px'; _cpHi.style.height=wb.height+'px';
+}
+function cpalPut(t,c){
+  const bar=findBar(song,t.barId); if(!bar) return;
+  tx('コードを置く',()=>putChordAt(bar,t.st,{root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}));
+  render();
+}
+function stampSet(c){ STAMP.chord=c||null; document.body.classList.toggle('stamping',!!STAMP.chord); renderChordPalette(); }
+function renderChordPalette(){
+  const bb=$('botbar'); if(!bb) return;
+  let row=$('bb-cpal');
+  if(!cpalOn()){
+    if(STAMP.chord&&mode!=='edit') stampSet(null);
+    /* 畳んである時は、出し直す札だけを置く */
+    if(mode==='edit'&&!dock&&library&&library.cpalHide){
+      if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; bb.insertBefore(row,bb.firstChild); }
+      row.innerHTML='';
+      const sh=document.createElement('button'); sh.type='button'; sh.className='cp-x'; sh.textContent='コードの札を出す';
+      sh.onclick=()=>{ library.cpalHide=false; try{ saveLibrary(); }catch(_){} render(); };
+      row.appendChild(sh); return;
+    }
+    if(row) row.remove(); return;
+  }
+  if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; bb.insertBefore(row,bb.firstChild); }
+  row.innerHTML='';
+  const sc=document.createElement('div'); sc.className='cp-scroll';
+  const hold=STAMP.chord?(STAMP.chord.root+'|'+STAMP.chord.type+'|'+(STAMP.chord.bass==null?'':STAMP.chord.bass)):null;
+  cpalChords().forEach(c=>{
+    const b=document.createElement('button'); b.type='button';
+    const k=c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass);
+    b.className='cp-chip'+(k===hold?' on':''); b.textContent=chordName(c,song.meta);
+    b.title='譜面へ引きずって置く／押して持つ（拍を押すたびに入る）／長押しで種類';
+    b.onclick=()=>{ if(b._dragEat&&Date.now()-b._dragEat<500) return; stampSet(k===hold?null:c); };
+    chordFanAttach(b,c,cc=>stampSet(cc));
+    /* ドラッグ（上へ引き上げた時だけ。横は列の送り） */
+    b.draggable=false; b.addEventListener('dragstart',e=>e.preventDefault());
+    b.addEventListener('pointerdown',e=>{ if(e.button&&e.button!==0) return;
+      if(e.pointerType==='mouse') e.preventDefault();      /* 文字選び・ブラウザの引きずりに奪われないように */
+      _cpDrag={b,c,x:e.clientX,y:e.clientY,on:false,id:e.pointerId,mouse:e.pointerType==='mouse'}; });
+    sc.appendChild(b);
+  });
+  row.appendChild(sc);
+  const st=document.createElement('span'); st.className='cp-state';
+  if(STAMP.chord){
+    st.innerHTML='';
+    const t=document.createElement('span'); t.textContent='持っている：'+chordName(STAMP.chord,song.meta)+'（拍を押すと入ります）';
+    const x=document.createElement('button'); x.type='button'; x.className='cp-x'; x.textContent='✕ 手放す'; x.onclick=()=>stampSet(null);
+    st.appendChild(t); st.appendChild(x);
+  }else st.textContent='引きずって置く／押して持つ';
+  row.appendChild(st);
+  const hide=document.createElement('button'); hide.type='button'; hide.className='cp-x'; hide.textContent='畳む';
+  hide.title='コードの札の列を畳みます（設定はこの端末に覚えます）';
+  hide.onclick=()=>{ library.cpalHide=true; try{ saveLibrary(); }catch(_){} stampSet(null); render(); toast('コードの札を畳みました。「コードの札を出す」で戻せます'); };
+  row.appendChild(hide);
+}
+/* ドラッグの動き（どこでも追う） */
+document.addEventListener('pointermove',e=>{
+  const d=_cpDrag; if(!d) return;
+  if(!d.on){
+    const dx=e.clientX-d.x, dy=e.clientY-d.y;
+    /* マウスは列を指で送ることが無いので、どちらへ動いても引きずり。
+       指は横に動けば列の送り、上へ動けば引きずり */
+    const go=d.mouse?(Math.hypot(dx,dy)>8):(dy<-12&&Math.abs(dy)>Math.abs(dx)*0.6);
+    if(go){ d.on=true; if(d.b._fanCancel) d.b._fanCancel();
+      try{ d.b.setPointerCapture(d.id); }catch(_){}
+      _cpGhost=document.createElement('div'); _cpGhost.className='cp-ghost'; _cpGhost.textContent=chordName(d.c,song.meta);
+      document.body.appendChild(_cpGhost); document.body.classList.add('cp-dragging'); }
+    else if(!d.mouse&&Math.abs(dx)>16&&Math.abs(dx)>Math.abs(dy)*2.5){ _cpDrag=null; return; }
+    else return;
+  }
+  _cpGhost.style.left=e.clientX+'px'; _cpGhost.style.top=e.clientY+'px';
+  const t=cpalTargetAt(e.clientX,e.clientY); d.t=t; cpalHilite(t);
+},{passive:true});
+document.addEventListener('pointerup',e=>{
+  const d=_cpDrag; _cpDrag=null; if(!d||!d.on) return;
+  d.b._dragEat=Date.now();
+  if(_cpGhost){ _cpGhost.remove(); _cpGhost=null; } cpalHilite(null); document.body.classList.remove('cp-dragging');
+  if(d.t) cpalPut(d.t,d.c); else toast('コード名を置ける所（小節の上）で離してください');
+},true);
+document.addEventListener('pointercancel',()=>{ if(_cpDrag&&_cpDrag.on){ if(_cpGhost){ _cpGhost.remove(); _cpGhost=null; } cpalHilite(null); document.body.classList.remove('cp-dragging'); } _cpDrag=null; },true);
+document.addEventListener('touchmove',e=>{ if(_cpDrag&&_cpDrag.on) e.preventDefault(); },{passive:false});
+/* スタンプ：譜面を押すたびに入れる。押している間は譜面のいつもの手つきを止める */
+var _stDown=null;
+document.addEventListener('pointerdown',e=>{
+  if(!STAMP.chord||mode!=='edit') return;
+  const t=e.target; if(!t||!t.closest||!t.closest('#paper .mwrap')) return;
+  e.stopPropagation(); _stDown={x:e.clientX,y:e.clientY,t:Date.now()};
+},true);
+document.addEventListener('pointerup',e=>{
+  if(!STAMP.chord||!_stDown) return; const s0=_stDown; _stDown=null;
+  if(Math.hypot(e.clientX-s0.x,e.clientY-s0.y)>10) return;          /* 送り（なぞり）だったので置かない */
+  const tg=cpalTargetAt(e.clientX,e.clientY); if(!tg) return;
+  e.stopPropagation();
+  cpalHilite(tg); setTimeout(()=>cpalHilite(null),220);
+  cpalPut(tg,STAMP.chord);
+  _bgEatUntil=Date.now()+500;                                      /* 続く click を譜面へ通さない */
+},true);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&STAMP.chord) stampSet(null); });
 function renderBandDock(bar){
   const cur=bandChordNow();
   const d=document.createElement('div'); d.className='dock no-print'; d.id='dock';
@@ -31653,6 +31885,8 @@ function renderBandDock(bar){
   cl.disabled=!cur;
   cl.onclick=()=>applyBandChord(null,'コードを外す');
   r4.appendChild(cl);
+  { const pg=document.createElement('button'); pg.className='dk-sub'; pg.textContent='進行のひな形';
+    pg.onclick=openProgressions; r4.appendChild(pg); }     /* tab-6.55 */
   d.appendChild(r4);
 
   if(dock.more) dockChordGrids(d,cur,{
@@ -31779,6 +32013,8 @@ function renderDock(){
                  :'この音符には自前のコードがありません';
   cl.onclick=()=>applyChordToDock(nn=>{ nn.chord=null; },'コードを外す',false,'clear');
   r4.appendChild(cl);
+  if(!dock.multi){ const pg=document.createElement('button'); pg.className='dk-sub'; pg.textContent='進行のひな形';
+    pg.onclick=openProgressions; r4.appendChild(pg); }     /* tab-6.55 */
   /* ══ コードネームだけの盤（tab-2.94）══
      ブラシ（×）も休符も、**音符そのものを作り替える**操作である。
      コード名の段を叩いて出た盤にこれが並んでいると、
@@ -34668,6 +34904,7 @@ function render(){
   renderTopbar();
   if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
   if(MXEL) mixRender();        /* ミキサーも同じ（tab-6.45） */
+  try{ renderChordPalette(); measureBot(); }catch(_){}   /* コードの札の列（tab-6.56） */
   renderModeBar();
   const paper=$('paper'); if(!paper) return;
   /* ══ 組み直しても、見ている所を失わない（tab-1.48）══
