@@ -1843,7 +1843,7 @@ body.stamping #paper .mwrap{cursor:copy}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.56', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.57', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -31501,11 +31501,26 @@ var FAN_TYPES=['maj','min','dom7','maj7','min7','sus4','add9','dom6','min6','sus
 var _fanEl=null;
 function chordFanClose(){ if(_fanEl){ _fanEl.remove(); _fanEl=null; document.removeEventListener('pointerdown',_fanOutside,true); } }
 function _fanOutside(e){ if(_fanEl&&!_fanEl.contains(e.target)){ chordFanClose(); } }
-function chordFanOpen(btn,c,apply){
+function chordFanOpen(btn,c,apply,opts){
+  opts=opts||{};
   chordFanClose();
   const f=document.createElement('div'); f.className='cfan'; f.setAttribute('role','menu');
   const mk=(cc,lbl,cls)=>{ const b=document.createElement('button'); b.type='button'; b.className='cf-it'+(cls?' '+cls:'');
-    b.textContent=lbl; b.dataset.c=JSON.stringify(cc); b.onclick=()=>{ chordFanClose(); apply(cc); }; return b; };
+    b.textContent=lbl; b.dataset.c=JSON.stringify(cc);
+    b.onclick=()=>{ if(b._dragEat&&Date.now()-b._dragEat<500) return; chordFanClose(); apply(cc); };
+    /* 札の列から開いた扇は、中のコードも譜面へ引きずれる（tab-6.57） */
+    if(opts.drag){
+      b.draggable=false; b.addEventListener('dragstart',e=>e.preventDefault());
+      b.addEventListener('pointerdown',e=>{ if(e.button&&e.button!==0) return; if(e.pointerType==='mouse') e.preventDefault();
+        const s0={x:e.clientX,y:e.clientY,id:e.pointerId};
+        const mv=ev=>{ if(Math.hypot(ev.clientX-s0.x,ev.clientY-s0.y)>8){ cleanup(); b._dragEat=Date.now();
+            chordFanClose(); cpalStartDrag(b,cc,s0.id,ev); } };
+        const up=()=>cleanup();
+        const cleanup=()=>{ document.removeEventListener('pointermove',mv,true); document.removeEventListener('pointerup',up,true); };
+        document.addEventListener('pointermove',mv,true); document.addEventListener('pointerup',up,true); });
+      b.style.touchAction='none';
+    }
+    return b; };
   const h1=document.createElement('div'); h1.className='cf-lbl'; h1.textContent=noteName(c.root,false)+' の種類'; f.appendChild(h1);
   const g1=document.createElement('div'); g1.className='cf-grid';
   FAN_TYPES.filter(k=>CD[k]).forEach(k=>{ const cc={root:c.root,type:k,bass:null};
@@ -31531,13 +31546,16 @@ function chordFanOpen(btn,c,apply){
   return f;
 }
 /* 札に長押しの扇を付ける。軽く押せば今まで通り */
-function chordFanAttach(b,c,apply){
-  let t=null, open=false, st=null, hover=null;
+function chordFanAttach(b,c,apply,opts){
+  opts=opts||{};
+  let t=null, open=false, st=null, hover=null, lastC=null;
   b._fanCancel=()=>{ if(t){ clearTimeout(t); t=null; } st=null; };   /* 引きずりが始まったら扇は開かない（tab-6.56） */
   b.addEventListener('pointerdown',e=>{
     if(e.button&&e.button!==0) return;
     st={x:e.clientX,y:e.clientY,id:e.pointerId};
-    t=setTimeout(()=>{ t=null; open=true; chordFanOpen(b,c,apply);
+    t=setTimeout(()=>{ t=null; open=true; lastC=null;
+      if(opts.drag&&typeof _cpDrag!=='undefined'&&_cpDrag&&_cpDrag.b===b&&!_cpDrag.on) _cpDrag=null;   /* 扇が開いたら、札そのものの引きずりは止める */
+      chordFanOpen(b,c,apply,opts);
       try{ b.setPointerCapture(st.id); }catch(_){}
       try{ navigator.vibrate&&navigator.vibrate(8); }catch(_){} },380);
   });
@@ -31546,7 +31564,23 @@ function chordFanAttach(b,c,apply){
     if(!open){ if(Math.hypot(e.clientX-st.x,e.clientY-st.y)>10){ clearTimeout(t); t=null; st=null; } return; }
     const el=document.elementFromPoint(e.clientX,e.clientY);
     const it=el&&el.closest?el.closest('.cfan .cf-it'):null;
-    if(hover!==it){ if(hover) hover.classList.remove('hv'); hover=it; if(it) it.classList.add('hv'); }
+    if(hover!==it){ if(hover) hover.classList.remove('hv'); hover=it;
+      if(b._dwell){ clearTimeout(b._dwell); b._dwell=null; }
+      if(it){ it.classList.add('hv');
+        /* 札の列から開いた扇は、コードの上で一瞬止まると扇が閉じ、そのコードを引きずれる（tab-6.57）。
+           素早く通り過ぎたコードは拾わない */
+        if(opts.drag){ const cc=JSON.parse(it.dataset.c), pid=e.pointerId;
+          b._dwell=setTimeout(()=>{ b._dwell=null; if(!open) return; lastC=cc;
+            open=false; hover=null; st=null; b._eat=Date.now();
+            const r=it.getBoundingClientRect();
+            chordFanClose(); cpalStartDrag(b,cc,pid,{clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerType:e.pointerType}); },380); }
+      } }
+    /* 扇から譜面へ滑り出たら、最後に通ったコードを引きずる（tab-6.57） */
+    if(opts.drag&&!it&&el&&el.closest&&el.closest('#paper')&&!el.closest('.cfan')){
+      if(b._dwell){ clearTimeout(b._dwell); b._dwell=null; }
+      open=false; hover=null; st=null; b._eat=Date.now();
+      chordFanClose(); cpalStartDrag(b,lastC||c,e.pointerId,e);
+    }
   });
   b.addEventListener('touchmove',e=>{ if(open) e.preventDefault(); },{passive:false});
   b.addEventListener('pointerup',e=>{
@@ -31757,7 +31791,7 @@ function renderChordPalette(){
     b.className='cp-chip'+(k===hold?' on':''); b.textContent=chordName(c,song.meta);
     b.title='譜面へ引きずって置く／押して持つ（拍を押すたびに入る）／長押しで種類';
     b.onclick=()=>{ if(b._dragEat&&Date.now()-b._dragEat<500) return; stampSet(k===hold?null:c); };
-    chordFanAttach(b,c,cc=>stampSet(cc));
+    chordFanAttach(b,c,cc=>stampSet(cc),{drag:true});
     /* ドラッグ（上へ引き上げた時だけ。横は列の送り） */
     b.draggable=false; b.addEventListener('dragstart',e=>e.preventDefault());
     b.addEventListener('pointerdown',e=>{ if(e.button&&e.button!==0) return;
@@ -31778,6 +31812,16 @@ function renderChordPalette(){
   hide.title='コードの札の列を畳みます（設定はこの端末に覚えます）';
   hide.onclick=()=>{ library.cpalHide=true; try{ saveLibrary(); }catch(_){} stampSet(null); render(); toast('コードの札を畳みました。「コードの札を出す」で戻せます'); };
   row.appendChild(hide);
+}
+/* 引きずりを始める（札・扇の中のコードの両方から。tab-6.57） */
+function cpalStartDrag(b,c,pid,e){
+  _cpDrag={b,c,x:e.clientX,y:e.clientY,on:true,id:pid,mouse:e.pointerType==='mouse'};
+  try{ b.setPointerCapture(pid); }catch(_){}
+  if(_cpGhost) _cpGhost.remove();
+  _cpGhost=document.createElement('div'); _cpGhost.className='cp-ghost'; _cpGhost.textContent=chordName(c,song.meta);
+  _cpGhost.style.left=e.clientX+'px'; _cpGhost.style.top=e.clientY+'px';
+  document.body.appendChild(_cpGhost); document.body.classList.add('cp-dragging');
+  const t=cpalTargetAt(e.clientX,e.clientY); _cpDrag.t=t; cpalHilite(t);
 }
 /* ドラッグの動き（どこでも追う） */
 document.addEventListener('pointermove',e=>{
