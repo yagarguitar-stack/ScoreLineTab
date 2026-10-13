@@ -1860,7 +1860,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.60', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.62', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3775,6 +3775,29 @@ function playOrder(s){
 }
 
 /* コードの引き継ぎ：データを書き換えず、その場で解決する */
+/* 拍に置いたコード＋他のパートの音符に載ったコード（同じ拍は、拍に置いた方が先） */
+function barChordAtAll(bar){
+  const out={}; let any=false;
+  const own=new Set((bar.notes||[]).filter(n=>n&&n.chord&&n.chord.root!=null).map(n=>n.start|0));
+  if(Array.isArray(bar.np)&&bar.np.length>1){
+    const me=bar._pi||0;
+    bar.np.forEach((ns,pi)=>{ if(pi===me||!ns) return;
+      ns.forEach(n=>{ if(n&&n.kind!=='rest'&&n.chord&&n.chord.root!=null&&n.chord.type){ const t=n.start|0;
+        if(!own.has(t)&&!(t in out)){ out[t]=n.chord; any=true; } } }); });
+  }
+  if(bar.chordAt) Object.keys(bar.chordAt).forEach(k=>{ const c=bar.chordAt[k]; if(c&&!own.has(+k)){ out[k]=c; any=true; } });
+  return any?out:null;
+}
+/* 他のパートの音符から、その拍のコードを外す（同じ拍に二つ持たないように） */
+function clearOtherPartsChordAt(bar,t,inclusiveFrom){
+  if(!Array.isArray(bar.np)||bar.np.length<2) return 0;
+  const me=bar._pi||0; let n0=0;
+  bar.np.forEach((ns,pi)=>{ if(pi===me||!ns) return;
+    ns.forEach(n=>{ if(!n||!n.chord) return; const s0=n.start|0;
+      const hit=(inclusiveFrom!=null)?(s0>inclusiveFrom&&s0<=t):(s0===(t|0));
+      if(hit){ n.chord=null; n.voicing=null; n0++; } }); });
+  return n0;
+}
 function resolveChords(s,arr){
   /* arr の各小節について、各音符の「鳴っているコード」を返す
      戻り値: Map(arrIdx -> Array(音符index -> chord|null)) */
@@ -3797,7 +3820,12 @@ function resolveChords(s,arr){
        決まらない。音符だけを見て回すと、あいだに挟まった控えを飛ばして
        古いコードを渡してしまう。両方を tick で並べ直してから畳む。 */
     const free=[];
-    const ca=bar.chordAt||null;
+    /* ══ コード名は全パートで一つ（tab-6.62）══
+       L様——「パートが複数あってもコード表示は連動して」。
+       音符に載せたコードはパートごとに持つが、見せる時・鳴らす時は
+       **他のパートの音符に載ったコードも、拍に置いたコードと同じ扱いで拾う。**
+       同じ拍に表のパート自身のコードがあれば、そちらが勝つ。 */
+    const ca=barChordAtAll(bar);
     const caTicks=ca?Object.keys(ca).map(Number).sort((a,b)=>a-b):[];
     let ci2=0;
     bar.notes.forEach((n,ni)=>{
@@ -30960,6 +30988,7 @@ function applyBandChord(c,label){
   const t=dock.bandTick;
   const ni=(bar.notes||[]).findIndex(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0));
   tx(label,()=>{
+    clearOtherPartsChordAt(bar,t);    /* 全パートのコード名は一つ（tab-6.62） */
     if(c===null){
       if(bar.chordAt){ delete bar.chordAt[t];
         if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
@@ -31129,7 +31158,8 @@ function applyChordToDock(patch,label,advance,sig){
   } else render();
 }
 function setWholeChord(c){
-  applyChordToDock(n=>{ n.kind='chord'; n.chord={root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}; },
+  applyChordToDock((n,b)=>{ n.kind='chord'; n.chord={root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)};
+      if(b){ clearOtherPartsChordAt(b,n.start|0); if(b.chordAt&&b.chordAt[n.start|0]){ delete b.chordAt[n.start|0]; if(!Object.keys(b.chordAt).length) b.chordAt=null; } } },
     'コードを入れる',true,'chord:'+c.root+'|'+c.type+'|'+(c.bass==null?'':c.bass));
 }
 
@@ -31650,7 +31680,7 @@ function songChordsUsed(max){
       const b=findBar(song,it.barId); if(!b) return;
       const ev=[];
       (b.notes||[]).forEach(n=>{ if(n&&n.chord) ev.push([n.start|0,n.chord]); });
-      if(b.chordAt) Object.keys(b.chordAt).forEach(k=>ev.push([+k,b.chordAt[k]]));
+      { const all=barChordAtAll(b); if(all) Object.keys(all).forEach(k=>ev.push([+k,all[k]])); }   /* 全パート（tab-6.62） */
       ev.sort((x,y)=>x[0]-y[0]).forEach(e=>add(e[1]));
     }));
   }catch(_){}
@@ -31722,6 +31752,7 @@ function progLabel(tpl){
 }
 /* 刻へコードを置く（音符があれば音符へ、無ければ控えへ。applyBandChord と同じ決まり） */
 function putChordAt(bar,t,ch){
+  clearOtherPartsChordAt(bar,t);      /* 同じ拍に二つ持たない（tab-6.62） */
   const ni=(bar.notes||[]).findIndex(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0));
   if(ni>=0){ bar.notes[ni].kind='chord'; bar.notes[ni].chord=ch;
     if(bar.chordAt){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; } }
@@ -31742,7 +31773,7 @@ function applyProgression(tpl){
       const it=sec.items[t0.pos+k]; const bar=it&&findBar(song,it.barId); if(!bar) continue;
       /* その小節のコードを入れ替える（前のコードが残って混ざらないように） */
       bar.chordAt=null;
-      (bar.notes||[]).forEach(n=>{ if(n&&n.chord){ n.chord=null; n.voicing=null; } });
+      (Array.isArray(bar.np)?bar.np:[bar.notes||[]]).forEach(ns=>(ns||[]).forEach(n=>{ if(n&&n.chord){ n.chord=null; n.voicing=null; } }));   /* 全パート（tab-6.62） */
       const half=Math.floor(barTicks(song,bar)/2);
       cs[k].forEach((c,j)=>putChordAt(bar,j===0?0:half,{root:c.root,type:c.type,bass:null}));
     }
@@ -31940,9 +31971,11 @@ function chordAtTick(bar,st){
   if(!bar) return null;
   const n=(bar.notes||[]).find(x=>x&&x.kind!=='rest'&&(x.start|0)===(st|0)&&x.chord&&x.chord.root!=null);
   if(n) return n.chord;
-  const c=bar.chordAt&&bar.chordAt[st]; return (c&&c.root!=null)?c:null;
+  const c=bar.chordAt&&bar.chordAt[st]; if(c&&c.root!=null) return c;
+  const all=barChordAtAll(bar); const c2=all&&all[st]; return (c2&&c2.root!=null)?c2:null;   /* 他のパートの分も（tab-6.62） */
 }
 function removeChordAt(bar,st){
+  clearOtherPartsChordAt(bar,st);     /* 全パートから（tab-6.62） */
   (bar.notes||[]).forEach(x=>{ if(x&&(x.start|0)===(st|0)&&x.chord){ x.chord=null; x.voicing=null; } });
   if(bar.chordAt){ delete bar.chordAt[st]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
 }
@@ -32025,6 +32058,48 @@ document.addEventListener('touchmove',e=>{ if(_cdg&&_cdg.on) e.preventDefault();
 document.addEventListener('contextmenu',e=>{ if(_cdg) e.preventDefault(); },true);
 document.addEventListener('keydown',e=>{ if(_cdg&&_cdg.on&&e.key==='Alt'){ _cdg.mode='copy'; cdgGhost(); } if(_cdg&&e.key==='Escape') cdgEnd(); });
 document.addEventListener('keyup',e=>{ if(_cdg&&_cdg.on&&e.key==='Alt'&&_cdg.mouse){ _cdg.mode='move'; cdgGhost(); } });
+/* ══ コードを外す——拍に置いたコードも一緒に（tab-6.61）══
+   L様——「コードを外せないことがある」。
+   コードは「音符に載せる」と「拍に置く（chordAt）」の二通りで持つ。
+   盤の〈コードを外す〉は音符に載せた方しか外さず、同じ拍に置いた方が残って
+   名前が消えないことがあった（札の列・ドラッグ・コード名の帯から置いた物で起きる）。
+   この音符に掛かっている拍のコード（前の音符の後ろ〜この音符の頭）も外す。
+   それでも何も外れない時は、前から引き継いでいるだけなので、元のコードの場所を知らせる。 */
+function chordSourceBefore(barId,tick){
+  const di=_disp.findIndex(d=>d.barId===barId); if(di<0) return null;
+  for(let i=di;i>=0;i--){
+    const d=_disp[i], b=findBar(song,d.barId); if(!b) continue;
+    if(b.marks&&b.marks.nc) return null;
+    const lim=(i===di)?tick:Infinity, ev=[];
+    (b.notes||[]).forEach(n=>{ if(n&&n.chord&&n.chord.root!=null&&(n.start|0)<lim) ev.push([n.start|0,n.chord]); });
+    { const all=barChordAtAll(b); if(all) Object.keys(all).forEach(k=>{ const c=all[k]; if(c&&c.root!=null&&+k<lim) ev.push([+k,c]); }); }
+    if(ev.length){ ev.sort((a,b)=>a[0]-b[0]); const e=ev[ev.length-1]; return {disp:d,bar:b,tick:e[0],chord:e[1],no:i+1}; }
+  }
+  return null;
+}
+function clearDockChords(){
+  if(!dock) return;
+  let removed=0;
+  applyChordToDock((nn,b,idx)=>{
+    if(nn.chord){ removed++; nn.chord=null; nn.voicing=null; }
+    { let prev0=-1; for(let j=idx-1;j>=0;j--){ if(b.notes[j]){ prev0=b.notes[j].start|0; break; } }
+      removed+=clearOtherPartsChordAt(b,nn.start|0,prev0); }      /* 他のパートの分も（tab-6.62） */
+    if(b.chordAt){
+      let prev=-1; for(let j=idx-1;j>=0;j--){ if(b.notes[j]){ prev=b.notes[j].start|0; break; } }
+      Object.keys(b.chordAt).forEach(k=>{ const t=+k; if(t>prev&&t<=(nn.start|0)){ delete b.chordAt[k]; removed++; } });
+      if(!Object.keys(b.chordAt).length) b.chordAt=null;
+    }
+  },'コードを外す',false,'clear');
+  if(removed||dock.multi) return;
+  const t0=dock.targets[0], b0=findBar(song,t0.barId), n0=b0&&b0.notes[t0.noteIdx]; if(!n0) return;
+  const src=chordSourceBefore(t0.barId,n0.start|0);
+  if(!src){ toast('この音符にはコードがありません'); return; }
+  const ts=barTS(song,src.bar)||{n:4}, beatT=barTicks(song,src.bar)/Math.max(1,(ts.n|0)||4);
+  const where=src.no+'小節目・'+(Math.floor(src.tick/beatT)+1)+'拍目';
+  toast('このコードは '+where+' の '+chordName(src.chord,song.meta)+' から続いています','そちらを外す',()=>{
+    tx('コードを外す',()=>removeChordAt(src.bar,src.tick)); render();
+  },7000);
+}
 function renderBandDock(bar){
   const cur=bandChordNow();
   const d=document.createElement('div'); d.className='dock no-print'; d.id='dock';
@@ -32211,10 +32286,10 @@ function renderDock(){
     : !!(n&&n.chord);
   const cl=document.createElement('button'); cl.className='dk-sub';
   cl.textContent='コードを外す';
-  cl.disabled=!hasOwn;
+  /* 自前のコードが無くても押せる（tab-6.61）。拍に置いたコード・引き継いだコードも扱う */
   cl.title=hasOwn?'この音符のコードを外します（前のコードを引き継ぎます）'
-                 :'この音符には自前のコードがありません';
-  cl.onclick=()=>applyChordToDock(nn=>{ nn.chord=null; },'コードを外す',false,'clear');
+                 :'この拍に置いたコード、または引き継いでいるコードの元を外します';
+  cl.onclick=()=>clearDockChords();   /* 拍に置いたコードも一緒に（tab-6.61） */
   r4.appendChild(cl);
   if(!dock.multi){ const pg=document.createElement('button'); pg.className='dk-sub'; pg.textContent='進行のひな形';
     pg.onclick=openProgressions; r4.appendChild(pg); }     /* tab-6.55 */
