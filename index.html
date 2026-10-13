@@ -1722,6 +1722,14 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
 body.cp-dragging,body.cp-dragging *{cursor:grabbing!important;-webkit-user-select:none!important;user-select:none!important}
 body.stamping #paper .mwrap{cursor:copy}
 @media (max-width:700px){ .cpal .cp-state{display:none} body.stamping .cpal .cp-state{display:flex} body.stamping .cpal .cp-state>span{display:none} }
+
+/* 盤の頭の取り消し・やり直し（tab-6.58） */
+.dk-nav .dk-undo{display:inline-flex;align-items:center;justify-content:center}
+.dk-nav .dk-undo:disabled{opacity:.35}
+.dk-nav .dk-undo+.dk-undo{margin-right:6px}
+
+/* ほかのコードの札（tab-6.59） */
+.cp-chip.cp-more{cursor:pointer;color:#ffcf7a;font-weight:700;font-size:13px;touch-action:manipulation}
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1843,7 +1851,7 @@ body.stamping #paper .mwrap{cursor:copy}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.57', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.59', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -31545,6 +31553,31 @@ function chordFanOpen(btn,c,apply,opts){
   setTimeout(()=>document.addEventListener('pointerdown',_fanOutside,true),0);
   return f;
 }
+/* ══ ほかのコード——ルートから選ぶ扇（tab-6.59）══
+   札の列に無いルート（Key Am の曲での B♭ など）も、列から選べるように。
+   ルート12音を並べ、押すとそのルートの種類・分数コードの扇へ進む。 */
+function chordRootFanOpen(btn,apply){
+  chordFanClose();
+  const f=document.createElement('div'); f.className='cfan'; f.setAttribute('role','menu');
+  const h=document.createElement('div'); h.className='cf-lbl'; h.textContent='ルートを選ぶ'; f.appendChild(h);
+  const g=document.createElement('div'); g.className='cf-grid cf-bass';
+  for(let r=0;r<12;r++){
+    const b=document.createElement('button'); b.type='button'; b.className='cf-it';
+    b.textContent=chordName({root:r,type:'maj',bass:null},song.meta);
+    b.onclick=()=>{ chordFanOpen(btn,{root:r,type:'maj',bass:null},apply,{drag:true}); };
+    g.appendChild(b);
+  }
+  f.appendChild(g);
+  const note=document.createElement('div'); note.className='cf-lbl'; note.style.margin='2px 2px 0';
+  note.textContent='押すと、そのルートの種類と分数コードが開きます'; f.appendChild(note);
+  document.body.appendChild(f);
+  const rr=btn.getBoundingClientRect(), vw=window.innerWidth;
+  const w=Math.min(440,vw-16); f.style.width=w+'px';
+  f.style.left=Math.max(8,Math.min(vw-w-8,rr.left+rr.width/2-w/2))+'px';
+  f.style.top=Math.max(8,rr.top-f.offsetHeight-8)+'px';
+  _fanEl=f;
+  setTimeout(()=>document.addEventListener('pointerdown',_fanOutside,true),0);
+}
 /* 札に長押しの扇を付ける。軽く押せば今まで通り */
 function chordFanAttach(b,c,apply,opts){
   opts=opts||{};
@@ -31620,7 +31653,7 @@ function chordAdvSelect(band){
   const s=document.createElement('select'); s.className='dk-adv'; s.setAttribute('aria-label','入れた後の送り');
   [['note',band?'入れたら：次の拍':'入れたら：次の音符'],['bar','入れたら：次の小節'],['off','入れたら：その場']].forEach(([v,l])=>{
     const o=document.createElement('option'); o.value=v; o.textContent=l; if(chordAdvMode()===v) o.selected=true; s.appendChild(o); });
-  s.onchange=()=>{ library.chordAdv=s.value; try{ saveLibrary(); }catch(_){} };
+  s.onchange=()=>{ library.chordAdv=s.value; try{ saveLibrary(); }catch(_){} s.blur(); };
   return s;
 }
 /* 帯の盤の送り */
@@ -31799,6 +31832,11 @@ function renderChordPalette(){
       _cpDrag={b,c,x:e.clientX,y:e.clientY,on:false,id:e.pointerId,mouse:e.pointerType==='mouse'}; });
     sc.appendChild(b);
   });
+  /* ほかのコード（tab-6.59） */
+  { const mo=document.createElement('button'); mo.type='button'; mo.className='cp-chip cp-more';
+    mo.textContent='＋ ほかのコード'; mo.title='列に無いコードを、ルートから選びます';
+    mo.onclick=()=>chordRootFanOpen(mo,cc=>stampSet(cc));
+    sc.appendChild(mo); }
   row.appendChild(sc);
   const st=document.createElement('span'); st.className='cp-state';
   if(STAMP.chord){
@@ -31866,6 +31904,17 @@ document.addEventListener('pointerup',e=>{
   _bgEatUntil=Date.now()+500;                                      /* 続く click を譜面へ通さない */
 },true);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&STAMP.chord) stampSet(null); });
+/* ══ 盤の頭にも、取り消し・やり直し（tab-6.58）══
+   L様——「コードに対しての取り消しができない」。
+   盤を開いている間は、盤が下の帯の場所を使うので、帯の取り消し・やり直しが隠れていた。
+   スマホでは他に取り消す手段が無い。盤の頭に同じ物を置く。 */
+function dockUndoBtns(nav){
+  const mk=(ico,title,fn,dis)=>{ const b=document.createElement('button'); b.className='dk-ico dk-undo';
+    setIco(b,ico,''); b.title=title; b.setAttribute('aria-label',title); b.disabled=!!dis; b.onclick=fn; return b; };
+  const u=mk('undo','取り消す（⌘Z）',()=>doUndo(),!hist.undo.length);
+  const r=mk('redo','やり直す（⌘⇧Z）',()=>doRedo(),!hist.redo.length);
+  nav.insertBefore(r,nav.firstChild); nav.insertBefore(u,nav.firstChild);
+}
 function renderBandDock(bar){
   const cur=bandChordNow();
   const d=document.createElement('div'); d.className='dock no-print'; d.id='dock';
@@ -31906,7 +31955,7 @@ function renderBandDock(bar){
   br.textContent='›'; br.title='次の刻へ（→）'; br.onclick=()=>mv(false); nav.appendChild(br);
   const x=document.createElement('button'); x.className='dk-ico';
   x.textContent='✕'; x.onclick=closeDock; nav.appendChild(x);
-  hd.appendChild(nav);
+  dockUndoBtns(nav); hd.appendChild(nav);
   d.appendChild(hd);
 
   const curKey=cur?(cur.root+'|'+cur.type+'|'+(cur.bass==null?'':cur.bass)):null;
@@ -31995,7 +32044,7 @@ function renderDock(){
     }
   }
   mv('✕',closeDock);
-  hd.appendChild(nav);
+  dockUndoBtns(nav); hd.appendChild(nav);
   d.appendChild(hd);
 
   if(dock.tab==='rhythm'){
@@ -41530,7 +41579,8 @@ window.addEventListener('keydown',e=>{
        曲名や歌詞を打っている最中の Cmd+Z が譜面を戻していた。
        変換中（isComposing）も同様に手を出さない。 */
     const t=e.target, tag=(t&&t.tagName)||'';
-    const typing=(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable)||e.isComposing);
+    /* 選びの枠（SELECT）は文字を打つ所ではないので、⌘Z を止めない（tab-6.58） */
+    const typing=((tag==='INPUT'&&!/^(range|checkbox|radio|button)$/i.test((t&&t.type)||''))||tag==='TEXTAREA'||(t&&t.isContentEditable)||e.isComposing);
     if((e.metaKey||e.ctrlKey)&&k==='z'){ if(typing) return; e.preventDefault(); e.shiftKey?doRedo():doUndo(); }
     if((e.metaKey||e.ctrlKey)&&k==='y'){ if(typing) return; e.preventDefault(); doRedo(); }
     if(e.key==='Escape'){ closeRadial(); closeHelpPop();
