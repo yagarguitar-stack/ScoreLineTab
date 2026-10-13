@@ -1860,7 +1860,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.62', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.64', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -24571,6 +24571,11 @@ function renderCtxRow(){
     const sc=document.createElement('div'); sc.className='bb-scroll';
     while(row.firstChild) sc.appendChild(row.firstChild);
     row.appendChild(sc);
+    /* ══ 消す札は、なぞる箱の外へ（tab-6.63）══
+       L様——「小節を消せない」。
+       小節を選んだ時の札は数が多く、〈外す〉はいちばん右端——箱の外に隠れて見えなかった。
+       取り消し・やり直しと同じく、**いつも見える右端**に出す。 */
+    sc.querySelectorAll('.bb-keep').forEach(k=>row.appendChild(k));
     const dv=document.createElement('span'); dv.className='bb-div'; row.appendChild(dv);
     btn('','取り消す（⌘Z）',doUndo,!hist.undo.length,'undo');
     btn('','やり直す（⌘⇧Z）',doRedo,!hist.redo.length,'redo');
@@ -24623,7 +24628,7 @@ function renderCtxRow(){
     /* 消す札の手前に仕切りを立てる（tab-2.88）。空きだけでは、
        画面が広い時に**隙間が詰まって隣り合う**。線は必ず間に立つ */
     { const dv=document.createElement('span'); dv.className='bb-div'; row.appendChild(dv); }
-    btn('外す','選んだ小節を曲の構成から外します（⌘Zで戻せます）',bulkRemove,false,'trash','dgr wide');
+    btn('外す','選んだ小節を曲の構成から外します（⌘Zで戻せます）',bulkRemove,false,'trash','dgr wide bb-keep');
     closeRow(); return;
   }
 
@@ -24833,7 +24838,7 @@ function renderCtxRow(){
         if(wb.length){
           const dv=document.createElement('span'); dv.className='bb-div'; row.appendChild(dv);
           btn('小節を外す',wb.length+'小節を曲の構成から外します（⌘Zで戻せます）',
-              ()=>nselRemoveBars(),false,'trash','dgr wide');
+              ()=>nselRemoveBars(),false,'trash','dgr wide bb-keep');
         } }
     }
   }
@@ -27837,7 +27842,7 @@ const HELP=[
     ['緑は二層','**濃い緑（枠つき）が、選んだマス**でございます。**薄い緑は、そのマスが掛かる音符ぜんぶ**——〈奏法〉〈コピー〉〈弦を移す〉が及ぶ範囲です。〈休符に〉は濃い方にだけ効きますので、4分音符の裏のマスだけを濃く選べば8分になります'],
     ['もう一度叩く','**濃い緑を叩けば、そのマスが外れます。** 薄い緑を叩けば、そのマスが足されます'],
     ['矢印キー／Shift＋矢印','カーソルを動かす／矩形に伸ばす。**指で触った所がそのままカーソル**でございますので、最後に叩いたマスから伸びます。矢印だけを押せば、選びはそのカーソル1マスに戻ります'],
-    ['Delete','**選んでいるマスに効きます。** 選んだ音符を休符に（弦を絞っていればその弦の押さえだけ）。頭を選んでいないマスは、その手前で切り詰めます。下の帯の札と同じ物が消えます'],
+    ['Delete','**選んでいるマスに効きます。** 選んだ音符を休符に（弦を絞っていればその弦の押さえだけ）。頭を選んでいないマスは、その手前で切り詰めます。下の帯の札と同じ物が消えます。〈入力〉〈コード〉で小節番号を押して小節を選んでいる時は、**その小節を外します**'],
     ['Cmd＋C／Cmd＋V','コピー・貼り付け'],
     ['なぞっている間、掴んでいる音符が光ります','どれを動かしているのかが指の下で見えます。縦になぞる時は**その弦の高さ**に、横になぞる時は音符の全長に印が出ます。離せば消えます'],
     ['ポインタを乗せると光ります','囲う前に、何が掛かるのかが見えます'],
@@ -33894,6 +33899,13 @@ function bindPaper(){
        選んだ小節から下を、新しいセクションへ。**どのモードでも効かせる**——
        小節を選べるのは〈入力〉〈コード〉〈選択〉の三つとも同じであるから。
        他のキーは今までどおり〈入力〉〈選択〉だけに効かせる。 */
+    /* ══ 小節を選んでいれば、Delete で小節を外す（tab-6.64）══
+       L様——「ショートカットのデリートも有効？」。
+       〈入力〉〈コード〉で小節番号を押して選んだ時は、帯の〈外す〉と同じ物を消す。
+       〈選択〉の Delete は「中身を休符にする」決まりのまま（そちらは触らない）。 */
+    if((k==='Backspace'||k==='Delete')&&(mode==='tab'||mode==='edit')&&sel.size&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+      e.preventDefault(); bulkRemove(); return;
+    }
     if(k==='Enter'&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
       if(sel.size){ e.preventDefault(); splitAtSelection(); return; }
       /* ══ 小節を選んでいなければ、Enter は下へ譲る（tab-6.05）══
