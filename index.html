@@ -1730,6 +1730,15 @@ body.stamping #paper .mwrap{cursor:copy}
 
 /* ほかのコードの札（tab-6.59） */
 .cp-chip.cp-more{cursor:pointer;color:#ffcf7a;font-weight:700;font-size:13px;touch-action:manipulation}
+
+/* 入れてあるコードを引きずる（tab-6.60） */
+.cp-ghost{white-space:nowrap}
+.cp-ghost.del{background:linear-gradient(180deg,#ff8a6a,#d2452c);color:#fff}
+.cdg-pill{position:fixed;z-index:96;transform:translate(-50%,-50%);padding:10px 16px;border-radius:999px;pointer-events:none;
+  background:#1d1c1b;color:#ffcf7a;border:2px solid #ffcf7a;font:800 14px/1 var(--font-ui,system-ui,sans-serif);box-shadow:0 6px 16px rgba(0,0,0,.45)}
+.cdg-pill.on{background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407;border-color:#c9a560}
+body.md-edit #paper .hit-mark[data-zone="chord"]{-webkit-touch-callout:none}
+body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
 @media print{ #mx,#tb-mix,.bb-mix{display:none!important} }
 
 </style>
@@ -1851,7 +1860,7 @@ body.stamping #paper .mwrap{cursor:copy}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.59', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.60', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -31915,6 +31924,107 @@ function dockUndoBtns(nav){
   const r=mk('redo','やり直す（⌘⇧Z）',()=>doRedo(),!hist.redo.length);
   nav.insertBefore(r,nav.firstChild); nav.insertBefore(u,nav.firstChild);
 }
+/* ══════════════════════════════════════════
+   入れてあるコードを引きずる——移動・写す・消す（tab-6.60）
+   L様——「すでに入れてあるコードをドラッグで何かにできない？」。
+
+   〈コード〉の時、譜面のコード名の段に入っているコードを掴んで——
+     ・別の拍へ離す       → 移動（パソコンは Option／Alt を押しながらで写す）
+     ・下の帯・譜面の外へ → 消す
+   スマホは譜面をなぞる動きとぶつからないよう、長押ししてから引きずる。
+   長押しすると指の右上に〈写す〉の札が出る。指がその札を通れば写す、通らなければ移動。
+   置き場所は札の列と同じ物差し（`cpalTargetAt`）。取り消しは一手で戻る。
+   ══════════════════════════════════════════ */
+var _cdg=null, _cdgPill=null;
+function chordAtTick(bar,st){
+  if(!bar) return null;
+  const n=(bar.notes||[]).find(x=>x&&x.kind!=='rest'&&(x.start|0)===(st|0)&&x.chord&&x.chord.root!=null);
+  if(n) return n.chord;
+  const c=bar.chordAt&&bar.chordAt[st]; return (c&&c.root!=null)?c:null;
+}
+function removeChordAt(bar,st){
+  (bar.notes||[]).forEach(x=>{ if(x&&(x.start|0)===(st|0)&&x.chord){ x.chord=null; x.voicing=null; } });
+  if(bar.chordAt){ delete bar.chordAt[st]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
+}
+function cdgGhost(){
+  const d=_cdg; if(!d||!_cpGhost) return;
+  const nm=chordName(d.chord,song.meta);
+  _cpGhost.classList.toggle('del',!!d.del);
+  _cpGhost.textContent=d.del?('消す：'+nm):((d.mode==='copy'?'写す：':'移動：')+nm);
+}
+function cdgStart(e){
+  const d=_cdg; d.on=true;
+  try{ d.el.setPointerCapture(d.id); }catch(_){}
+  _cpGhost=document.createElement('div'); _cpGhost.className='cp-ghost'; document.body.appendChild(_cpGhost);
+  _cpGhost.style.left=e.clientX+'px'; _cpGhost.style.top=e.clientY+'px';
+  document.body.classList.add('cp-dragging','cdg-on');
+  if(!d.mouse){
+    _cdgPill=document.createElement('div'); _cdgPill.className='cdg-pill'; _cdgPill.textContent='写す';
+    _cdgPill.style.left=(e.clientX+34)+'px'; _cdgPill.style.top=(e.clientY-86)+'px';
+    document.body.appendChild(_cdgPill);
+  }
+  try{ navigator.vibrate&&navigator.vibrate(8); }catch(_){}
+  cdgGhost();
+}
+function cdgEnd(){
+  if(_cpGhost){ _cpGhost.remove(); _cpGhost=null; }
+  if(_cdgPill){ _cdgPill.remove(); _cdgPill=null; }
+  cpalHilite(null); document.body.classList.remove('cp-dragging','cdg-on');
+  if(_cdg&&_cdg.lp) clearTimeout(_cdg.lp);
+  _cdg=null;
+}
+document.addEventListener('pointerdown',e=>{
+  if(mode!=='edit'||(typeof STAMP!=='undefined'&&STAMP.chord)||(e.button&&e.button!==0)) return;
+  const hm=e.target&&e.target.closest&&e.target.closest('#paper .hit-mark[data-zone="chord"]'); if(!hm) return;
+  const w=hm.closest('.mwrap'); if(!w) return;
+  const barId=w.getAttribute('data-bar'), st=+hm.getAttribute('data-st');
+  const ch=chordAtTick(findBar(song,barId),st); if(!ch) return;
+  const mouse=e.pointerType==='mouse';
+  _cdg={barId,st,chord:{root:ch.root,type:ch.type,bass:(ch.bass==null?null:ch.bass)},x:e.clientX,y:e.clientY,id:e.pointerId,
+        el:hm,mouse,on:false,mode:'move',del:false,t:null,lp:null};
+  if(!mouse) _cdg.lp=setTimeout(()=>{ if(_cdg&&!_cdg.on){ _cdg.lp=null; cdgStart({clientX:_cdg.x,clientY:_cdg.y}); } },380);
+},true);
+document.addEventListener('pointermove',e=>{
+  const d=_cdg; if(!d) return;
+  if(!d.on){
+    const mv=Math.hypot(e.clientX-d.x,e.clientY-d.y);
+    if(d.mouse){ if(mv>6) cdgStart(e); else return; }
+    else { if(mv>8){ clearTimeout(d.lp); _cdg=null; } return; }   /* 長押し前に動いた＝譜面を送る */
+  }
+  _cpGhost.style.left=e.clientX+'px'; _cpGhost.style.top=e.clientY+'px';
+  if(d.mouse) d.mode=e.altKey?'copy':'move';
+  else if(_cdgPill){ const r=_cdgPill.getBoundingClientRect();
+    if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom&&d.mode!=='copy'){ d.mode='copy'; _cdgPill.classList.add('on'); } }
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const inPaper=!!(el&&el.closest&&el.closest('#paper'));
+  const overBar=!!(el&&el.closest&&(el.closest('#botbar')||el.closest('.topbar')));
+  d.del=overBar||!inPaper;
+  d.t=d.del?null:cpalTargetAt(e.clientX,e.clientY);
+  cpalHilite(d.t); cdgGhost();
+},true);
+document.addEventListener('pointerup',e=>{
+  const d=_cdg; if(!d) return;
+  if(!d.on){ cdgEnd(); return; }
+  e.stopPropagation();
+  const bar0=findBar(song,d.barId);
+  if(d.del){
+    tx('コードを消す',()=>removeChordAt(bar0,d.st)); render(); toast('コードを消しました','取り消す',()=>doUndo(),4000);
+  }else if(d.t&&!(d.t.barId===d.barId&&d.t.st===d.st)){
+    const bar1=findBar(song,d.t.barId);
+    tx(d.mode==='copy'?'コードを写す':'コードを動かす',()=>{
+      if(d.mode!=='copy') removeChordAt(bar0,d.st);
+      putChordAt(bar1,d.t.st,Object.assign({},d.chord));
+    });
+    render();
+  }
+  _bgEatUntil=Date.now()+350;          /* 続く click で盤が開かないように（次に押す時は通す） */
+  cdgEnd();
+},true);
+document.addEventListener('pointercancel',()=>{ if(_cdg) cdgEnd(); },true);
+document.addEventListener('touchmove',e=>{ if(_cdg&&_cdg.on) e.preventDefault(); },{passive:false});
+document.addEventListener('contextmenu',e=>{ if(_cdg) e.preventDefault(); },true);
+document.addEventListener('keydown',e=>{ if(_cdg&&_cdg.on&&e.key==='Alt'){ _cdg.mode='copy'; cdgGhost(); } if(_cdg&&e.key==='Escape') cdgEnd(); });
+document.addEventListener('keyup',e=>{ if(_cdg&&_cdg.on&&e.key==='Alt'&&_cdg.mouse){ _cdg.mode='move'; cdgGhost(); } });
 function renderBandDock(bar){
   const cur=bandChordNow();
   const d=document.createElement('div'); d.className='dock no-print'; d.id='dock';
