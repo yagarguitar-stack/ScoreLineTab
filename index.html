@@ -1751,6 +1751,37 @@ body.stamping #paper .mwrap{cursor:copy}
 .snd-credits .ds-credits a{color:inherit}
 @media print{ .snd-credits{display:none!important} }
 
+:root{--drum-cr:#7F77DD;--drum-rd:#D4537E;--drum-oh:#5DCAA5;--drum-rm:#888780;--drum-th:#D85A30;--drum-tl:#993C1D}
+/* ドラムのマス（tab-6.71） */
+.botbar .dgridbar{display:flex;flex-direction:column;gap:4px;padding-bottom:2px}
+.dgridbar .dgb-hd{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.dgridbar .dgb-hd::-webkit-scrollbar{display:none}
+.dgridbar .dgb-ttl{font:800 12.5px/1 var(--font-ui,system-ui,sans-serif);color:#f1dca2;margin-right:2px;white-space:nowrap}
+.dgridbar .dgb-sp{flex:1 1 auto}
+.dgridbar .dgb-btn,.dgridbar .dgb-chip,.dgridbar .dgb-lamp{flex:0 0 auto;height:26px;padding:0 9px;border-radius:7px;border:1px solid var(--ink-line);
+  background:var(--ink3);color:var(--on-ink);font:600 11.5px/1 var(--font-ui,system-ui,sans-serif);cursor:pointer;white-space:nowrap}
+.dgridbar .dgb-chip.on{background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407;border-color:#000}
+.dgridbar .dgb-lamp{display:inline-flex;align-items:center;gap:6px}
+.dgridbar .dgb-lamp .lp{width:7px;height:7px;border-radius:50%;background:#4a463f;box-shadow:inset 0 1px 1px rgba(0,0,0,.6)}
+.dgridbar .dgb-lamp.on .lp{background:#ffb347;box-shadow:0 0 6px rgba(255,170,60,.85)}
+.dgridbar .dgb-wrap{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;touch-action:pan-x}
+.dgridbar .dgb-tbl{border-collapse:separate;border-spacing:2px}
+.dgridbar .dgb-tbl th{font:600 10px/1 var(--font-ui,system-ui,sans-serif);color:#9a917f;height:12px;text-align:left;padding:0 0 0 2px}
+.dgridbar .dgb-tbl td{padding:0}
+.dgridbar .dgb-lbl{font:600 10.5px/1 var(--font-ui,system-ui,sans-serif);color:#cfc5b2;white-space:nowrap;padding-right:6px;text-align:right}
+.dgridbar tr.extra .dgb-lbl{color:#a89e8a}
+.dgridbar .dgb-cell{display:block;width:20px;height:18px;padding:0;border-radius:4px;border:1px solid #121110;background:#33302c;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.dgridbar .dgb-cell.b1{border-left:2px solid #8b8172}
+.dgridbar .dgb-cell.on.hh{background:var(--drum-hh)} .dgridbar .dgb-cell.on.sn{background:var(--drum-sn)}
+.dgridbar .dgb-cell.on.bd{background:var(--drum-bd)} .dgridbar .dgb-cell.on.cr{background:var(--drum-cr)}
+.dgridbar .dgb-cell.on.rd{background:var(--drum-rd)} .dgridbar .dgb-cell.on.oh{background:var(--drum-oh)}
+.dgridbar .dgb-cell.on.rm{background:var(--drum-rm)} .dgridbar .dgb-cell.on.th{background:var(--drum-th)}
+.dgridbar .dgb-cell.on.tl{background:var(--drum-tl)}
+.dgridbar .dgb-cell.cur{outline:2px solid #ffcf7a;outline-offset:1px}
+@media (max-width:700px){ .dgridbar .dgb-hd{flex-wrap:wrap;row-gap:5px} .dgridbar .dgb-sp{display:none} .dgridbar .dgb-cell{width:18px;height:17px} .dgridbar .dgb-lbl{font-size:10px} }
+@media print{ .dgridbar{display:none!important} }
+
 /* 盤の頭の取り消し・やり直し（tab-6.58） */
 .dk-nav .dk-undo{display:inline-flex;align-items:center;justify-content:center}
 .dk-nav .dk-undo:disabled{opacity:.35}
@@ -1889,7 +1920,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.70', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.71', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -16909,34 +16940,40 @@ function unlockAudioOnce(){
    6/8 では付点4分が1拍になる。
    （tab-3.36 で註を直した。1拍=48 は 48→1680 へ移す前の数である） */
 
+/* ══ ドラムの型・マス——ことりノームと同じ仕様（tab-6.71）══
+   L様——「ことりノームってもっと細かく設定できない？」。
+   選択：音の行はことりノームと同じ9行（ふだんは5行、「ほかの音」4行はたたむ。
+   オープンとクローズのハイハットは同じマスに入らない）／〈タイト〉を付け曲ごとに覚える／
+   型はことりノームと同じ6つ、拍子に合わせて伸び縮みし拍子ごとに形を覚える
+   （ワルツは「3/4 の8ビート」として引き継ぐ）／マスは下の帯の上に常に出す。
+
+   拍子の扱いはことりノームと同じ：型は 4/4 の形で持ち、拍子の分子（x/8 は8分を1拍と数える）
+   の数だけ拍を並べる。4拍より長ければ足りない拍は空、短ければ切り詰める。
+   形は `song.play.drum.custom['3/4'].beat8` のように「拍子 → 型」で覚える。 */
 const DD={
-  beat8    :{label:'8ビート',   beats:4,steps:8, div:2,
-             HH:[1,1,1,1,1,1,1,1],
-             SN:[0,0,1,0,0,0,1,0],
-             BD:[1,0,0,0,1,0,0,0]},
-  beat16   :{label:'16ビート',  beats:4,steps:16,div:4,
+  beat4    :{label:'4分',        steps:4, div:1, HH:[0,0,0,0], SN:[0,0,1,0], BD:[1,0,0,0]},
+  beat8    :{label:'8ビート',    steps:8, div:2,
+             HH:[1,1,1,1,1,1,1,1], SN:[0,0,1,0,0,0,1,0], BD:[1,0,0,0,1,0,0,0]},
+  beat16   :{label:'16ビート',   steps:16,div:4,
              HH:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
              SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
              BD:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0]},
-  shuffle8 :{label:'8シャッフル',beats:4,steps:12,div:3,
-             HH:[1,0,1,1,0,1,1,0,1,1,0,1],
-             SN:[0,0,0,1,0,0,0,0,0,1,0,0],
-             BD:[1,0,0,0,0,0,1,0,0,0,0,0]},
-  shuffle16:{label:'16シャッフル',beats:4,steps:24,div:6,
-             HH:[1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1],
-             SN:[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
-             BD:[1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0]},
-  triplet8 :{label:'トリプレット',beats:4,steps:12,div:3,
+  triplet8 :{label:'トリプレット',steps:12,div:3,
              HH:[1,1,1,1,1,1,1,1,1,1,1,1],
              SN:[0,0,0,1,0,0,0,0,0,1,0,0],
              BD:[1,0,0,0,0,0,1,0,0,0,0,0]},
-  /* 3拍子の受け皿。同じ作風で書き足したもの（pedal_proto には無い） */
-  waltz    :{label:'ワルツ',    beats:3,steps:6, div:2,
-             HH:[1,1,1,1,1,1],
-             SN:[0,0,1,0,1,0],
-             BD:[1,0,0,0,0,0]},
+  shuffle8 :{label:'8シャッフル',steps:12,div:3,
+             HH:[1,0,1,1,0,1,1,0,1,1,0,1],
+             SN:[0,0,0,1,0,0,0,0,0,1,0,0],
+             BD:[1,0,0,0,0,0,1,0,0,0,0,0]},
+  shuffle16:{label:'16シャッフル',steps:24,div:6,
+             HH:[1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1],
+             SN:[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+             BD:[1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0]},
 };
-const DRUM_ORDER=['beat8','beat16','shuffle8','shuffle16','triplet8','waltz'];
+const DRUM_ORDER=['beat4','beat8','beat16','triplet8','shuffle8','shuffle16'];
+/* 引き継ぎ用：旧ワルツ（3拍・8分割り）。いまは「3/4 の8ビート」の形として持つ */
+const DRUM_WALTZ={HH:[1,1,1,1,1,1],SN:[0,0,1,0,1,0],BD:[1,0,0,0,0,0]};
 /* 曲を「はねる」設定にすると、ドラムも同じだけ跳ねる。
    そこへ 8シャッフルを重ねると二重に跳ねるので、3連系は一覧から外す。
    はねた8ビート＝8シャッフルなので、失うものは無い */
@@ -16954,93 +16991,193 @@ function straightenDrum(s){
   if(typeof DRUM_LAST!=='undefined'&&DRUM_TRIPLET.indexOf(DRUM_LAST)>=0) DRUM_LAST=to;
   return from;
 }
-const DRUM_LANES=[['HH','ハイハット'],['SN','スネア'],['BD','バスドラム']];
+/* 行（ことりノームと同じ並び）。「ほかの音」はたたむ */
+const DROWS=['CR','RD','OH','HH','RM','SN','TH','TL','BD'];
+const DROWS_EXTRA={OH:1,RM:1,TH:1,TL:1};
+const DROW_NAME={CR:'クラッシュ',RD:'ライド',OH:'オープンハイハット',HH:'ハイハット',RM:'リム',
+                 SN:'スネア',TH:'ハイタム',TL:'ロータム',BD:'バスドラム'};
 let DRUM_LAST='beat8';                   /* 消した時に覚えておく直前のパターン */
 
-/* パターン作成モード。セルを叩いて入り切りし、「このパターンで鳴らす」で曲に書き込む */
-function openDrumEditor(){
-  const key=song.play.drum.pat;
-  if(!DD[key]){ toast('先にドラムのパターンを選んでください'); return; }
-  const base=DD[key], cur=drumDef(song,key);
-  const w={HH:cur.HH.slice(),SN:cur.SN.slice(),BD:cur.BD.slice()};
-  const pop=popup('パターンを作る',base.label);
-
-  const wrap=document.createElement('div'); wrap.className='dgrid-wrap';
-  const tbl=document.createElement('table'); tbl.className='dgrid';
-  wrap.appendChild(tbl); pop.appendChild(wrap);
-
-  const hint=document.createElement('div'); hint.className='pg-lbl';
-  hint.textContent='1拍を'+base.div+'つに割った'+base.steps+'刻み（'+base.beats+'拍）';
-  pop.insertBefore(hint,wrap);
-
-  const draw=()=>{
-    tbl.innerHTML='';
-    const hd=document.createElement('tr');
-    const h0=document.createElement('th'); h0.className='dg-lbl'; hd.appendChild(h0);
-    for(let i=0;i<base.steps;i++){ const th=document.createElement('th');
-      if(i%base.div===0) th.textContent=String(Math.floor(i/base.div)+1); hd.appendChild(th); }
-    tbl.appendChild(hd);
-    DRUM_LANES.forEach(([ln,label])=>{
-      const tr=document.createElement('tr');
-      const td0=document.createElement('td'); td0.className='dg-lbl'; td0.textContent=label; tr.appendChild(td0);
-      for(let i=0;i<base.steps;i++){
-        const td=document.createElement('td');
-        const c=document.createElement('div');
-        c.className='dg-cell'+(w[ln][i]?' on '+ln.toLowerCase():'')+(i%base.div===0?' b1':'');
-        c.onclick=()=>{ w[ln][i]=w[ln][i]?0:1; draw(); };
-        td.appendChild(c); tr.appendChild(td);
-      }
-      tbl.appendChild(tr);
-    });
-  };
-  draw();
-
-  const row=pgrp(pop,null);
-  pbtn(row,'元に戻す',false,()=>{
-    ['HH','SN','BD'].forEach(k=>{ w[k]=base[k].slice(); }); draw();
-  });
-  pbtn(row,'ぜんぶ消す',false,()=>{
-    ['HH','SN','BD'].forEach(k=>{ w[k]=base[k].map(()=>0); }); draw();
-  });
-  pbtn(row,'このパターンで鳴らす',true,()=>{
-    const same=['HH','SN','BD'].every(k=>w[k].every((v,i)=>!!v===!!base[k][i]));
-    tx('ドラムのパターンを直す',()=>{
-      if(same) delete song.play.drum.custom[key];
-      else song.play.drum.custom[key]={HH:w.HH.slice(),SN:w.SN.slice(),BD:w.BD.slice()};
-    });
-    closePop();
-  },'wide');
-  popClose(pop);
+function drumTsKey(ts){ return ((ts&&ts.n)|0)+'/'+((ts&&ts.d)|0); }
+function drumSteps(k,ts){ return Math.max(1,Math.round(DD[k].steps*((ts&&ts.n)||4)/4)); }
+/* その拍子での最初の形（4/4 の形を拍の数に合わせて伸び縮み。足りない拍は空） */
+function drumDefault(k,ts){
+  const n=drumSteps(k,ts), p={steps:n,div:DD[k].div};
+  DROWS.forEach(r=>{ p[r]=[]; for(let i=0;i<n;i++) p[r].push((DD[k][r]&&DD[k][r][i])?1:0); });
+  return p;
+}
+function drumCustomOf(s,k,ts){
+  const d=(s||song).play.drum||{}, m=d.custom&&d.custom[drumTsKey(ts)], c=m&&m[k];
+  return (c&&c.steps===drumSteps(k,ts)&&c.div===DD[k].div)?c:null;
+}
+/* 型と拍子に合う形（直してあればそちら） */
+function drumPatFor(s,k,ts){
+  if(!DD[k]||!ts) return null;
+  return drumCustomOf(s,k,ts)||drumDefault(k,ts);
+}
+function drumIsCustom(s,k,ts){ return !!(DD[k]&&drumCustomOf(s,k,ts||(s||song).meta.timeSig)); }
+function drumFromOld(c,steps,div){
+  const p={steps,div};
+  DROWS.forEach(r=>{ p[r]=[]; for(let i=0;i<steps;i++) p[r].push((c[r]&&c[r][i])?1:0); });
+  return p;
 }
 
-/* song.play.drum を {pat,custom} 形に揃える。将来セクション別へ広げられるよう器だけ残す */
+/* song.play.drum を {pat,custom,tight} 形に揃える。古い形（custom[型]={HH,SN,BD}）は引き継ぐ */
 function normDrum(p){
   let d=p.drum;
   if(!d||typeof d!=='object') d={pat:(typeof d==='string'?d:'none'),custom:{}};
-  if(typeof d.pat!=='string'||(d.pat!=='none'&&!DD[d.pat])) d.pat='none';
   if(!d.custom||typeof d.custom!=='object') d.custom={};
-  Object.keys(d.custom).forEach(k=>{ if(!DD[k]) delete d.custom[k]; });
+  const isTs=k=>/^\d+\/\d+$/.test(k);
+  const old=Object.keys(d.custom).filter(k=>!isTs(k));
+  if(old.length){
+    const nw={};
+    Object.keys(d.custom).filter(isTs).forEach(k=>{ nw[k]=d.custom[k]; });
+    old.forEach(k=>{ const c=d.custom[k]; if(!c||!Array.isArray(c.HH)) return;
+      if(k==='waltz'){ (nw['3/4']=nw['3/4']||{}).beat8=drumFromOld(c,6,2); }
+      else if(DD[k]){ const m=(nw['4/4']=nw['4/4']||{}); if(!m[k]) m[k]=drumFromOld(c,DD[k].steps,DD[k].div); } });
+    d.custom=nw;
+  }
+  if(d.pat==='waltz'){
+    d.pat='beat8';
+    const m=(d.custom['3/4']=d.custom['3/4']||{});
+    if(!m.beat8) m.beat8=drumFromOld(DRUM_WALTZ,6,2);
+  }
+  if(typeof d.pat!=='string'||(d.pat!=='none'&&!DD[d.pat])) d.pat='none';
+  Object.keys(d.custom).forEach(tk=>{
+    const m=d.custom[tk];
+    if(!isTs(tk)||!m||typeof m!=='object'){ delete d.custom[tk]; return; }
+    Object.keys(m).forEach(k=>{ const c=m[k];
+      if(!DD[k]||!c||!(c.steps>0)){ delete m[k]; return; }
+      DROWS.forEach(r=>{ if(!Array.isArray(c[r])) c[r]=[]; while(c[r].length<c.steps) c[r].push(0); c[r].length=c.steps; }); });
+    if(!Object.keys(m).length) delete d.custom[tk];
+  });
+  d.tight=!!d.tight;
   p.drum=d; return p;
 }
 function drumOn(s){ const d=(s||song).play.drum; return !!(d&&d.pat&&d.pat!=='none'); }
-/* 選ばれているパターン（自作があればそちら） */
-function drumDef(s,key){
-  const d=(s||song).play.drum||{}; const k=key||d.pat;
-  if(!DD[k]) return null;
-  const c=(d.custom||{})[k];
-  if(c&&c.HH&&c.SN&&c.BD) return Object.assign({},DD[k],{HH:c.HH,SN:c.SN,BD:c.BD});
-  return DD[k];
+function drumTight(){ const d=song&&song.play&&song.play.drum; return !!(d&&d.tight); }
+
+/* ══ マス（下の帯の上に常に出す）══ */
+var DGRID={tsk:null,more:false};
+function drumSongTs(){
+  const seen=new Map();
+  const add=ts=>{ if(ts&&ts.n&&ts.d){ const k=drumTsKey(ts); if(!seen.has(k)) seen.set(k,{n:ts.n,d:ts.d}); } };
+  add(song.meta.timeSig);
+  (song.bars||[]).forEach(b=>add(barTS(song,b)));
+  return [...seen.entries()];
 }
-function drumIsCustom(s,key){
-  const d=(s||song).play.drum||{}; const k=key||d.pat;
-  return !!((d.custom||{})[k]);
+function drumGridTs(){
+  const list=drumSongTs();
+  const hit=list.find(([k])=>k===DGRID.tsk);
+  return hit?hit[1]:list[0][1];
 }
-/* 小節の拍数に合うパターンを選び直す。合わなければワルツへ、それも駄目なら切り詰める */
-function drumForBar(p,nb){
-  if(!p) return null;
-  if(nb%p.beats===0) return p;
-  if(nb%3===0&&p.beats!==3) return DD.waltz;
-  return p;                      /* 剰余は先頭から使う（切り詰め） */
+/* マスを一つ入り切りする。オープンとクローズのハイハットは同じマスに入れない（入れた方を残す） */
+function drumToggleCell(ts,r,i){
+  const d=song.play.drum, k=d.pat; if(!DD[k]) return;
+  const tk=drumTsKey(ts);
+  const cur=JSON.parse(JSON.stringify(drumPatFor(song,k,ts)));
+  cur[r][i]=cur[r][i]?0:1;
+  const other=(r==='OH')?'HH':(r==='HH')?'OH':null;
+  if(other&&cur[r][i]) cur[other][i]=0;
+  const def=drumDefault(k,ts);
+  const same=DROWS.every(x=>cur[x].every((v,j)=>!!v===!!def[x][j]));
+  d.custom=d.custom||{};
+  if(same){ if(d.custom[tk]){ delete d.custom[tk][k]; if(!Object.keys(d.custom[tk]).length) delete d.custom[tk]; } }
+  else (d.custom[tk]=d.custom[tk]||{})[k]=cur;
+}
+function drumResetShape(ts){
+  const d=song.play.drum, tk=drumTsKey(ts);
+  if(d.custom&&d.custom[tk]){ delete d.custom[tk][d.pat]; if(!Object.keys(d.custom[tk]).length) delete d.custom[tk]; }
+}
+/* 鉛筆の札：マスを出す／畳む（この端末に覚える） */
+function openDrumEditor(){
+  if(!library) return;
+  library.drumGridHide=!library.drumGridHide;
+  try{ saveLibrary(); }catch(_){}
+  render();
+}
+function drumGridShown(){ return !!(song&&drumOn()&&!(library&&library.drumGridHide)); }
+function renderDrumGrid(){
+  const bb=$('botbar'); if(!bb) return;
+  let row=$('bb-drum');
+  if(!drumGridShown()){ if(row) row.remove(); return; }
+  if(!row){ row=document.createElement('div'); row.id='bb-drum'; row.className='dgridbar no-print'; bb.insertBefore(row,bb.firstChild); }
+  const k=song.play.drum.pat, ts=drumGridTs(), tk=drumTsKey(ts);
+  const p=drumPatFor(song,k,ts);
+  row.dataset.tsk=tk;
+  row.innerHTML='';
+  /* 頭：拍子（曲に二つ以上ある時だけ）・タイト・ほかの音・元に戻す・畳む */
+  const hd=document.createElement('div'); hd.className='dgb-hd';
+  const ttl=document.createElement('span'); ttl.className='dgb-ttl'; ttl.textContent=DD[k].label;
+  hd.appendChild(ttl);
+  const tsl=drumSongTs();
+  if(tsl.length>1) tsl.forEach(([key])=>{
+    const b=document.createElement('button'); b.type='button'; b.className='dgb-chip'+(key===tk?' on':'');
+    b.textContent=key; b.title=key+' の小節で鳴る形';
+    b.onclick=()=>{ DGRID.tsk=key; renderDrumGrid(); measureBot(); };
+    hd.appendChild(b);
+  });
+  const lamp=(label,on,title,fn)=>{ const b=document.createElement('button'); b.type='button';
+    b.className='dgb-lamp'+(on?' on':''); b.title=title; b.setAttribute('aria-pressed',on?'true':'false');
+    const l=document.createElement('span'); l.className='lp'; b.appendChild(l);
+    const t=document.createElement('span'); t.textContent=label; b.appendChild(t);
+    b.onclick=fn; return b; };
+  hd.appendChild(lamp('タイト',drumTight(),'ドラム全体の響きを短く止めます',
+    ()=>{ tx('ドラムのタイトを切り替える',()=>{ song.play.drum.tight=!song.play.drum.tight; },FREE); }));
+  let used=0; Object.keys(DROWS_EXTRA).forEach(r=>(p[r]||[]).forEach(v=>{ if(v) used++; }));
+  const mo=document.createElement('button'); mo.type='button'; mo.className='dgb-btn';
+  mo.textContent=DGRID.more?'− ほかの音をたたむ':('＋ ほかの音'+(used?'（'+used+'か所）':''));
+  mo.title='オープンハイハット・リム・ハイタム・ロータム';
+  mo.onclick=()=>{ DGRID.more=!DGRID.more; renderDrumGrid(); measureBot(); };
+  hd.appendChild(mo);
+  if(drumCustomOf(song,k,ts)){
+    const rs=document.createElement('button'); rs.type='button'; rs.className='dgb-btn';
+    rs.textContent='元に戻す'; rs.title='この拍子の「'+DD[k].label+'」を最初の形に戻します';
+    rs.onclick=()=>tx('ドラムの形を元に戻す',()=>drumResetShape(ts),FREE);
+    hd.appendChild(rs);
+  }
+  const sp=document.createElement('span'); sp.className='dgb-sp'; hd.appendChild(sp);
+  const fold=document.createElement('button'); fold.type='button'; fold.className='dgb-btn';
+  fold.textContent='畳む'; fold.title='ドラムのマスを畳みます（鉛筆の札で出し直せます）';
+  fold.onclick=openDrumEditor;
+  hd.appendChild(fold);
+  row.appendChild(hd);
+  /* マス */
+  const wrap=document.createElement('div'); wrap.className='dgb-wrap';
+  const tbl=document.createElement('table'); tbl.className='dgb-tbl';
+  const h=document.createElement('tr'); const h0=document.createElement('th'); h0.className='dgb-lbl'; h.appendChild(h0);
+  for(let i=0;i<p.steps;i++){ const th=document.createElement('th'); if(i%p.div===0) th.textContent=String(Math.floor(i/p.div)+1); h.appendChild(th); }
+  tbl.appendChild(h);
+  DROWS.forEach(r=>{
+    if(DROWS_EXTRA[r]&&!DGRID.more) return;
+    const tr=document.createElement('tr'); if(DROWS_EXTRA[r]) tr.className='extra';
+    const l=document.createElement('td'); l.className='dgb-lbl'; l.textContent=DROW_NAME[r]; tr.appendChild(l);
+    for(let i=0;i<p.steps;i++){
+      const td=document.createElement('td');
+      const c=document.createElement('button'); c.type='button';
+      c.className='dgb-cell'+(p[r][i]?' on '+r.toLowerCase():'')+(i%p.div===0?' b1':'');
+      c.dataset.s=String(i);
+      c.title=DROW_NAME[r]+'・'+(Math.floor(i/p.div)+1)+'拍目';
+      c.onclick=()=>tx('ドラムのマスを直す',()=>drumToggleCell(ts,r,i),FREE);
+      td.appendChild(c); tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  });
+  wrap.appendChild(tbl); row.appendChild(wrap);
+}
+/* 鳴っている刻を光らせる（ことりノームと同じ） */
+let _dgCurT=null;
+function drumCurAt(at,tsk,si){
+  if(!AC) return;
+  const ms=Math.max(0,(at-AC.currentTime)*1000);
+  setTimeout(()=>{
+    const g=$('bb-drum'); if(!g) return;
+    g.querySelectorAll('.dgb-cell.cur').forEach(x=>x.classList.remove('cur'));
+    if(g.dataset.tsk!==tsk) return;          /* 別の拍子の小節を鳴らしている間は光らせない */
+    g.querySelectorAll('.dgb-cell[data-s="'+si+'"]').forEach(x=>x.classList.add('cur'));
+    clearTimeout(_dgCurT);
+    _dgCurT=setTimeout(()=>{ const g2=$('bb-drum'); if(g2) g2.querySelectorAll('.dgb-cell.cur').forEach(x=>x.classList.remove('cur')); },2500);
+  },ms);
 }
 
 /* ══ 音源：ことりノームと同じ音に揃えた（tab-6.20）══
@@ -17081,8 +17218,41 @@ function noiseSource(t,dur){
      ・読み込みが済むまで・読めない時は、下の合成ドラムで鳴らす
      ・出口はドラムの帯（DRUMG）——ミキサーの音量・パン・響き送りはそのまま効く
      ・出典（CC BY-SA 3.0）は、ことりノームと同じく画面のいちばん下（紙の下）に載せる */
-var SMP_DRUM={ bd:{name:'kick',vel:0.833}, sn:{name:'snare',vel:1.016}, hh:{name:'hihat',vel:1.020}, hhs:{name:'hihat',vel:0.595} };
-var SMP_NORMAL={ kick:{dur:0.32,release:0.12}, snare:{dur:0.35,release:0.12}, hihat:{dur:0.16,release:0.08} };
+var SMP_DRUM={ bd:{name:'kick',vel:0.833}, sn:{name:'snare',vel:1.016}, hh:{name:'hihat',vel:1.020}, hhs:{name:'hihat',vel:0.595},
+               cr:{name:'crash',vel:1.040}, rd:{name:'ride',vel:1.082},
+               oh:{name:'hihat-open',vel:0.802}, rm:{name:'rim',vel:1.088}, th:{name:'tom-high',vel:1.196}, tl:{name:'tom-low',vel:0.995} };
+var SMP_NORMAL={ kick:{dur:0.32,release:0.12}, snare:{dur:0.35,release:0.12}, hihat:{dur:0.16,release:0.08},
+                 crash:{dur:1.6,release:0.6}, ride:{dur:0.8,release:0.3},
+                 'hihat-open':{dur:0.8,release:0.25}, rim:{dur:0.16,release:0.08}, 'tom-high':{dur:0.4,release:0.15}, 'tom-low':{dur:0.45,release:0.15} };
+/* 〈タイト〉：響きを短く止める（ことりノームと同じ値。tab-6.71） */
+var SMP_TIGHT={ kick:{dur:0.15,release:0.05}, snare:{dur:0.12,release:0.05}, hihat:{dur:0.045,release:0.035},
+                crash:{dur:0.35,release:0.15}, ride:{dur:0.25,release:0.10},
+                'hihat-open':{dur:0.18,release:0.08}, rim:{dur:0.06,release:0.04}, 'tom-high':{dur:0.15,release:0.06}, 'tom-low':{dur:0.18,release:0.07} };
+/* オープンハイハットだけ、高い音を持ち上げて明るく・少し大きく通す（録音が控えめなため。ことりノームと同じ） */
+var _ohAC=null,_ohIn=null;
+function ohChain(){
+  if(_ohAC===AC&&_ohIn) return _ohIn;
+  const shelf=AC.createBiquadFilter(), g=AC.createGain();
+  shelf.type='highshelf'; shelf.frequency.value=6000; shelf.gain.value=6;
+  g.gain.value=Math.pow(10,3/20);
+  shelf.connect(g); g.connect(DRUMG);
+  _ohAC=AC; _ohIn=shelf; return shelf;
+}
+/* 1マス分を鳴らす。同じマスにオープンとクローズがあれば、オープンだけ（ことりノームと同じ） */
+function drumStepFire(at,e){
+  const dr=e.dr||[], has=r=>dr.indexOf(r)>=0, oh=has('OH');
+  if(has('HH')&&!oh) mdrm(at,'hh');
+  if(oh) mdrm(at,'oh');
+  if(has('RM')) mdrm(at,'rm');
+  if(has('SN')) mdrm(at,'sn');
+  if(has('TH')) mdrm(at,'th');
+  if(has('TL')) mdrm(at,'tl');
+  if(has('BD')) mdrm(at,'bd');
+  if(has('CR')) mdrm(at,'cr');
+  if(has('RD')) mdrm(at,'rd');
+  try{ drumCurAt(at,e.tsk,e.si); }catch(_){}
+}
+var drumOpenHat=null;   /* 鳴っているオープンハイハット。次にクローズを叩いた時刻で止める（本物と同じ） */
 var _smpAC=null, _smpLoading=false;
 function smpOk(){ return !!(window.DS&&DS.sound&&DS.sound.drum); }
 function smpBind(){
@@ -17099,13 +17269,50 @@ function smpDrum(t,type){
   if(_smpAC!==AC) smpBind();
   if(_smpAC!==AC||!DS.sound.isReady('drums')) return false;
   const d=SMP_DRUM[type]; if(!d) return false;
-  const o={time:t,vel:d.vel,dest:DRUMG}, len=SMP_NORMAL[d.name];
+  const o={time:t,vel:d.vel,dest:(type==='oh')?ohChain():DRUMG}, len=(drumTight()?SMP_TIGHT:SMP_NORMAL)[d.name];
   if(len){ o.dur=len.dur; o.release=len.release; }
-  try{ DS.sound.drum(d.name,o); return true; }catch(e){ return false; }
+  try{ const v=DS.sound.drum(d.name,o); if(type==='oh') drumOpenHat=v; return true; }catch(e){ return false; }
 }
 function mdrm(t,type){
   if(!AC||!DRUMG) return;
+  if((type==='hh'||type==='hhs')&&drumOpenHat){ try{ drumOpenHat.stop(t); }catch(_){} drumOpenHat=null; }
   if(smpDrum(t,type)) return;          /* 録音で鳴らせたら、合成はしない */
+  /* 録音が読み込めるまでの代わりの音（ことりノームの予備と同じ作り） */
+  const tight=drumTight();
+  if(type==='oh'){
+    const lenO=tight?0.26:0.6, nO=noiseSource(t,lenO), hO=AC.createBiquadFilter(), gO=AC.createGain();
+    hO.type='highpass'; hO.frequency.value=7000;
+    gO.gain.setValueAtTime(0.0001,t); gO.gain.exponentialRampToValueAtTime(0.22,t+0.004); gO.gain.exponentialRampToValueAtTime(0.001,t+lenO);
+    nO.connect(hO); hO.connect(gO); gO.connect(DRUMG);
+    drumOpenHat={stop:w=>{ try{ gO.gain.cancelScheduledValues(w); gO.gain.setTargetAtTime(0.0001,w,0.01); }catch(_){} }};
+    return;
+  }
+  if(type==='rm'){
+    const nR=noiseSource(t,0.05), bR=AC.createBiquadFilter(), gR=AC.createGain();
+    bR.type='bandpass'; bR.frequency.value=1900; bR.Q.value=3;
+    gR.gain.setValueAtTime(0.5,t); gR.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+    nR.connect(bR); bR.connect(gR); gR.connect(DRUMG);
+    return;
+  }
+  if(type==='th'||type==='tl'){
+    const f0=(type==='th')?220:140, lenT=tight?0.18:0.4, oT=AC.createOscillator(), gT=AC.createGain();
+    oT.type='sine'; oT.frequency.setValueAtTime(f0*1.6,t); oT.frequency.exponentialRampToValueAtTime(f0,t+0.05);
+    gT.gain.setValueAtTime(0.0001,t); gT.gain.exponentialRampToValueAtTime(0.6,t+0.004); gT.gain.exponentialRampToValueAtTime(0.001,t+lenT);
+    oT.connect(gT); gT.connect(DRUMG); oT.start(t); oT.stop(t+lenT+0.02);
+    return;
+  }
+  if(type==='cr'||type==='rd'){
+    const crash=(type==='cr'), len=crash?1.4:0.6;
+    const ns2=noiseSource(t,len), hpc=AC.createBiquadFilter(), gc=AC.createGain();
+    hpc.type='highpass'; hpc.frequency.value=crash?5200:7000;
+    gc.gain.setValueAtTime(0.0001,t); gc.gain.exponentialRampToValueAtTime(crash?0.32:0.12,t+0.004); gc.gain.exponentialRampToValueAtTime(0.001,t+len);
+    ns2.connect(hpc); hpc.connect(gc); gc.connect(DRUMG);
+    if(!crash){ const ob2=AC.createOscillator(), gb2=AC.createGain();
+      ob2.type='triangle'; ob2.frequency.value=3200;
+      gb2.gain.setValueAtTime(0.06,t); gb2.gain.exponentialRampToValueAtTime(0.001,t+0.5);
+      ob2.connect(gb2); gb2.connect(DRUMG); ob2.start(t); ob2.stop(t+0.55); }
+    return;
+  }
   const bus=DRUMG;
   if(type==='bd'){
     /* 生のバスドラムに寄せた作り。
@@ -21221,7 +21428,7 @@ function buildTimeline(s){
   const arr=arrangement(s), cmap=resolveChords(s,arr);
   const aiOf=new Map();
   arr.forEach((it,ai)=>{ if(!aiOf.has(it.barId)) aiOf.set(it.barId,ai); });
-  const dbase=drumOn(s)?drumDef(s):null;   /* ドラムのパターン（無ければ null） */
+  const dOn=drumOn(s);                     /* ドラムを鳴らすか（形は小節の拍子ごとに引く。tab-6.71） */
   let prevTieOut=false;                    /* 前の小節の最後がタイで続いているか */
   let prevTied=null;                       /* その時、どの弦を繋いできたか（tab-1.50） */
   /* ══ コードの変わり目 ══
@@ -21268,15 +21475,15 @@ function buildTimeline(s){
       });
     }catch(e){ console.error('[伴奏]',e); }
     /* ドラム：拍ではなくパターン自身の刻みで打つ。小節ごとに頭から数え直す */
-    if(dbase){
-      const p=drumForBar(dbase,nb);
+    if(dOn){
+      /* 拍子ごとの形（ことりノームと同じ：x/8 は8分を1拍と数える） */
+      const p=drumPatFor(s,s.play.drum.pat,ts);
       if(p){
-        const st=bt/p.div, cnt=nb*p.div;
-        for(let i=0;i<cnt;i++){
-          const si=i%p.steps;
-          if(!(p.HH[si]||p.SN[si]||p.BD[si])) continue;
-          ev.push({t:startT+at(b.tick+Math.round(i*st)),kind:'drum',barId:b.id,
-                   hh:!!p.HH[si],sn:!!p.SN[si],bd:!!p.BD[si]});
+        const st=(T.QUARTER*4/ts.d)/p.div, tk=drumTsKey(ts);
+        for(let i=0;i<p.steps;i++){
+          const off=Math.round(i*st); if(off>=b.tot) break;
+          const dr=DROWS.filter(r=>p[r]&&p[r][i]); if(!dr.length) continue;
+          ev.push({t:startT+at(b.tick+off),kind:'drum',barId:b.id,dr,si:i,tsk:tk});
         }
       }
     }
@@ -22034,6 +22241,7 @@ function playStart(){
 }
 function playStop(){
   try{ recPlayAlong(false); }catch(_){}
+  try{ const g=$('bb-drum'); if(g) g.querySelectorAll('.dgb-cell.cur').forEach(x=>x.classList.remove('cur')); }catch(_){}
   /* 止めたら元の見え方へ（tab-6.11）——**練習の道具が譜面の設定を書き換えない** */
   try{ swapReset(); }catch(_){}
   try{ nudgeForget(); }catch(_){}   /* 聴き比べる所も忘れる（tab-6.12） */
@@ -22134,7 +22342,7 @@ function _fireEvent(e,at){
      **メトロノームの何倍も重い。** 録りながら合わせるには、拍さえ刻めば足りる。
 
      > **要る物だけ鳴らす。合わせるのに要るのは、拍である。** */
-  else if(e.kind==='drum'){ if(drumOn()&&!REC.on){ if(e.hh) mdrm(at,'hh'); if(e.sn) mdrm(at,'sn'); if(e.bd) mdrm(at,'bd'); } }
+  else if(e.kind==='drum'){ if(drumOn()&&!REC.on) drumStepFire(at,e); }
   else if(e.kind==='backing'){
       /* 録音中は黙る（tab-6.10）——**伴奏に合わせて弾いた音だけが録れること** */
       /* ══ 無い物を渡していた（tab-6.10）══
@@ -30796,13 +31004,15 @@ function renderPlayBar(){
        余りは `.bb-sp` が受け持つ（下で足す）。 */
     const ds=document.createElement('select'); ds.className='bb-sel drum'; ds.title='ドラムパターン';
     drumList(song).forEach(k=>{ const o=document.createElement('option');
-      o.value=k; o.textContent=DD[k].label+(drumIsCustom(song,k)?' ✎':''); ds.appendChild(o); });
+      o.value=k; o.textContent=DD[k].label+(drumIsCustom(song,k,drumGridTs())?' ✎':''); ds.appendChild(o); });
     ds.value=song.play.drum.pat;
     ds.onchange=()=>{ const v=ds.value; if(!DD[v]) return;
       tx('ドラムパターンを変える',()=>{ song.play.drum.pat=v; DRUM_LAST=v; },FREE); };
     row.appendChild(ds);
     const de=document.createElement('button'); de.className='bb-btn';
-    setIco(de,'pencil'); de.title='パターンを作る'; de.onclick=openDrumEditor;
+    setIco(de,'pencil'); de.title=drumGridShown()?'ドラムのマスを畳む':'ドラムのマスを出す';
+    if(drumGridShown()) de.classList.add('on');
+    de.onclick=openDrumEditor;
     row.appendChild(de);
     const sp=document.createElement('span'); sp.className='bb-sp'; row.appendChild(sp);
   }else{
@@ -35485,7 +35695,9 @@ function render(){
   renderTopbar();
   if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
   if(MXEL) mixRender();        /* ミキサーも同じ（tab-6.45） */
-  try{ renderChordPalette(); measureBot(); }catch(_){}   /* コードの札の列（tab-6.56） */
+  try{ renderChordPalette(); }catch(_){}               /* コードの札の列（tab-6.56） */
+  try{ renderDrumGrid(); }catch(e){ console.error('[drumgrid]',e); }   /* ドラムのマス（tab-6.71） */
+  try{ measureBot(); }catch(_){}
   try{ renderVPick(); }catch(e){ console.error('[vpick]',e); }   /* 押さえの候補（tab-6.67） */
   renderModeBar();
   const paper=$('paper'); if(!paper) return;
