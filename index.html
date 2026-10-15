@@ -1723,6 +1723,25 @@ body.cp-dragging,body.cp-dragging *{cursor:grabbing!important;-webkit-user-selec
 body.stamping #paper .mwrap{cursor:copy}
 @media (max-width:700px){ .cpal .cp-state{display:none} body.stamping .cpal .cp-state{display:flex} body.stamping .cpal .cp-state>span{display:none} }
 
+.vpick{position:fixed;z-index:60;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));
+  bottom:calc(var(--botH,64px) + 8px);display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;
+  background:linear-gradient(180deg,#2f2d2a,#211f1c);border:1px solid #000;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 10px 26px rgba(0,0,0,.45)}
+.vpick .vp-hd{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:44px}
+.vpick .vp-nm{font:800 16px/1 var(--font-ui,system-ui,sans-serif);color:#f1dca2}
+.vpick .vp-lb{font:600 10.5px/1.2 var(--font-ui,system-ui,sans-serif);color:#bfb4a0;white-space:nowrap}
+.vpick .vp-scroll{display:flex;gap:7px;flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:2px 1px;touch-action:pan-x}
+.vpick .vp-scroll::-webkit-scrollbar{display:none}
+.vpick .vp-card{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px 5px;border-radius:9px;cursor:pointer;
+  background:#f7f3ea;border:1px solid #0b0a09;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04);color:#4a4338}
+.vpick .vp-card.on{background:#fff9e8;box-shadow:0 0 0 2px #e2bf6e,inset 0 0 0 1px rgba(201,165,96,.5)}
+.vpick .vp-dg svg{display:block}
+.vpick .vp-cap{font:600 9.5px/1.15 var(--font-ui,system-ui,sans-serif);white-space:nowrap;max-width:96px;overflow:hidden;text-overflow:ellipsis}
+.vpick .vp-x{flex:0 0 auto;height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--ink-line);background:var(--ink3);color:var(--on-ink);
+  font:600 12px/1 var(--font-ui,system-ui,sans-serif);cursor:pointer}
+@media (max-width:700px){ .vpick{gap:7px;padding:7px 8px} .vpick .vp-lb{display:none} }
+@media print{ .vpick{display:none!important} }
+
 /* 盤の頭の取り消し・やり直し（tab-6.58） */
 .dk-nav .dk-undo{display:inline-flex;align-items:center;justify-content:center}
 .dk-nav .dk-undo:disabled{opacity:.35}
@@ -1860,7 +1879,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.66', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.68', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3588,6 +3607,7 @@ function lockRefuse(label){
 
 function tx(label,fn,opt){
   if(isLocked()&&!(opt&&opt.free)){ lockRefuse(label); return null; }
+  if(VPICK&&!VPICK.busy) VPICK=null;    /* 押さえの候補は、次の操作で引っ込む（tab-6.67） */
   /* ══ 手を入れたら、それはもうL様の曲（tab-3.53）══
      練習用の印は「道具が出したまま、手つかず」を指す。
      一筆でも入れば**捨ててよい物ではなくなる。**
@@ -30998,9 +31018,11 @@ function applyBandChord(c,label){
   const bar=findBar(song,dock.targets[0].barId); if(!bar) return;
   const t=dock.bandTick;
   const ni=(bar.notes||[]).findIndex(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0));
+  let wrote=false;
   tx(label,()=>{
     clearOtherPartsChordAt(bar,t);    /* 全パートのコード名は一つ（tab-6.62） */
     if(c===null){
+      revertAutoTab(bar,t);           /* 自動で書いた押さえは休符へ（tab-6.67） */
       if(bar.chordAt){ delete bar.chordAt[t];
         if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
       if(ni>=0){ bar.notes[ni].chord=null; bar.notes[ni].voicing=null; }
@@ -31016,7 +31038,9 @@ function applyBandChord(c,label){
       bar.chordAt=bar.chordAt||{};
       bar.chordAt[t]=ch;
     }
+    if(c!==null) wrote=autoTabSpan(bar,t,ch);   /* 空いていれば押さえも（tab-6.67） */
   });
+  vpickSet(wrote?{bar,st:t,chord:{root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}}:null);
   render();
 }
 
@@ -31762,12 +31786,14 @@ function progLabel(tpl){
   return progChords(tpl).map(b=>b.map(c=>chordName(c,song.meta)).join('・')).join(' → ');
 }
 /* 刻へコードを置く（音符があれば音符へ、無ければ控えへ。applyBandChord と同じ決まり） */
-function putChordAt(bar,t,ch){
+function putChordAt(bar,t,ch,opt){
   clearOtherPartsChordAt(bar,t);      /* 同じ拍に二つ持たない（tab-6.62） */
   const ni=(bar.notes||[]).findIndex(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0));
   if(ni>=0){ bar.notes[ni].kind='chord'; bar.notes[ni].chord=ch;
     if(bar.chordAt){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; } }
   else{ bar.chordAt=bar.chordAt||{}; bar.chordAt[t]=ch; }
+  /* TAB が空いていれば、押さえも書く（tab-6.67） */
+  return autoTabSpan(bar,t,ch,opt);
 }
 function applyProgression(tpl){
   if(!dock) return;
@@ -31790,6 +31816,7 @@ function applyProgression(tpl){
     }
   });
   render();
+  vpickSet(null);
   toast(tpl.name+'を'+need+'小節に入れました'+(added?('（'+added+'小節を足しました）'):'')+'。取り消しで戻せます');
 }
 function openProgressions(){
@@ -31846,7 +31873,9 @@ function cpalHilite(t){
 }
 function cpalPut(t,c){
   const bar=findBar(song,t.barId); if(!bar) return;
-  tx('コードを置く',()=>putChordAt(bar,t.st,{root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}));
+  const ch={root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)};
+  const wrote=tx('コードを置く',()=>putChordAt(bar,t.st,ch));
+  vpickSet(wrote?{bar,st:t.st,chord:ch}:null);
   render();
 }
 function stampSet(c){ STAMP.chord=c||null; document.body.classList.toggle('stamping',!!STAMP.chord); renderChordPalette(); }
@@ -31986,9 +32015,216 @@ function chordAtTick(bar,st){
   const all=barChordAtAll(bar); const c2=all&&all[st]; return (c2&&c2.root!=null)?c2:null;   /* 他のパートの分も（tab-6.62） */
 }
 function removeChordAt(bar,st){
+  revertAutoTab(bar,st);              /* 自動で書いた押さえは休符へ戻す（tab-6.67） */
   clearOtherPartsChordAt(bar,st);     /* 全パートから（tab-6.62） */
   (bar.notes||[]).forEach(x=>{ if(x&&(x.start|0)===(st|0)&&x.chord){ x.chord=null; x.voicing=null; } });
   if(bar.chordAt){ delete bar.chordAt[st]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
+}
+/* ══════════════════════════════════════════════════════════════
+   空いた拍には、コードから押さえを書く（tab-6.67）
+   L様——「コード名を入れるとき TAB に何もない場合、コード名から自動で TAB に入力したい。
+          いくつかボイシング候補があるといい」。
+
+   札の列・スタンプ・扇・ひな形・コード名の帯（tab-6.54〜）から置いたコードは、
+   空いた拍では**拍の控え（chordAt）に名を持つだけ**で、TAB は空のままだった。
+   盤の〈入力〉から入れた時だけ押さえを書いていた（applyChordToDock）。
+
+   決まり（L様の選択）：
+     ・書く範囲は、置いた拍から**次のコード（無ければ小節の終わり）**まで
+     ・パートの〈新しい小節の刻み〉が決めてあればその刻みで、無ければ一つの和音で伸ばす
+     ・刻みだけで押さえの無い音符（新しい小節の刻みで出来た物）は、その刻みのまま押さえを入れる
+     ・手で置いた押さえが一つでもあれば、**何も書かない**（名前だけ）
+     ・押さえは今の自動と同じ選び方（音符の取り決め → 曲の辞書 → 開放形・低い位置）
+     ・書いた直後は、下の帯の上に押さえの候補を一列に出す。押せば差し替わり、次の操作で引っ込む
+     ・コードを動かせば、自動で書いた押さえも一緒に動き、元の拍は休符に戻る
+       （手で直した押さえは「自動で書いた物」ではないので動かさない）
+
+   「自動で書いた物」の見分け：書いた時の姿（長さ・押さえ・奏法）を `atab` に控える。
+   今の姿と同じ間は自動の物、一筆でも入れば L様の物。
+   `atabFill` は「刻みだけの音符へ押さえを入れた」印——戻す時は休符ではなく刻みへ戻す。
+   ══════════════════════════════════════════════════════════════ */
+var VPICK=null;      /* 押さえを書いたばかりの所 {barId,st,part,chord,span} */
+function atabSig(n){
+  return JSON.stringify([n.len|0,n.kind,(n.stops||[]).map(o=>[o.s,o.f,
+    o.t?Object.keys(o.t).filter(k=>o.t[k]!=null&&o.t[k]!==false&&o.t[k]!=='').sort().join(','):''])]);
+}
+function atabMark(n,fill){ n.atab=atabSig(n); if(fill) n.atabFill=true; else delete n.atabFill; }
+function atabUntouched(n){ return !!(n&&n.atab&&n.kind!=='rest'&&n.atab===atabSig(n)); }
+function atabClear(n){ if(n){ delete n.atab; delete n.atabFill; } }
+function chordTabPolicy(){ return tuningStd(song)?(song.meta.chordToTab||'fill'):'off'; }
+/* t より後で、次にコードが替わる刻（無ければ小節の終わり） */
+function nextChordTickIn(bar,t){
+  t=t|0; let e=barTicks(song,bar);
+  (bar.notes||[]).forEach(n=>{ const x=n&&(n.start|0);
+    if(n&&n.kind!=='rest'&&n.chord&&n.chord.root!=null&&x>t&&x<e) e=x; });
+  const all=barChordAtAll(bar);
+  if(all) Object.keys(all).forEach(k=>{ const x=+k; if(x>t&&x<e) e=x; });
+  return e;
+}
+/* 刻みの型を [t,end) に切り出す。型が無ければ一つで伸ばす */
+function atabSegs(bar,t,end){
+  const key=song.meta.defaultRhythm;
+  const segs=[];
+  if(key){
+    const tmp={id:'_atab',timeSig:bar.timeSig||null,notes:[],marks:{}};
+    try{ applyRhythm(song,tmp,key,rhythmDirOf()); }catch(_){ tmp.notes=[]; }
+    (tmp.notes||[]).forEach(n=>{
+      if(!n||n.kind==='rest') return;
+      const a=Math.max(t,n.start), b=Math.min(end,n.start+n.len);
+      if(b>a) segs.push({start:a,len:b-a,stroke:(a===n.start)?(n.stroke||null):null});
+    });
+    segs.sort((x,y)=>x.start-y.start);
+    if(!segs.length||segs[0].start>t) segs.unshift({start:t,len:(segs.length?segs[0].start:end)-t,stroke:null});
+  }
+  if(!segs.length) segs.push({start:t,len:end-t,stroke:null});
+  return segs;
+}
+/* 置いたコードから押さえを書く。書いたら true */
+function autoTabSpan(bar,t,ch,opt){
+  if(chordTabPolicy()==='off') return false;
+  if(!bar||!ch||ch.root==null||(bar.marks&&bar.marks.nc)) return false;
+  t=t|0;
+  const end=nextChordTickIn(bar,t);
+  if(end<=t) return false;
+  const vo=(opt&&opt.voicing)?clone(opt.voicing):null;
+  const mkStops=()=>stopsFromChord(song,{chord:ch,voicing:vo});
+  if(!mkStops()) return false;
+  const ns=(bar.notes||[]).filter(Boolean);
+  const ov=ns.filter(n=>n.start<end&&n.start+n.len>t);
+  let hand=false, fills=[];
+  ov.forEach(n=>{
+    if(n.kind==='rest') return;
+    if(atabUntouched(n)){ if(n.atabFill&&n.start>=t) fills.push(n); return; }
+    if(!n.stops||!n.stops.length){ if(n.start>=t) fills.push(n); return; }   /* 刻みだけの音符 */
+    hand=true;
+  });
+  if(hand) return false;                  /* 手で置いた押さえがある＝空いていない */
+
+  /* ── 刻みだけの音符がある時：その刻みのまま押さえを入れる ── */
+  if(fills.length){
+    fills.forEach(n=>{ n.stops=mkStops(); if(n.kind==='rest') n.kind='chord'; n.voicing=vo?clone(vo):null; atabMark(n,true); });
+    return true;
+  }
+  /* ── 休符（と前のコードの自動の押さえ）だけ：書き直す ── */
+  const keep=[];
+  ns.forEach(n=>{
+    const a0=n.start, a1=n.start+n.len;
+    if(a1<=t||a0>=end){ keep.push(n); return; }
+    if(a0<t){
+      n.len=t-a0;
+      if(n.kind!=='rest'){ (n.stops||[]).forEach(o=>{ if(o.t) o.t.tie=false; }); n.tieOut=false; }
+      keep.push(n);
+      if(n.atab) atabMark(n,!!n.atabFill);
+    }
+    if(a1>end) keep.push(mkNote({start:end,len:a1-end,kind:'rest'}));
+  });
+  const made=atabSegs(bar,t,end).map((g,i)=>mkNote({start:g.start,len:g.len,kind:'chord',stops:mkStops(),
+    stroke:g.stroke||null,chord:(i===0)?clone(ch):null,voicing:vo?clone(vo):null}));
+  bar.notes=keep.concat(made);
+  normalizeBar(song,bar);
+  made.forEach(n=>atabMark(n,false));
+  /* 名は音符が持つ。同じ拍の控えは掃く（同じ拍に持ち主は一人） */
+  if(bar.chordAt&&bar.chordAt[t]!==undefined){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
+  return true;
+}
+/* 自動で書いた押さえを戻す（コードを動かした・消した時）。休符は繋げ直す */
+function revertAutoTab(bar,st){
+  if(!bar||!bar.notes) return 0;
+  st=st|0;
+  const end=nextChordTickIn(bar,st);
+  let n0=0;
+  bar.notes.forEach(n=>{
+    if(!n||n.start<st||n.start>=end||!atabUntouched(n)) return;
+    if(n.atabFill){ n.stops=null; n.voicing=null; }
+    else{ n.kind='rest'; n.stops=null; n.chord=null; n.voicing=null; n.stroke=null; n._atabR=true; }
+    atabClear(n); n0++;
+  });
+  if(!n0) return 0;
+  const plain=n=>n.kind==='rest'&&!(n.sym&&(n.sym.fermata||n.sym.tempo||n.sym.text||n.sym.hair));
+  const out=[];
+  bar.notes.filter(Boolean).sort((a,b)=>a.start-b.start).forEach(n=>{
+    const p=out[out.length-1];
+    if(p&&plain(p)&&plain(n)&&(p._atabR||n._atabR)&&p.start+p.len===n.start){ p.len+=n.len; p._atabR=true; return; }
+    out.push(n);
+  });
+  out.forEach(n=>{ delete n._atabR; });
+  bar.notes=out;
+  normalizeBar(song,bar);
+  return n0;
+}
+/* ══ 押さえの候補の列 ══ */
+function vpSpanNotes(bar,st){
+  const end=nextChordTickIn(bar,st);
+  return (bar.notes||[]).filter(n=>n&&n.start>=st&&n.start<end&&atabUntouched(n));
+}
+function vpSpanSig(bar,st){ return JSON.stringify((bar.notes||[]).filter(Boolean).map(n=>[n.start,n.atab||'',n.kind,(n.stops||[]).length])); }
+function vpickSet(o){
+  if(!o||!o.bar){ VPICK=null; return; }
+  VPICK={barId:o.bar.id,st:o.st|0,part:song.part||0,chord:clone(o.chord),span:vpSpanSig(o.bar,o.st|0)};
+}
+function vpickLive(){
+  const p=VPICK; if(!p) return null;
+  if(mode!=='edit'||(song.part||0)!==p.part||!tuningStd(song)){ VPICK=null; return null; }
+  const bar=findBar(song,p.barId);
+  if(!bar||vpSpanSig(bar,p.st)!==p.span){ VPICK=null; return null; }   /* 取り消し・手直しで姿が変われば引っ込む */
+  const ns=vpSpanNotes(bar,p.st); if(!ns.length){ VPICK=null; return null; }
+  return {p,bar,ns};
+}
+function vpickApply(fr){
+  const L=vpickLive(); if(!L) return;
+  const {p,bar}=L;
+  p.busy=true;
+  try{
+    tx('押さえを選ぶ',()=>{
+      const v=buildVoicing(fr.slice());
+      vpSpanNotes(bar,p.st).forEach(n=>{
+        const fill=!!n.atabFill;
+        n.voicing=clone(v); n.stops=stopsFromChord(song,{chord:p.chord,voicing:v}); atabMark(n,fill);
+      });
+      p.span=vpSpanSig(bar,p.st);      /* 選び直しても列は残す（tx の中で描き直されるため、先に控える） */
+    });
+  } finally { p.busy=false; }
+  if(VPICK===p) p.span=vpSpanSig(bar,p.st);
+  render();
+}
+function renderVPick(){
+  let el=$('vpick');
+  const L=vpickLive();
+  if(!L){ if(el) el.remove(); return; }
+  const {p,ns}=L;
+  const curFr=[0,1,2,3,4,5].map(i=>{ const o=(ns[0].stops||[]).find(x=>x.s===i); return o?o.f:null; });
+  const curSig=fretSig(curFr);
+  let cands=voicingCandidates(p.chord,12);
+  if(!cands.some(c=>fretSig(c.frets)===curSig))
+    cands=[{frets:curFr,label:voicingLabel(curFr,((p.chord.root%12)+12)%12)}].concat(cands);
+  if(!el){ el=document.createElement('div'); el.id='vpick'; el.className='vpick no-print'; document.body.appendChild(el); }
+  el.innerHTML='';
+  const hd=document.createElement('div'); hd.className='vp-hd';
+  const nm=document.createElement('span'); nm.className='vp-nm'; nm.textContent=chordName(p.chord,song.meta);
+  const lb=document.createElement('span'); lb.className='vp-lb'; lb.textContent='押さえを選ぶ';
+  hd.appendChild(nm); hd.appendChild(lb);
+  el.appendChild(hd);
+  const sc=document.createElement('div'); sc.className='vp-scroll';
+  cands.forEach(c=>{
+    const b=document.createElement('button'); b.type='button';
+    const on=(fretSig(c.frets)===curSig);
+    b.className='vp-card'+(on?' on':'');
+    b.title=fretText(c.frets)+'　'+c.label;
+    let svg='';
+    try{ svg=diagramSVG(buildVoicing(c.frets.slice()),{label:"none",sx:10,sy:7.2,padL:14}); }catch(_){ svg=''; }
+    b.innerHTML='<span class="vp-dg">'+svg+'</span>';
+    const cap=document.createElement('span'); cap.className='vp-cap'; cap.textContent=c.label;
+    b.appendChild(cap);
+    b.onclick=()=>{ if(!on) vpickApply(c.frets); };
+    sc.appendChild(b);
+  });
+  el.appendChild(sc);
+  const x=document.createElement('button'); x.type='button'; x.className='vp-x'; x.textContent='閉じる';
+  x.onclick=()=>{ VPICK=null; renderVPick(); };
+  el.appendChild(x);
+  /* いま選んでいる押さえを見える所へ */
+  const onEl=sc.querySelector('.vp-card.on');
+  if(onEl&&onEl.offsetLeft>sc.clientWidth-40) sc.scrollLeft=onEl.offsetLeft-12;
 }
 function cdgGhost(){
   const d=_cdg; if(!d||!_cpGhost) return;
@@ -32055,10 +32291,14 @@ document.addEventListener('pointerup',e=>{
     tx('コードを消す',()=>removeChordAt(bar0,d.st)); render(); toast('コードを消しました','取り消す',()=>doUndo(),4000);
   }else if(d.t&&!(d.t.barId===d.barId&&d.t.st===d.st)){
     const bar1=findBar(song,d.t.barId);
-    tx(d.mode==='copy'?'コードを写す':'コードを動かす',()=>{
+    /* 選び直した押さえは、コードと一緒に動く（tab-6.67） */
+    const on0=(bar0.notes||[]).find(x=>x&&(x.start|0)===(d.st|0)&&x.chord&&atabUntouched(x));
+    const vo=(on0&&on0.voicing)?clone(on0.voicing):null;
+    const wrote=tx(d.mode==='copy'?'コードを写す':'コードを動かす',()=>{
       if(d.mode!=='copy') removeChordAt(bar0,d.st);
-      putChordAt(bar1,d.t.st,Object.assign({},d.chord));
+      return putChordAt(bar1,d.t.st,Object.assign({},d.chord),{voicing:vo});
     });
+    vpickSet(wrote?{bar:bar1,st:d.t.st,chord:Object.assign({},d.chord)}:null);
     render();
   }
   _bgEatUntil=Date.now()+350;          /* 続く click で盤が開かないように（次に押す時は通す） */
@@ -35203,6 +35443,7 @@ function render(){
   if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
   if(MXEL) mixRender();        /* ミキサーも同じ（tab-6.45） */
   try{ renderChordPalette(); measureBot(); }catch(_){}   /* コードの札の列（tab-6.56） */
+  try{ renderVPick(); }catch(e){ console.error('[vpick]',e); }   /* 押さえの候補（tab-6.67） */
   renderModeBar();
   const paper=$('paper'); if(!paper) return;
   /* ══ 組み直しても、見ている所を失わない（tab-1.48）══
@@ -39396,22 +39637,41 @@ function fillBarDiagrams(row,bar,chords,prevKey,ctx){
   if(dgmMode!=='first'&&dgmMode!=='all') return;
   if(!tuningStd(song)) return;                       /* 変則チューニングでは当てにならない（tab-1.47） */
   if((bar.marks||{}).simile) return;                 /* シミレの小節は描かない */
-  const hits=shownChords(song,bar,chords,prevKey);
+  /* 名前が出る所に加え、同じコードのまま押さえが替わった所にも図を出す（tab-6.68） */
+  const hits=[];
+  { const base=shownChords(song,bar,chords,prevKey);
+    const {list}=timeline(song,bar);
+    let pk=(prevKey==null)?null:(ctx._dgmPrev||null);
+    (list||[]).forEach((n,ni)=>{
+      if((n.sym&&n.sym.tap)||n.kind==='brush'||n.kind==='rest') return;
+      const ch=(chords&&chords[ni]!==undefined)?chords[ni]:n.chord;
+      if(!ch||ch.root==null) return;
+      const sv=shownVoicing(song,n,ch); if(!sv.v) return;
+      const k=chordKey(ch)+'|'+(ch.bass??'')+'@'+fretSig(sv.v.frets);
+      if(base.some(h=>h.note===n)||k!==pk) hits.push({chord:ch,note:n});
+      pk=k;
+    });
+    ctx._dgmPrev=pk;
+  }
   hits.forEach(h=>{
-    const key=chordKey(h.chord);
+    /* 図は TAB に書いてある押さえを描く（tab-6.68）。
+       〈初めて出るところ〉は「コード＋押さえ」で数える——押さえが違えば、同じコードでも出す */
+    const sv=shownVoicing(song,h.note,h.chord);
+    const v=sv.v;
+    if(!v) return;
+    const key=chordKey(h.chord)+'@'+fretSig(v.frets);
     if(dgmMode==='first'){
       if(!ctx.seenDgm) ctx.seenDgm=new Set();
       if(ctx.seenDgm.has(key)) return;
       ctx.seenDgm.add(key);
     }
-    const pseudo={chord:h.chord,voicing:h.note.voicing};
-    const v=resolveVoicing(song,pseudo);
-    if(!v) return;
     const cell=document.createElement('button');
     cell.className='dgm-cell';
     cell.innerHTML=diagramSVG(v,{name:chordName(h.chord,song.meta),
-                                 capo:song.meta.capo>0,auto:isAutoVoicing(song,pseudo)});
-    cell.onclick=ev=>{ ev.stopPropagation(); openVoicingEditor({chord:clone(h.chord)}); };
+                                 capo:song.meta.capo>0,auto:sv.auto});
+    const ni=bar.notes.indexOf(h.note);
+    cell.onclick=ev=>{ ev.stopPropagation();
+      openVoicingEditor({chord:clone(h.chord),places:(ni>=0)?[{barId:bar.id,noteIdx:ni}]:null}); };
     row.appendChild(cell);
   });
 }
@@ -39434,15 +39694,19 @@ function levelDiagramRows(stages){
 }
 
 /* ══ 曲の先頭にコード一覧を並べる ══ */
+/* 「コード＋押さえ」ごとに一つ（tab-6.68）。同じ押さえで弾いている所を places に集める */
 function usedChords(s){
   const seen=new Map();
   const arr=arrangement(s);
   arr.forEach(a=>{
     const b=findBar(s,a.barId); if(!b) return;
-    b.notes.forEach(n=>{
+    b.notes.forEach((n,i)=>{
       if(n.kind==='rest'||!n.chord||n.chord.root==null) return;
-      const k=chordKey(n.chord);
-      if(k&&!seen.has(k)) seen.set(k,n);
+      const sv=shownVoicing(s,n,n.chord); if(!sv.v) return;
+      const k=chordKey(n.chord)+'@'+fretSig(sv.v.frets);
+      if(!seen.has(k)) seen.set(k,{n,sv,places:[]});
+      const e=seen.get(k);
+      if(!e.places.some(p=>p.barId===b.id&&p.noteIdx===i)) e.places.push({barId:b.id,noteIdx:i});
     });
   });
   return [...seen.entries()];
@@ -39453,35 +39717,93 @@ function renderDiagramHead(host){
   const list=usedChords(song);
   if(!list.length) return;
   const box=document.createElement('div'); box.className='dgm-head';
-  list.forEach(([k,n])=>{
-    const v=resolveVoicing(song,n), auto=isAutoVoicing(song,n);
+  list.forEach(([k,e])=>{
+    const n=e.n, v=e.sv.v, auto=e.sv.auto;
     const cell=document.createElement('button');
     cell.className='dgm-cell';
     cell.innerHTML=diagramSVG(v,{name:chordName(n.chord,song.meta),capo:song.meta.capo>0,auto});
-    cell.onclick=()=>openVoicingEditor({chord:clone(n.chord)});
+    cell.onclick=()=>openVoicingEditor({chord:clone(n.chord),places:e.places.slice()});
     box.appendChild(cell);
   });
   host.appendChild(box);
 }
 
 /* ══ 指板図エディタ ══ */
-let vedit=null;   /* {chord, frets, target:{barId,noteIdx}|null, scope:'song'|'note'} */
+let vedit=null;   /* {chord, frets, places:[{barId,noteIdx}]|null, scope:'song'|'note'} */
+
+/* ══ 押さえは一か所ずつ直せる（tab-6.68）══
+   L様——「コードのボイシングが個別に表示がしにくい。全部共通で変わっちゃう」。
+
+   図を押して開く窓は、相手の音符を渡されていなかったので
+   〈この曲のこのコード全部〉しか選べず、一か所直すと同じコードがすべて変わった。
+   また図は「そのコードに決めた押さえ」を描いていたので、TAB を手で直しても図は付いてこなかった。
+
+   決まり（L様の選択）：
+     ・図を押したら既定は「この箇所だけ」。窓の中で〈この曲のこのコード全部〉にも切り替えられる
+     ・図は TAB に書いてある押さえを描く（3弦以上を押さえている時。単音・重音は今まで通り決めた押さえ）
+     ・〈初めて出るところ〉〈曲の先頭にまとめる〉は「コード＋押さえ」ごとに出す
+   「この箇所」は、図の音符から次のコードまでの、同じ押さえで弾いている音符（刻みで並んだ物）を指す。 */
+function stopsFrets(n){
+  if(!n||n.kind==='rest'||!n.stops) return null;
+  const fr=[null,null,null,null,null,null]; let k=0;
+  n.stops.forEach(o=>{ if(o&&typeof o.f==='number'&&o.s>=0&&o.s<6){ fr[o.s]=o.f; k++; } });
+  return (k>=3)?fr:null;
+}
+function shownVoicing(s,n,ch){
+  const pseudo={chord:ch,voicing:n&&n.voicing};
+  const fr=stopsFrets(n);
+  const rv=resolveVoicing(s,pseudo);
+  if(fr){
+    if(n.voicing&&n.voicing.frets&&fretSig(n.voicing.frets)===fretSig(fr)) return {v:n.voicing,auto:false};
+    if(rv&&rv.frets&&fretSig(rv.frets)===fretSig(fr)) return {v:rv,auto:isAutoVoicing(s,pseudo)};
+    return {v:buildVoicing(fr),auto:false};
+  }
+  return {v:rv,auto:isAutoVoicing(s,pseudo)};
+}
+/* 一か所へ押さえを当てる。v=null は「曲の取り決め（無ければ自動）」へ戻す */
+function applyShapeAt(bar,idx,v,chord){
+  const n=bar&&bar.notes[idx]; if(!n) return;
+  const old=stopsFrets(n), oldSig=old?fretSig(old):null;
+  const end=nextChordTickIn(bar,n.start|0);
+  bar.notes.forEach((m,j)=>{
+    if(!m) return;
+    if(j!==idx){
+      if(!oldSig||m.kind==='rest'||m.start<=n.start||m.start>=end) return;
+      const f2=stopsFrets(m); if(!f2||fretSig(f2)!==oldSig) return;
+    }
+    const was=atabUntouched(m), fill=!!m.atabFill;
+    m.voicing=v?clone(v):null;
+    /* 単音・重音の旋律は図だけ変える（数字は書き換えない） */
+    const melody=m.stops&&m.stops.length&&!stopsFrets(m);
+    if(!melody){
+      const st=stopsFromChord(song,{chord:m.chord||chord,voicing:m.voicing});
+      if(st){ m.stops=st; if(m.kind==='rest') m.kind='chord'; }
+    }
+    if(was) atabMark(m,fill);
+  });
+}
+/* 曲じゅうのこのコードへ（辞書に合わせる） */
+function applyShapeAll(k,chord){
+  (song.bars||[]).forEach(b=>{
+    const idxs=[]; (b.notes||[]).forEach((m,i)=>{ if(m&&m.kind!=='rest'&&m.chord&&chordKey(m.chord)===k) idxs.push(i); });
+    idxs.forEach(i=>applyShapeAt(b,i,null,chord));
+  });
+}
 
 function openVoicingEditor(o){
   if(!o||!o.chord||o.chord.root==null){ toast('先にコードを入れてください'); return; }
   let base=null;
-  if(o.target){
-    const b=findBar(song,o.target.barId), n=b&&b.notes[o.target.noteIdx];
-    if(n) base=resolveVoicing(song,n);
+  const places=(o.places&&o.places.length)?o.places.slice():(o.target?[o.target]:null);
+  if(places){
+    const b=findBar(song,places[0].barId), n=b&&b.notes[places[0].noteIdx];
+    if(n){ const sv=shownVoicing(song,n,o.chord); base=sv.v; }
   }
   if(!base){
     const k=chordKey(o.chord);
     base=(song.voicings&&song.voicings[k])||autoVoicing(o.chord.root,o.chord.type,o.chord.bass);
   }
   vedit={ chord:clone(o.chord), frets:clone(base.frets), fingers:clone(base.fingers||[null,null,null,null,null,null]),
-          tool:'fret', target:o.target||null,
-          scope:(o.target&&(findBar(song,o.target.barId)||{}).notes&&
-                 ((findBar(song,o.target.barId).notes[o.target.noteIdx]||{}).voicing))?'note':'song' };
+          tool:'fret', places, scope:places?'note':'song' };
   renderVoicingEditor();
   openSheet('ov-vc');
 }
@@ -39612,8 +39934,8 @@ function renderVoicingEditor(){
   const scb=(v2,l)=>{ const b=document.createElement('button');
     b.className='btn'+(vedit.scope===v2?' pri':''); b.textContent=l;
     b.onclick=()=>{ vedit.scope=v2; renderVoicingEditor(); }; sc.appendChild(b); };
+  if(vedit.places) scb('note',vedit.places.length>1?('この押さえの所だけ（'+vedit.places.length+'か所）'):'この箇所だけ');
   scb('song','この曲のこのコード全部');
-  if(vedit.target) scb('note','この音符だけ');
   host.appendChild(sc);
 }
 
@@ -39622,17 +39944,13 @@ function saveVoicing(){
   const v=editorVoicing();
   if(!v.frets.some(f=>f!=null)){ toast('鳴る弦がありません'); return; }
   tx('押さえを決める',()=>{
-    if(vedit.scope==='note'&&vedit.target){
-      const b=findBar(song,vedit.target.barId), n=b&&b.notes[vedit.target.noteIdx];
-      if(n){ n.voicing=clone(v); fillStopsFromChord(song,n,true); }
+    if(vedit.scope==='note'&&vedit.places){
+      vedit.places.forEach(p=>applyShapeAt(findBar(song,p.barId),p.noteIdx,v,vedit.chord));
     } else {
       const k=chordKey(vedit.chord);
       song.voicings=song.voicings||{};
       song.voicings[k]=clone(v);
-      if(vedit.target){
-        const b=findBar(song,vedit.target.barId), n=b&&b.notes[vedit.target.noteIdx];
-        if(n) n.voicing=null;      /* 曲の辞書に合わせる */
-      }
+      applyShapeAll(k,vedit.chord);   /* 曲の辞書に合わせ、TAB も書き直す */
     }
   });
   closeVoicingEditor();
@@ -39642,10 +39960,12 @@ function resetVoicing(){
   if(!vedit) return;
   tx('押さえを自動に戻す',()=>{
     const k=chordKey(vedit.chord);
-    if(song.voicings) delete song.voicings[k];
-    if(vedit.target){
-      const b=findBar(song,vedit.target.barId), n=b&&b.notes[vedit.target.noteIdx];
-      if(n) n.voicing=null;
+    if(vedit.scope==='note'&&vedit.places){
+      const av=autoVoicing(vedit.chord.root,vedit.chord.type,vedit.chord.bass);
+      vedit.places.forEach(p=>applyShapeAt(findBar(song,p.barId),p.noteIdx,av,vedit.chord));
+    } else {
+      if(song.voicings) delete song.voicings[k];
+      applyShapeAll(k,vedit.chord);
     }
   });
   closeVoicingEditor();
