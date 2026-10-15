@@ -1401,6 +1401,8 @@ body.locked #paper::before{
 </style>
 <link rel="stylesheet" href="https://yagarguitar-stack.github.io/design-system/v1/components.css">
 <script src="https://yagarguitar-stack.github.io/design-system/v1/components.js"></script>
+<!-- 共通の楽器の音（tab-6.70）。ドラムを録音で鳴らす。読めない時は合成のドラムで鳴る -->
+<script src="https://yagarguitar-stack.github.io/design-system/v1/sound.js"></script>
 <style>
 /* ══════════════════════════════════════════
    録音スタジオの卓・夜（tab-6.30）
@@ -1742,6 +1744,13 @@ body.stamping #paper .mwrap{cursor:copy}
 @media (max-width:700px){ .vpick{gap:7px;padding:7px 8px} .vpick .vp-lb{display:none} }
 @media print{ .vpick{display:none!important} }
 
+.paperwrap{flex-wrap:wrap}
+.snd-credits{flex:0 0 100%;margin:8px 0 0;padding:0 16px;text-align:center}
+.snd-credits:empty{display:none}
+.snd-credits .ds-credits{font-size:11px;line-height:1.6;color:#8b8578;margin:0}
+.snd-credits .ds-credits a{color:inherit}
+@media print{ .snd-credits{display:none!important} }
+
 /* 盤の頭の取り消し・やり直し（tab-6.58） */
 .dk-nav .dk-undo{display:inline-flex;align-items:center;justify-content:center}
 .dk-nav .dk-undo:disabled{opacity:.35}
@@ -1788,6 +1797,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
   </div>
   <div class="paper" id="paper"></div>
   <div class="printfoot" id="printfoot"></div>
+  <div class="snd-credits no-print" id="sndcredits"></div>
 </div>
 
 <div class="botbar" id="botbar">
@@ -1879,7 +1889,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.69', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.70', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -16880,6 +16890,7 @@ function audioReady(){
   RECG=AC.createGain(); RECG.gain.value=recVolOf(); RECG.connect(MASTER);
   DRUMG=AC.createGain(); DRUMG.gain.value=DRUM_MIX; DRUMG.connect(MASTER);
   try{ mixApplyAll(); }catch(_){}     /* ミキサーの値を出口へ（tab-6.45） */
+  try{ smpBind(); }catch(_){}         /* 録音のドラムを読む（tab-6.70） */
   /* iOS の無音対策：長さ0のバッファを一度鳴らして解錠する */
   try{ const b=AC.createBuffer(1,1,22050); const src=AC.createBufferSource();
        src.buffer=b; src.connect(MASTER); src.start(0); }catch(e){}
@@ -17061,8 +17072,40 @@ function noiseSource(t,dur){
   s.start(t); s.stop(t+dur);
   return s;
 }
+/* ══ ドラムは録音で鳴らす——ことりノームと同じ仕様（tab-6.70）══
+   L様——「ドラムの音が以前と違う。リアルな音にしたはず」「ことりノームと同じ仕様にして」。
+   tab-6.20 で写したのは、ことりノームの**録音が読めない時の予備の合成ドラム**であった。
+   ことりノーム本体と同じく、共通の音（design-system/v1/sound.js）の録音（MusyngKite）で鳴らす。
+     ・強さ・鳴らす長さは、ことりノームの値をそのまま使う（SMP_DRUM／SMP_NORMAL）
+     ・ハイハットは閉じた音（ことりノームのドラムの刻みと同じ）
+     ・読み込みが済むまで・読めない時は、下の合成ドラムで鳴らす
+     ・出口はドラムの帯（DRUMG）——ミキサーの音量・パン・響き送りはそのまま効く
+     ・出典（CC BY-SA 3.0）は、ことりノームと同じく画面のいちばん下（紙の下）に載せる */
+var SMP_DRUM={ bd:{name:'kick',vel:0.833}, sn:{name:'snare',vel:1.016}, hh:{name:'hihat',vel:1.020}, hhs:{name:'hihat',vel:0.595} };
+var SMP_NORMAL={ kick:{dur:0.32,release:0.12}, snare:{dur:0.35,release:0.12}, hihat:{dur:0.16,release:0.08} };
+var _smpAC=null, _smpLoading=false;
+function smpOk(){ return !!(window.DS&&DS.sound&&DS.sound.drum); }
+function smpBind(){
+  if(!smpOk()||!AC) return;
+  if(_smpAC!==AC){ try{ DS.sound.use({context:AC}); _smpAC=AC; }catch(e){ return; } }
+  if(!_smpLoading){ _smpLoading=true; DS.sound.load('drums').then(smpCredits).catch(()=>{}); }
+}
+function smpCredits(){
+  const el=document.getElementById('sndcredits');
+  if(el&&smpOk()&&DS.sound.creditsHtml) el.innerHTML=DS.sound.creditsHtml(['drums']);
+}
+function smpDrum(t,type){
+  if(!smpOk()||!AC||!DRUMG) return false;
+  if(_smpAC!==AC) smpBind();
+  if(_smpAC!==AC||!DS.sound.isReady('drums')) return false;
+  const d=SMP_DRUM[type]; if(!d) return false;
+  const o={time:t,vel:d.vel,dest:DRUMG}, len=SMP_NORMAL[d.name];
+  if(len){ o.dur=len.dur; o.release=len.release; }
+  try{ DS.sound.drum(d.name,o); return true; }catch(e){ return false; }
+}
 function mdrm(t,type){
   if(!AC||!DRUMG) return;
+  if(smpDrum(t,type)) return;          /* 録音で鳴らせたら、合成はしない */
   const bus=DRUMG;
   if(type==='bd'){
     /* 生のバスドラムに寄せた作り。
