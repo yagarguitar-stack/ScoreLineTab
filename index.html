@@ -1920,7 +1920,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.71', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.72', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -16922,6 +16922,7 @@ function audioReady(){
   DRUMG=AC.createGain(); DRUMG.gain.value=DRUM_MIX; DRUMG.connect(MASTER);
   try{ mixApplyAll(); }catch(_){}     /* ミキサーの値を出口へ（tab-6.45） */
   try{ smpBind(); }catch(_){}         /* 録音のドラムを読む（tab-6.70） */
+  try{ compPrime(); }catch(_){}       /* コンプの通り抜けを測っておく（tab-6.72） */
   /* iOS の無音対策：長さ0のバッファを一度鳴らして解錠する */
   try{ const b=AC.createBuffer(1,1,22050); const src=AC.createBufferSource();
        src.buffer=b; src.connect(MASTER); src.start(0); }catch(e){}
@@ -18016,6 +18017,83 @@ function roomIR(kind){
 
 /* ══ エフェクトの列を組む（tab-2.99）══
    一度だけ組み、以後は摘みの値だけを差し替える。 */
+/* ══ コンプを作り直す（tab-6.72）══
+   L様——「コンプがすごい歪む」（掛けると薄く歪みが乗る）。
+
+   測ると原因は二つあった。
+     ① ブラウザのコンプは、こちらの持ち上げとは別に**自前でも音を持ち上げる**作り
+        （閾値と比率から決まる。−34dB・10倍では十数dB）。そこへ立ち上がり4ミリ秒・
+        比率10〜16倍で掛けていたので、低い弦では一周期の中で音量が動き、波形そのものが潰れた
+        （正弦波で 3倍音が −48dB）。
+     ② 掛けると出口が持ち上がり、クランチ等では 3〜6dB 大きくなっていた。
+        ※ 音の通り道を辿ると、コンプは実際には歪み（`guitarBus` の中）の**後ろ**に繋がっている
+          （エフェクトの列は音色の出口 `GTRIM` の後）。ゆえに歪みを深くしてはいない。
+          画面とヘルプの「コンプは歪みより前」は、繋ぎと食い違っている（未修正・L様に確認）。
+
+   直し方（L様の選択）：
+     ・掛かり方を実物のコンプに近い穏やかさにする——立ち上がり20ミリ秒・戻り0.45秒、比率は2〜5倍、
+       膝（掛かり始めの丸み）を付ける。歪み（3倍音）を決めるのは主に**戻りの速さ**であった
+       （戻りが速いと一周期ごとに音量が揺れる）。6弦開放で −47dB → −58dB 前後
+     ・掛けても掛けなくても**同じ大きさで次へ送る**。ギターの弾く強さ（実効値 −16.5dB）の音で
+       コンプの通り抜け（自前の持ち上げ込み）を実際に測り、その逆数を掛ける。
+       ゆえに大きい音はそのまま、小さい音（減衰の尾）だけが持ち上がる——コンプ本来の働きである。
+   測りは音の器ができた時に、選べる強さの分だけ裏で済ませる（一回 0.5 秒の書き出し×4）。 */
+var COMP_REF_DB=-16.5;   /* 弾く強さの音（実効値）で、掛けても掛けなくても同じ大きさに（音色4つで ±1.5dB 以内） */
+function compParams(a){
+  a=Math.max(0,Math.min(1.5,+a||0));
+  return {thr:+(-18-a*11).toFixed(2), ratio:+(2+a*2.4).toFixed(2), knee:10, attack:0.020, release:0.45};
+}
+const _compGain=new Map();
+function compKey(cp){ return [cp.thr,cp.ratio,cp.knee,cp.attack,cp.release].join('|'); }
+/* 見積もり（測り終えるまでの仮の値）。ブラウザの自前の持ち上げはおよそ (閾値の深さ×(1−1/比率))×0.6 dB */
+function compEstimate(cp){
+  const refDb=COMP_REF_DB, over=Math.max(0,refDb-cp.thr);
+  const red=over*(1-1/cp.ratio);
+  const auto=(-cp.thr)*(1-1/cp.ratio)*0.6;
+  return Math.pow(10,(red-auto)/20);
+}
+function compMatchGain(cp){
+  const k=compKey(cp);
+  if(_compGain.has(k)) return _compGain.get(k);
+  compMeasure(cp);
+  return compEstimate(cp);
+}
+let _compBusy=new Set();
+function compMeasure(cp){
+  const k=compKey(cp);
+  if(_compGain.has(k)||_compBusy.has(k)) return;
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return;
+  _compBusy.add(k);
+  try{
+    const sr=44100, len=Math.round(sr*0.5);
+    const oc=new OAC(1,len,sr);
+    const o=oc.createOscillator(); o.frequency.value=220;
+    const g=oc.createGain(); g.gain.value=Math.pow(10,COMP_REF_DB/20)*Math.SQRT2;
+    const c=oc.createDynamicsCompressor();
+    c.threshold.value=cp.thr; c.ratio.value=cp.ratio; c.knee.value=cp.knee; c.attack.value=cp.attack; c.release.value=cp.release;
+    o.connect(g); g.connect(c); c.connect(oc.destination); o.start(0);
+    const done=buf=>{
+      const d=buf.getChannelData(0), from=Math.round(len*0.6);
+      let sum=0; for(let i=from;i<len;i++) sum+=d[i]*d[i];
+      const rms=Math.sqrt(sum/(len-from)), ref=Math.pow(10,COMP_REF_DB/20);
+      const gain=(rms>1e-6)?Math.max(0.05,Math.min(4,ref/rms)):compEstimate(cp);
+      _compGain.set(k,gain); _compBusy.delete(k);
+      /* 測り終えたら、いま掛かっている通り道へ配る */
+      try{ compApplyMeasured(); }catch(_){}
+    };
+    const r=oc.startRendering();
+    if(r&&r.then) r.then(done).catch(()=>_compBusy.delete(k));
+    else oc.oncomplete=e=>done(e.renderedBuffer);
+  }catch(e){ _compBusy.delete(k); }
+}
+function compPrime(){ FX_COMP.forEach(([v])=>{ const a=parseFloat(v); if(a>0) compMeasure(compParams(a)); }); }
+function compApplyMeasured(){
+  const put=(c,w)=>{ if(!c||!w||!(w.gain.value>0)) return;
+    const cp={thr:+c.threshold.value.toFixed(2),ratio:+c.ratio.value.toFixed(2),knee:c.knee.value,attack:+c.attack.value.toFixed(3),release:+c.release.value.toFixed(2)};
+    const k=compKey(cp); if(_compGain.has(k)) w.gain.value=_compGain.get(k); };
+  put(FXCOMP,FXCOMP_WET);
+  if(typeof _BUSES!=='undefined') _BUSES.forEach(o=>put(o.FXCOMP,o.FXCOMP_WET));
+}
 function fxChain(){
   if(!AC) return null;
   if(FXIN) return FXIN;
@@ -18513,18 +18591,15 @@ function fxApply(){
   /* コンプ */
   {
     const a=fxNum(s,'comp',0);
-    if(FXCOMP){
-      /* 掛かりを深く（tab-3.10）。−30dB では和音の頭しか捕まらない */
-      /* **−42dB より下げない。** それ以下では弦の減衰まで潰し、
-         音が伸びっぱなしの平らな塊になる */
-      FXCOMP.threshold.value=Math.max(-42,-24-a*14);
-      FXCOMP.ratio.value=Math.min(16,3+a*10);
-      FXCOMP.attack.value=0.004; FXCOMP.release.value=0.14;
-      /* 潰したぶんを持ち上げないと、掛けるほど音が引っ込む */
-      if(FXCOMP_WET) FXCOMP_WET.gain.value=1+a*0.6;
+    const cp=compParams(a);
+    if(FXCOMP&&a){
+      FXCOMP.threshold.value=cp.thr; FXCOMP.ratio.value=cp.ratio; FXCOMP.knee.value=cp.knee;
+      FXCOMP.attack.value=cp.attack; FXCOMP.release.value=cp.release;
     }
     mix(FXCOMP_DRY,FXCOMP_WET,a?Math.min(1,a):0,FXCOMP_SEND);
     if(FXCOMP_DRY&&a) FXCOMP_DRY.gain.value=0;   /* コンプは掛けたら素の音は要らない */
+    /* 出口の大きさを、掛けない時と揃える（tab-6.72）。測り終えるまでは見積もりで */
+    if(FXCOMP_WET&&a) FXCOMP_WET.gain.value=compMatchGain(cp);
   }
   /* ══ ワウ（tab-3.01）══
      濾しは一つ。型によって**動かすかどうか**だけが変わる。 */
