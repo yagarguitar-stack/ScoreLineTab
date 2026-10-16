@@ -1923,7 +1923,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.75', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.76', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -12598,15 +12598,20 @@ function openTabRadial(barId,idx,str,cx,cy,drag,gtick,atTick){
         :(!nx||nx.kind==='rest')?(nb?'次の小節の頭に音符がございません':'次に音符がございません')
         :(!pairs.length)?'次の音符に、同じ弦の押さえがございません'
         :null;
-      return {t:'⌣', sub:on?'つながりを外す':(nb?'次の小節へ 弧でつなぐ':'次へ 弧でつなぐ'), on,
-        off:needStops||why,
-        fn:one(on?'つながりを外す':'次の音符へつなぐ',()=>{
-          if(on){
-            (n.stops||[]).forEach(x=>{ x.t=x.t||{}; delete x.t.tie; });
-            pairs.forEach(pr=>{ pr.b.t=pr.b.t||{};
+      /* ══ 和音は、まとめてか・その弦だけかを選ぶ（tab-6.76）══
+         L様——「和音をタイするときまとめてつけるかその弦だけするかを選べるようにしたい」。
+         選択：和音（繋げる弦が二本以上）の時だけ二段目の輪を開き、〈和音まとめて〉
+         〈この弦だけ〉から選ぶ（P.M. の締め方と同じ作法）。外す時も同じく選ぶ。
+         単音（繋げる弦が一本）の時は、今まで通り一押しで掛かる。
+         `only`＝弦の番号なら、その弦だけを掛ける／外す。null なら全弦。 */
+      const doJoin=(off2,only)=>{
+        const use=(only==null)?pairs:pairs.filter(pr=>pr.a.s===only);
+          if(off2){
+            (n.stops||[]).forEach(x=>{ if(only!=null&&x.s!==only) return; x.t=x.t||{}; delete x.t.tie; });
+            use.forEach(pr=>{ pr.b.t=pr.b.t||{};
               if(TECH_LINK[pr.b.t.link]){ delete pr.b.t.link; delete pr.b.t.auto; } });
           }else{
-            pairs.forEach(pr=>{
+            use.forEach(pr=>{
               pr.a.t=pr.a.t||{}; pr.b.t=pr.b.t||{};
               /* ══ 張ったまま繋ぐなら、装飾音符も一緒に置く（tab-4.48）══
                  L様——「タイで次の音に繋ぐが装飾音符にもつながらないと面倒。
@@ -12644,7 +12649,19 @@ function openTabRadial(barId,idx,str,cx,cy,drag,gtick,atTick){
           /* またいだ先の小節も、その場で正す（後始末は小節ごとゆえ） */
           if(nb){ syncTieOut(nb); sanitizeBarLinks(song,nb); }
           sanitizeTiesAcross(song);
-        })}; })(),
+      };
+      const strOn=si=>{ const x=(n.stops||[]).find(q=>q.s===si); if(x&&x.t&&x.t.tie) return true;
+        const pr=pairs.find(q=>q.a.s===si); return !!(pr&&pr.b.t&&TECH_LINK[pr.b.t.link]); };
+      const onStrs=(n.stops||[]).map(q=>q.s).filter(strOn);
+      const chordy=on?(onStrs.length>=2||(onStrs.length>=1&&pairs.length>=2)):(pairs.length>=2);
+      const label0=on?'つながりを外す':'次の音符へつなぐ';
+      return {t:'⌣', sub:on?'つながりを外す':(nb?'次の小節へ 弧でつなぐ':'次へ 弧でつなぐ'), on,
+        off:needStops||why,
+        fn:chordy?(()=>openTieScopeRadial({barId,idx,str,cx,cy,on,
+                    thisOn:strOn(str), thisCan:pairs.some(pr=>pr.a.s===str),
+                    all:one(label0,()=>doJoin(on,null)),
+                    one:v=>one(v?'この弦のつながりを外す':'この弦だけ次へつなぐ',()=>doJoin(v,str))}))
+           :one(label0,()=>doJoin(on,null))}; })(),
     /* `let ring` は〈くわしく〉へ譲った（tab-4.03）。
        **音を伸ばしっぱなしにする印**であって、繋がりの技ではない */
     /* ══ 戻しは、チョーキングの輪へ移した（tab-3.84 → 3.98）══
@@ -13531,6 +13548,18 @@ function openPmRadial(barId,idx,cx,cy){
     cur ? {t:'外す', fn:set(null)}
         : {t:'← 戻る', fn:()=>openTabRadial(barId,idx,0,cx,cy)},
     false);
+}
+/* 和音の ⌣ の二段目（tab-6.76）。右に〈和音まとめて〉、左に〈この弦だけ〉、中心は戻る */
+function openTieScopeRadial(o){
+  /* 二区画は狭いので、主題は短く（中心の〈戻る〉に被らないよう）、くわしくは副題で */
+  const sl=STR_LABEL[o.str]+'弦';
+  const items=[
+    {t:'全弦', sub:o.on?'まとめて外す':'まとめて', on:false, fn:()=>{ o.all(); }},   /* 右 */
+    {t:sl, sub:o.thisOn?'だけ外す':'だけ', on:false,
+     off:(!o.thisOn&&!o.thisCan)?'この弦は、次の音符に同じ弦の押さえがございません':null,
+     fn:()=>{ o.one(o.thisOn)(); }},                                                                    /* 左 */
+  ];
+  openRadial(o.cx,o.cy,items,{t:'← 戻る', fn:()=>openTabRadial(o.barId,o.idx,o.str,o.cx,o.cy)},false);
 }
 function openHarmRadial(barId,idx,str,cx,cy){
   const bar=findBar(song,barId); if(!bar) return;
