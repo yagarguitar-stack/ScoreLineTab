@@ -1920,7 +1920,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.72', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.73', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2233,7 +2233,7 @@ function normFx(o){
 function normSound(o){
   if(!o||typeof o!=='object') return null;
   const out={};
-  ['tone','body','drive','sustain'].forEach(k=>{
+  ['tone','body','drive','cdrive','sustain'].forEach(k=>{
     const v=o[k];
     if(v!==undefined&&v!==null&&(typeof v==='string'||typeof v==='number')) out[k]=v;
   });
@@ -3200,7 +3200,7 @@ function bindSecSound(s){
 function mergeSound(a,b){
   if(!a&&!b) return null;
   const out=Object.assign({},a||{});
-  ['tone','body','drive','sustain'].forEach(k=>{ if(b&&b[k]!=null) out[k]=b[k]; });
+  ['tone','body','drive','cdrive','sustain'].forEach(k=>{ if(b&&b[k]!=null) out[k]=b[k]; });
   const fx=Object.assign({},(a&&a.fx)||{},(b&&b.fx)||{});
   if(Object.keys(fx).length) out.fx=fx; else delete out.fx;
   return normSound(out);
@@ -9272,6 +9272,7 @@ function openSoundSheet(cfg){
   row('音色',TONES.map(t=>[t.id,t.label||t.id]),'tone');
   row('胴の鳴り',BODY_AMT,'body');
   row('歪みの強さ',DRIVE_AMT,'drive');
+  row('クリーンの歪み',CDRIVE_AMT,'cdrive');
   row('弦の伸び',SUSTAIN_AMT,'sustain');
   row('コンプレッサー',FX_COMP,'comp',true);
   row('ワウ',FX_WAH,'wah',true);
@@ -16923,6 +16924,7 @@ function audioReady(){
   try{ mixApplyAll(); }catch(_){}     /* ミキサーの値を出口へ（tab-6.45） */
   try{ smpBind(); }catch(_){}         /* 録音のドラムを読む（tab-6.70） */
   try{ compPrime(); }catch(_){}       /* コンプの通り抜けを測っておく（tab-6.72） */
+  try{ csMeasureLatency(); }catch(_){} /* クリーンの歪みの遅れを測る（tab-6.73） */
   /* iOS の無音対策：長さ0のバッファを一度鳴らして解錠する */
   try{ const b=AC.createBuffer(1,1,22050); const src=AC.createBufferSource();
        src.buffer=b; src.connect(MASTER); src.start(0); }catch(e){}
@@ -17774,6 +17776,30 @@ function driveAmt(s){
   const v=parseFloat(sndPick(s,'drive',undefined));
   return (isFinite(v)&&v>=0.2&&v<=2.5)?v:DRIVE_DEF;
 }
+/* クリーンの歪み（tab-6.73）。0〜1、既定 0（今までの曲は真っさらのまま） */
+const CS_MAX=0.30;       /* 混ぜる量の上限 */
+const CS_ENV_K=1.24;     /* 包絡の掛け戻し（潰した道の基音を元の大きさに揃える。測って決めた値） */
+/* 4倍の細かさで潰す時のブラウザの遅れ（秒）。音の器ができた時に測る。測れなければ Chrome の値 */
+let _csLat=null;
+function csLatency(){ return (_csLat!=null)?_csLat:(192/((AC&&AC.sampleRate)||44100)); }
+function csMeasureLatency(){
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC||_csLat!=null) return;
+  try{
+    const sr=(AC&&AC.sampleRate)||44100, len=4096, oc=new OAC(1,len,sr);
+    const buf=oc.createBuffer(1,len,sr); buf.getChannelData(0)[100]=0.5;
+    const src=oc.createBufferSource(); src.buffer=buf;
+    const sh=oc.createWaveShaper(); sh.oversample='4x'; sh.curve=new Float32Array([-1,0,1]);
+    src.connect(sh); sh.connect(oc.destination); src.start(0);
+    const done=o=>{ const d=o.getChannelData(0); let mi=0; for(let i=0;i<len;i++) if(Math.abs(d[i])>Math.abs(d[mi])) mi=i;
+      _csLat=Math.max(0,Math.min(0.04,(mi-100)/sr)); try{ busDirtyAll(); }catch(_){} };
+    const r=oc.startRendering(); if(r&&r.then) r.then(done).catch(()=>{}); else oc.oncomplete=e=>done(e.renderedBuffer);
+  }catch(_){}
+}
+const CDRIVE_AMT=[['0','なし（真っさら）'],['0.25','ほんのり'],['0.5','少し'],['0.75','しっかり'],['1','いちばん']];
+function cdriveAmt(s){
+  const v=parseFloat(sndPick(s,'cdrive',undefined));
+  return (isFinite(v)&&v>=0&&v<=1)?Math.round(v*100)/100:0;
+}
 function bodyAmt(s){
   const v=parseFloat(sndPick(s,'body',undefined));
   return (isFinite(v)&&v>=0&&v<=2)?v:BODY_DEF;
@@ -17866,6 +17892,8 @@ function bodyIR(tn){
 /* 胴は**一本の通り道**で作る。声ごとに持たせると和音のたびに増える。
    音色を変える時は節点を作り直さず、応答と混ぜ具合だけ入れ替える。 */
 let GBUS=null, GDRY=null, GWET=null, GCONV=null, GTRIM=null, _gbId=null;
+/* コンプの後ろの合流点（tab-6.73）と、クリーンの歪みの節点一式（tab-6.73） */
+let GPOST=null, GCS=null;
 /* ══ エフェクトの段（tab-2.99）══
    `GTRIM`（音色の出口）から `MASTER` までのあいだに一列で繋ぐ。
    使わない段は wet を 0 にして素通りさせる——繋ぎ替えると、
@@ -17920,9 +17948,9 @@ let GLP2=null,GPRE2=null,GSHP2=null,_shpK2=null;   /* 二段目の潰し（tab-1
 /* 出口の音量・パン・目盛り（tab-6.45）。これもパートごとの部品として差し替える */
 let PMIX=null, PPAN=null, PMET=null, PSEND=null;   /* PSEND：響きへ送る量（tab-6.46） */
 const _BUSES=new Map(); let _busCur=0;
-function busFresh(){ return {GBUS:null, GDRY:null, GWET:null, GCONV:null, GTRIM:null, _gbId:null, FXIN:null, FXOUT:null, _fxId:null, _fxLFO:[], FXCOMP:null, FXCOMP_DRY:null, FXCOMP_WET:null, FXWAH:null, FXWAH_DRY:null, FXWAH_WET:null, FXWAH_LFO:null, FXWAH_DEPTH:null, FXWAH_UP:null, FXPH_DRY:null, FXPH_WET:null, FXPH_LFO:null, FXPH_DEPTH:null, FXPH_FB:null, FXCH_DRY:null, FXCH_WET:null, FXCH_LFO:[], FXCH_DEPTH:[], FXFL_DRY:null, FXFL_WET:null, FXFL_LFO:null, FXFL_DEPTH:null, FXFL_FB:null, FXTR:null, FXTR_LFO:null, FXTR_DEPTH:null, FXDL_DRY:null, FXDL_WET:null, FXDL_D:null, FXDL_FB:null, FXDL_LP:null, FXRV_DRY:null, FXRV_WET:null, FXRV_CONV:null, FXRV_PRE:null, FXTRIM:null, FXCOMP_SEND:null, FXWAH_SEND:null, FXPH_SEND:null, FXDL_SEND:null, FXRV_SEND:null, _fxWired:false, FXTR_START:null, _trHz:5, _trWave:'sine', FXWAH_START:null, GPRE:null, GSHP:null, GCAB:null, GMID:null, GDIRT:null, GCLEAN:null, _shpK:null, GHP:null, GRECT:null, _shpR:null, GLP2:null, GPRE2:null, GSHP2:null, _shpK2:null, PMIX:null, PPAN:null, PMET:null, PSEND:null}; }
-function busSave(){ return {GBUS:GBUS, GDRY:GDRY, GWET:GWET, GCONV:GCONV, GTRIM:GTRIM, _gbId:_gbId, FXIN:FXIN, FXOUT:FXOUT, _fxId:_fxId, _fxLFO:_fxLFO, FXCOMP:FXCOMP, FXCOMP_DRY:FXCOMP_DRY, FXCOMP_WET:FXCOMP_WET, FXWAH:FXWAH, FXWAH_DRY:FXWAH_DRY, FXWAH_WET:FXWAH_WET, FXWAH_LFO:FXWAH_LFO, FXWAH_DEPTH:FXWAH_DEPTH, FXWAH_UP:FXWAH_UP, FXPH_DRY:FXPH_DRY, FXPH_WET:FXPH_WET, FXPH_LFO:FXPH_LFO, FXPH_DEPTH:FXPH_DEPTH, FXPH_FB:FXPH_FB, FXCH_DRY:FXCH_DRY, FXCH_WET:FXCH_WET, FXCH_LFO:FXCH_LFO, FXCH_DEPTH:FXCH_DEPTH, FXFL_DRY:FXFL_DRY, FXFL_WET:FXFL_WET, FXFL_LFO:FXFL_LFO, FXFL_DEPTH:FXFL_DEPTH, FXFL_FB:FXFL_FB, FXTR:FXTR, FXTR_LFO:FXTR_LFO, FXTR_DEPTH:FXTR_DEPTH, FXDL_DRY:FXDL_DRY, FXDL_WET:FXDL_WET, FXDL_D:FXDL_D, FXDL_FB:FXDL_FB, FXDL_LP:FXDL_LP, FXRV_DRY:FXRV_DRY, FXRV_WET:FXRV_WET, FXRV_CONV:FXRV_CONV, FXRV_PRE:FXRV_PRE, FXTRIM:FXTRIM, FXCOMP_SEND:FXCOMP_SEND, FXWAH_SEND:FXWAH_SEND, FXPH_SEND:FXPH_SEND, FXDL_SEND:FXDL_SEND, FXRV_SEND:FXRV_SEND, _fxWired:_fxWired, FXTR_START:FXTR_START, _trHz:_trHz, _trWave:_trWave, FXWAH_START:FXWAH_START, GPRE:GPRE, GSHP:GSHP, GCAB:GCAB, GMID:GMID, GDIRT:GDIRT, GCLEAN:GCLEAN, _shpK:_shpK, GHP:GHP, GRECT:GRECT, _shpR:_shpR, GLP2:GLP2, GPRE2:GPRE2, GSHP2:GSHP2, _shpK2:_shpK2, PMIX:PMIX, PPAN:PPAN, PMET:PMET, PSEND:PSEND}; }
-function busLoad(o){ GBUS=o.GBUS; GDRY=o.GDRY; GWET=o.GWET; GCONV=o.GCONV; GTRIM=o.GTRIM; _gbId=o._gbId; FXIN=o.FXIN; FXOUT=o.FXOUT; _fxId=o._fxId; _fxLFO=o._fxLFO; FXCOMP=o.FXCOMP; FXCOMP_DRY=o.FXCOMP_DRY; FXCOMP_WET=o.FXCOMP_WET; FXWAH=o.FXWAH; FXWAH_DRY=o.FXWAH_DRY; FXWAH_WET=o.FXWAH_WET; FXWAH_LFO=o.FXWAH_LFO; FXWAH_DEPTH=o.FXWAH_DEPTH; FXWAH_UP=o.FXWAH_UP; FXPH_DRY=o.FXPH_DRY; FXPH_WET=o.FXPH_WET; FXPH_LFO=o.FXPH_LFO; FXPH_DEPTH=o.FXPH_DEPTH; FXPH_FB=o.FXPH_FB; FXCH_DRY=o.FXCH_DRY; FXCH_WET=o.FXCH_WET; FXCH_LFO=o.FXCH_LFO; FXCH_DEPTH=o.FXCH_DEPTH; FXFL_DRY=o.FXFL_DRY; FXFL_WET=o.FXFL_WET; FXFL_LFO=o.FXFL_LFO; FXFL_DEPTH=o.FXFL_DEPTH; FXFL_FB=o.FXFL_FB; FXTR=o.FXTR; FXTR_LFO=o.FXTR_LFO; FXTR_DEPTH=o.FXTR_DEPTH; FXDL_DRY=o.FXDL_DRY; FXDL_WET=o.FXDL_WET; FXDL_D=o.FXDL_D; FXDL_FB=o.FXDL_FB; FXDL_LP=o.FXDL_LP; FXRV_DRY=o.FXRV_DRY; FXRV_WET=o.FXRV_WET; FXRV_CONV=o.FXRV_CONV; FXRV_PRE=o.FXRV_PRE; FXTRIM=o.FXTRIM; FXCOMP_SEND=o.FXCOMP_SEND; FXWAH_SEND=o.FXWAH_SEND; FXPH_SEND=o.FXPH_SEND; FXDL_SEND=o.FXDL_SEND; FXRV_SEND=o.FXRV_SEND; _fxWired=o._fxWired; FXTR_START=o.FXTR_START; _trHz=o._trHz; _trWave=o._trWave; FXWAH_START=o.FXWAH_START; GPRE=o.GPRE; GSHP=o.GSHP; GCAB=o.GCAB; GMID=o.GMID; GDIRT=o.GDIRT; GCLEAN=o.GCLEAN; _shpK=o._shpK; GHP=o.GHP; GRECT=o.GRECT; _shpR=o._shpR; GLP2=o.GLP2; GPRE2=o.GPRE2; GSHP2=o.GSHP2; _shpK2=o._shpK2; PMIX=o.PMIX; PPAN=o.PPAN; PMET=o.PMET; PSEND=o.PSEND; }
+function busFresh(){ return {GPOST:null, GCS:null, GBUS:null, GDRY:null, GWET:null, GCONV:null, GTRIM:null, _gbId:null, FXIN:null, FXOUT:null, _fxId:null, _fxLFO:[], FXCOMP:null, FXCOMP_DRY:null, FXCOMP_WET:null, FXWAH:null, FXWAH_DRY:null, FXWAH_WET:null, FXWAH_LFO:null, FXWAH_DEPTH:null, FXWAH_UP:null, FXPH_DRY:null, FXPH_WET:null, FXPH_LFO:null, FXPH_DEPTH:null, FXPH_FB:null, FXCH_DRY:null, FXCH_WET:null, FXCH_LFO:[], FXCH_DEPTH:[], FXFL_DRY:null, FXFL_WET:null, FXFL_LFO:null, FXFL_DEPTH:null, FXFL_FB:null, FXTR:null, FXTR_LFO:null, FXTR_DEPTH:null, FXDL_DRY:null, FXDL_WET:null, FXDL_D:null, FXDL_FB:null, FXDL_LP:null, FXRV_DRY:null, FXRV_WET:null, FXRV_CONV:null, FXRV_PRE:null, FXTRIM:null, FXCOMP_SEND:null, FXWAH_SEND:null, FXPH_SEND:null, FXDL_SEND:null, FXRV_SEND:null, _fxWired:false, FXTR_START:null, _trHz:5, _trWave:'sine', FXWAH_START:null, GPRE:null, GSHP:null, GCAB:null, GMID:null, GDIRT:null, GCLEAN:null, _shpK:null, GHP:null, GRECT:null, _shpR:null, GLP2:null, GPRE2:null, GSHP2:null, _shpK2:null, PMIX:null, PPAN:null, PMET:null, PSEND:null}; }
+function busSave(){ return {GPOST:GPOST, GCS:GCS, GBUS:GBUS, GDRY:GDRY, GWET:GWET, GCONV:GCONV, GTRIM:GTRIM, _gbId:_gbId, FXIN:FXIN, FXOUT:FXOUT, _fxId:_fxId, _fxLFO:_fxLFO, FXCOMP:FXCOMP, FXCOMP_DRY:FXCOMP_DRY, FXCOMP_WET:FXCOMP_WET, FXWAH:FXWAH, FXWAH_DRY:FXWAH_DRY, FXWAH_WET:FXWAH_WET, FXWAH_LFO:FXWAH_LFO, FXWAH_DEPTH:FXWAH_DEPTH, FXWAH_UP:FXWAH_UP, FXPH_DRY:FXPH_DRY, FXPH_WET:FXPH_WET, FXPH_LFO:FXPH_LFO, FXPH_DEPTH:FXPH_DEPTH, FXPH_FB:FXPH_FB, FXCH_DRY:FXCH_DRY, FXCH_WET:FXCH_WET, FXCH_LFO:FXCH_LFO, FXCH_DEPTH:FXCH_DEPTH, FXFL_DRY:FXFL_DRY, FXFL_WET:FXFL_WET, FXFL_LFO:FXFL_LFO, FXFL_DEPTH:FXFL_DEPTH, FXFL_FB:FXFL_FB, FXTR:FXTR, FXTR_LFO:FXTR_LFO, FXTR_DEPTH:FXTR_DEPTH, FXDL_DRY:FXDL_DRY, FXDL_WET:FXDL_WET, FXDL_D:FXDL_D, FXDL_FB:FXDL_FB, FXDL_LP:FXDL_LP, FXRV_DRY:FXRV_DRY, FXRV_WET:FXRV_WET, FXRV_CONV:FXRV_CONV, FXRV_PRE:FXRV_PRE, FXTRIM:FXTRIM, FXCOMP_SEND:FXCOMP_SEND, FXWAH_SEND:FXWAH_SEND, FXPH_SEND:FXPH_SEND, FXDL_SEND:FXDL_SEND, FXRV_SEND:FXRV_SEND, _fxWired:_fxWired, FXTR_START:FXTR_START, _trHz:_trHz, _trWave:_trWave, FXWAH_START:FXWAH_START, GPRE:GPRE, GSHP:GSHP, GCAB:GCAB, GMID:GMID, GDIRT:GDIRT, GCLEAN:GCLEAN, _shpK:_shpK, GHP:GHP, GRECT:GRECT, _shpR:_shpR, GLP2:GLP2, GPRE2:GPRE2, GSHP2:GSHP2, _shpK2:_shpK2, PMIX:PMIX, PPAN:PPAN, PMET:PMET, PSEND:PSEND}; }
+function busLoad(o){ GPOST=o.GPOST||null; GCS=o.GCS||null; GBUS=o.GBUS; GDRY=o.GDRY; GWET=o.GWET; GCONV=o.GCONV; GTRIM=o.GTRIM; _gbId=o._gbId; FXIN=o.FXIN; FXOUT=o.FXOUT; _fxId=o._fxId; _fxLFO=o._fxLFO; FXCOMP=o.FXCOMP; FXCOMP_DRY=o.FXCOMP_DRY; FXCOMP_WET=o.FXCOMP_WET; FXWAH=o.FXWAH; FXWAH_DRY=o.FXWAH_DRY; FXWAH_WET=o.FXWAH_WET; FXWAH_LFO=o.FXWAH_LFO; FXWAH_DEPTH=o.FXWAH_DEPTH; FXWAH_UP=o.FXWAH_UP; FXPH_DRY=o.FXPH_DRY; FXPH_WET=o.FXPH_WET; FXPH_LFO=o.FXPH_LFO; FXPH_DEPTH=o.FXPH_DEPTH; FXPH_FB=o.FXPH_FB; FXCH_DRY=o.FXCH_DRY; FXCH_WET=o.FXCH_WET; FXCH_LFO=o.FXCH_LFO; FXCH_DEPTH=o.FXCH_DEPTH; FXFL_DRY=o.FXFL_DRY; FXFL_WET=o.FXFL_WET; FXFL_LFO=o.FXFL_LFO; FXFL_DEPTH=o.FXFL_DEPTH; FXFL_FB=o.FXFL_FB; FXTR=o.FXTR; FXTR_LFO=o.FXTR_LFO; FXTR_DEPTH=o.FXTR_DEPTH; FXDL_DRY=o.FXDL_DRY; FXDL_WET=o.FXDL_WET; FXDL_D=o.FXDL_D; FXDL_FB=o.FXDL_FB; FXDL_LP=o.FXDL_LP; FXRV_DRY=o.FXRV_DRY; FXRV_WET=o.FXRV_WET; FXRV_CONV=o.FXRV_CONV; FXRV_PRE=o.FXRV_PRE; FXTRIM=o.FXTRIM; FXCOMP_SEND=o.FXCOMP_SEND; FXWAH_SEND=o.FXWAH_SEND; FXPH_SEND=o.FXPH_SEND; FXDL_SEND=o.FXDL_SEND; FXRV_SEND=o.FXRV_SEND; _fxWired=o._fxWired; FXTR_START=o.FXTR_START; _trHz=o._trHz; _trWave=o._trWave; FXWAH_START=o.FXWAH_START; GPRE=o.GPRE; GSHP=o.GSHP; GCAB=o.GCAB; GMID=o.GMID; GDIRT=o.GDIRT; GCLEAN=o.GCLEAN; _shpK=o._shpK; GHP=o.GHP; GRECT=o.GRECT; _shpR=o._shpR; GLP2=o.GLP2; GPRE2=o.GPRE2; GSHP2=o.GSHP2; _shpK2=o._shpK2; PMIX=o.PMIX; PPAN=o.PPAN; PMET=o.PMET; PSEND=o.PSEND; }
 function busUse(pi){
   pi=(pi|0);
   if(pi===_busCur) return;
@@ -18028,7 +18056,7 @@ function roomIR(kind){
      ② 掛けると出口が持ち上がり、クランチ等では 3〜6dB 大きくなっていた。
         ※ 音の通り道を辿ると、コンプは実際には歪み（`guitarBus` の中）の**後ろ**に繋がっている
           （エフェクトの列は音色の出口 `GTRIM` の後）。ゆえに歪みを深くしてはいない。
-          画面とヘルプの「コンプは歪みより前」は、繋ぎと食い違っている（未修正・L様に確認）。
+          画面とヘルプの「コンプは歪みより前」と食い違っていたので、tab-6.73 で繋ぎを説明どおり歪みの前へ付け替えた。
 
    直し方（L様の選択）：
      ・掛かり方を実物のコンプに近い穏やかさにする——立ち上がり20ミリ秒・戻り0.45秒、比率は2〜5倍、
@@ -18038,7 +18066,7 @@ function roomIR(kind){
        コンプの通り抜け（自前の持ち上げ込み）を実際に測り、その逆数を掛ける。
        ゆえに大きい音はそのまま、小さい音（減衰の尾）だけが持ち上がる——コンプ本来の働きである。
    測りは音の器ができた時に、選べる強さの分だけ裏で済ませる（一回 0.5 秒の書き出し×4）。 */
-var COMP_REF_DB=-16.5;   /* 弾く強さの音（実効値）で、掛けても掛けなくても同じ大きさに（音色4つで ±1.5dB 以内） */
+var COMP_REF_DB=-16.5;   /* 弾く強さの音（実効値）で、掛けても掛けなくても同じ大きさに（歪みの前に置いた tab-6.73 で測り直し：音色4つで ±1.8dB 以内） */
 function compParams(a){
   a=Math.max(0,Math.min(1.5,+a||0));
   return {thr:+(-18-a*11).toFixed(2), ratio:+(2+a*2.4).toFixed(2), knee:10, attack:0.020, release:0.45};
@@ -18136,12 +18164,7 @@ function _fxChainBuild(){
     return {in:inN,out:outN,dry,wet,send,node};
   };
 
-  /* ① コンプ（歪みの前で粒を揃える） */
-  {
-    const c=AC.createDynamicsCompressor?AC.createDynamicsCompressor():null;
-    const w=wrap((inN,wet)=>{ if(c){ inN.connect(c); c.connect(wet); } else inN.connect(wet); return c; });
-    FXCOMP=c; FXCOMP_DRY=w.dry; FXCOMP_WET=w.wet; FXCOMP_SEND=w.send;
-  }
+  /* ① コンプは、この列ではなく通り道の頭（歪みの前）に置く（tab-6.73。`guitarBus` 参照） */
   /* ══ ② ワウ（tab-3.02 で作り直した）══
      はじめは bandpass 一段・Q=4・素の音を半分残す作りにしたが、
      **地味すぎた**（L様のご指摘）。実物のワウが効いて聞こえる理由は三つある。
@@ -18817,8 +18840,51 @@ function guitarBus(){
     GCONV=AC.createConvolver?AC.createConvolver():null;
     if(GCONV) GCONV.normalize=false;
     GCLEAN=AC.createGain(); GCLEAN.gain.value=1;
-    GBUS.connect(GDRY); GDRY.connect(GCLEAN); GCLEAN.connect(GTRIM);
-    if(GCONV){ GBUS.connect(GCONV); GCONV.connect(GWET); GWET.connect(GTRIM); }
+    /* ══ コンプを歪みの前へ（tab-6.73）══
+       L様——「コンプは繋ぎを説明どおり、歪みの前に付け替える」。
+       以前はエフェクトの列（音色の出口 GTRIM の後ろ）にあり、説明と食い違っていた。
+       弦の音が入る GBUS の直後に置き、ここから先（素の音・胴・歪み）はすべて GPOST から分ける。
+       使わない時は素通し（FXCOMP_DRY=1・送り0）。 */
+    GPOST=AC.createGain(); GPOST.gain.value=1;
+    { const c=AC.createDynamicsCompressor?AC.createDynamicsCompressor():null;
+      const dry=AC.createGain(), wet=AC.createGain(), send=AC.createGain();
+      dry.gain.value=1; wet.gain.value=0; send.gain.value=0;
+      GBUS.connect(dry); dry.connect(GPOST);
+      GBUS.connect(send); if(c){ send.connect(c); c.connect(wet); } else send.connect(wet);
+      wet.connect(GPOST);
+      FXCOMP=c; FXCOMP_DRY=dry; FXCOMP_WET=wet; FXCOMP_SEND=send; }
+    /* 素の音の道に遅れを一つ挟む。ふだんは 0。クリーンの歪みを混ぜる時だけ、潰す道の遅れ
+       （曲線の4倍の細かさで潰すと、ブラウザが数ミリ秒遅らせる）に揃える——揃えないと、
+       混ぜた所で打ち消し合い、音が痩せる（tab-6.73） */
+    const _gdl=AC.createDelay(0.05); _gdl.delayTime.value=0;
+    GPOST.connect(GDRY); GDRY.connect(_gdl); _gdl.connect(GCLEAN); GCLEAN.connect(GTRIM);
+    if(GCONV){ GPOST.connect(GCONV); GCONV.connect(GWET); GWET.connect(GTRIM); }
+    /* ══ クリーンの歪み（tab-6.73）══
+       L様——「クリーンもつまみで調整できない？」。選択：0は真っさらなクリーン、上げるほど艶が乗り、
+       上げきってもクランチより手前／**弾く強さに関わらず、つまみの分だけ均一に掛かる。**
+
+       ふつうの潰し（曲線一枚）は、強く弾くほど深く掛かる。強さに依らず同じだけ掛けるため、
+       別の道を一本並べて素の音に混ぜる：
+         ① 大きく持ち上げて潰す——どの強さの音もほぼ同じ形（角の取れた矩形）になる＝歪みの割合が一定
+         ② 角を落とす濾し（4.5kHz）
+         ③ 元の音の大きさ（整流して濾した包絡）を掛け戻す——**大きさは弾いた強さのまま**
+       混ぜる量はつまみで決め、混ぜたぶん素の音を引く（大きさは変えない）。上限は 0.3 で、
+       3倍音がクランチより 5dB ほど下に留まる。 */
+    { const pre=AC.createGain(); pre.gain.value=1;
+      /* 持ち上げは曲線の中で行う（曲線の外＝±1 を超える入力は、ブラウザによって折り返して化けるため） */
+      const shp=AC.createWaveShaper(); shp.oversample='4x';
+      { const n=16385, c=new Float32Array(n); for(let i=0;i<n;i++){ const x=i*2/(n-1)-1; c[i]=Math.tanh(120*x); } shp.curve=c; }
+      const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=4500; lp.Q.value=0.5;
+      const vca=AC.createGain(); vca.gain.value=0;
+      const ab=AC.createWaveShaper();
+      { const n=2049, c=new Float32Array(n); for(let i=0;i<n;i++){ c[i]=Math.abs(i*2/(n-1)-1); } ab.curve=c; }
+      const e1=AC.createBiquadFilter(); e1.type='lowpass'; e1.frequency.value=28; e1.Q.value=0.5;
+      const e2=AC.createBiquadFilter(); e2.type='lowpass'; e2.frequency.value=28; e2.Q.value=0.5;
+      const eg=AC.createGain(); eg.gain.value=CS_ENV_K;
+      const mixg=AC.createGain(); mixg.gain.value=0;
+      GPOST.connect(pre); pre.connect(shp); shp.connect(lp); lp.connect(vca); vca.connect(mixg); mixg.connect(GCLEAN);
+      GPOST.connect(ab); ab.connect(e1); e1.connect(e2); e2.connect(eg); eg.connect(vca.gain);
+      GCS={mix:mixg,pre,dly:_gdl}; }
 
     /* ══ 歪みは全弦を混ぜた後で掛ける ══
        一音ずつ歪ませると、音どうしが混じり合わない。
@@ -18853,7 +18919,7 @@ function guitarBus(){
     GCAB=AC.createBiquadFilter(); GCAB.type='lowpass'; GCAB.Q.value=0.7;
     GMID=AC.createBiquadFilter(); GMID.type='peaking'; GMID.Q.value=0.9;
     GDIRT=AC.createGain(); GDIRT.gain.value=0;
-    if(GRECT){ GBUS.connect(GRECT); GRECT.connect(GHP); } else GBUS.connect(GHP);
+    if(GRECT){ GPOST.connect(GRECT); GRECT.connect(GHP); } else GPOST.connect(GHP);
     GHP.connect(GPRE);
     const _afterShp=GSHP?(GPRE.connect(GSHP),GSHP):GPRE;
     _afterShp.connect(GLP2); GLP2.connect(GPRE2);
@@ -18910,13 +18976,15 @@ function guitarBus(){
       }catch(_){}
     }
   }
-  const key=t.id+'|'+amt+'|'+(t.drive?dv:0);
+  const cdv=(t.id==='clean'||String(t.id).indexOf('clean@')===0)?cdriveAmt(sg):0;   /* クリーンの歪み（tab-6.73） */
+  const key=t.id+'|'+amt+'|'+(t.drive?dv:0)+'|c'+cdv;
   if(_gbId!==key){
     const ir=GCONV?bodyIR(t):null;
     const wet=(ir&&t.wet)?Math.min(1,t.wet*amt):0;
     if(GCONV&&ir) GCONV.buffer=ir;
     GWET.gain.value=wet;
-    GDRY.gain.value=1-wet*0.45;      /* 濡れたぶんだけ素の音を少し引く */
+    GDRY.gain.value=(1-wet*0.45)*(1-CS_MAX*cdv);      /* 濡れたぶんだけ素の音を少し引く。クリーンの歪みを混ぜたぶんも引く */
+    if(GCS&&GCS.mix){ GCS.mix.gain.value=CS_MAX*cdv; if(GCS.dly) GCS.dly.delayTime.value=cdv>0?csLatency():0; }
     /* 音色ごとの補正に、混ぜ具合を**掛け合わせる**（tab-6.12）。
        上書きすれば、音色を変えるたび摘みが忘れられる——
        **二つの理由で同じ摘みを動かすなら、掛ける。** */
@@ -39332,6 +39400,9 @@ function renderSettings(){
     '箱の響きの量です。エレキには元から胴がありません');
   /* 歪みの摘みは、歪む音色を選んでいる時だけ出す。
      効かない摘みが並んでいるのが、設定画面でいちばん惑わせる */
+  if(String((toneOf(song)||{}).id||'').split('@')[0]==='clean')
+    fld('歪みの強さ',contRange('cdrive'),false,
+      '0 は真っさらなクリーンでございます。上げるほど音に艶と軽い割れが乗りますが、上げきってもクランチより手前に留めてございます。弾く強さに関わらず、つまみの分だけ同じように掛かります');
   if((toneOf(song)||{}).drive)
     fld('歪みの強さ',contRange('drive'),false,
       '全部の弦を混ぜてから潰しております。一音ずつ歪ませると音どうしが混じり合わず、和音が濁らないためでございます。※強くするほど弦そのものの伸びは短くしてございます（tab-3.05）——潰しが深くなると痩せた尾まで持ち上がりますので、そのままでは書いた音価の何倍も鳴り続けてしまうためでございます');
@@ -41544,6 +41615,7 @@ const AMP_CH=[['steel','アコギ'],['nylon','ナイロン'],['clean','クリー
    回している間は書き換えだけで鳴らし（取り消しは積まない）、離した所で一手に収める。 */
 var CONT_KNOBS={
   drive:  {min:0.3,max:2.5,label:'歪み',    tx:'歪みの強さを変える',list:()=>DRIVE_AMT,  get:()=>driveAmt(song)},
+  cdrive: {min:0,  max:1,  label:'歪み',    tx:'クリーンの歪みを変える',list:()=>CDRIVE_AMT,get:()=>cdriveAmt(song)},
   body:   {min:0,  max:2,  label:'胴の鳴り',tx:'胴の鳴りを変える',  list:()=>BODY_AMT,   get:()=>bodyAmt(song)},
   sustain:{min:0.5,max:1.8,label:'弦の伸び',tx:'弦の伸びを変える',  list:()=>SUSTAIN_AMT,get:()=>sustainAmt(song)}
 };
@@ -41555,13 +41627,13 @@ function contGet(k,view){ const keep=_sndNow; _sndNow=(view!==undefined)?view:pa
 function contSnap(){ const pt=song.parts&&song.parts[song.part||0];
   const sec=(typeof AMP!=='undefined'&&AMP.scope==='sec')?ampSec():null;
   return {toPart:sndToPart(song), part:pt&&pt.sound?JSON.stringify(pt.sound):null,
-          play:JSON.stringify({drive:song.play.drive,body:song.play.body,sustain:song.play.sustain}),
+          play:JSON.stringify({drive:song.play.drive,cdrive:song.play.cdrive,body:song.play.body,sustain:song.play.sustain}),
           sec:sec, secSnd:sec?JSON.stringify(sec.psnd||{}):null}; }
 function contRestore(sn){
   if(!sn) return;
   if(sn.sec){ try{ sn.sec.psnd=JSON.parse(sn.secSnd); }catch(_){} }
   if(sn.toPart){ const pt=song.parts[song.part||0]; if(pt) pt.sound=sn.part?JSON.parse(sn.part):null; }
-  else{ const o=JSON.parse(sn.play); ['drive','body','sustain'].forEach(k=>{ if(o[k]===undefined) delete song.play[k]; else song.play[k]=o[k]; }); }
+  else{ const o=JSON.parse(sn.play); ['drive','cdrive','body','sustain'].forEach(k=>{ if(o[k]===undefined) delete song.play[k]; else song.play[k]=o[k]; }); }
 }
 function contLive(k,v,setter){ (setter||((kk,vv)=>setSnd(song,kk,vv)))(k,v); try{ clearSndCache(); soundRefresh(); }catch(_){} }
 function contCommit(k,v,sn,setter){
@@ -41646,7 +41718,7 @@ function ampViewSound(){
 /* セクションで決めた所の名前（知らせの文に使う） */
 function secOverrideNames(so){
   if(!so) return [];
-  const nm={tone:'音色',drive:'歪み',body:'胴の鳴り',sustain:'弦の伸び'};
+  const nm={tone:'音色',drive:'歪み',cdrive:'クリーンの歪み',body:'胴の鳴り',sustain:'弦の伸び'};
   const fxn={comp:'コンプ',wah:'ワウ',phaser:'フェイザー',chorus:'コーラス',flange:'フランジャー',trem:'トレモロ',delay:'ディレイ',room:'残響'};
   const out=[]; Object.keys(nm).forEach(k=>{ if(so[k]!=null) out.push(nm[k]); });
   Object.keys(so.fx||{}).forEach(k=>{ if(fxn[k]) out.push(fxn[k]); });
@@ -41817,7 +41889,9 @@ function ampRender(){
   panel.appendChild(ampKnob(chList,tone,'音色',v=>ampApply('音色を変える',()=>ampSet('tone',v)),
     {top:win,noVal:true,onShow:i=>{ win.textContent=(chList[i]||[])[1]||''; }}));
   /* 歪み・胴の鳴り・弦の伸びは無段階（tab-6.50） */
-  panel.appendChild(ampDial('drive',{dim:!hasDrive,dimTip:'歪みは、エレキの歪む音色（クランチ・ハイゲイン）の時に効きます'}));
+  /* クリーンでは、クリーン用の歪み（0＝真っさら）を回す（tab-6.73） */
+  if(!hasDrive&&tone==='clean') panel.appendChild(ampDial('cdrive'));
+  else panel.appendChild(ampDial('drive',{dim:!hasDrive,dimTip:'歪みは、エレキの音色（クリーン・クランチ・ハイゲイン）の時に効きます'}));
   panel.appendChild(ampDial('body'));
   panel.appendChild(ampDial('sustain'));
   const gr=document.createElement('span'); gr.className='grow'; panel.appendChild(gr);
