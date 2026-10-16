@@ -986,7 +986,10 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 .m-menu{
   position:absolute;top:-2px;right:0;z-index:5;
   width:34px;height:32px;border:none;border-radius:6px;
-  background:rgba(255,255,255,.85);color:var(--dim3);
+  /* 下地は透かす（tab-6.75）。L様——「横幅まだ治ってない」。
+     白い下地（85%）がコードの帯の右端を覆い、帯だけ短く見えていた。
+     触れる大きさ（34×32）はそのまま、ふだんは「⋯」の字だけを出す */
+  background:transparent;color:var(--dim3);
   font-size:14px;line-height:1;cursor:pointer;padding:0;
 }
 .m-menu:hover{background:var(--tint-indigo);color:var(--indigo)}
@@ -1920,7 +1923,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.74', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.75', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
