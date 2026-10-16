@@ -1920,7 +1920,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.73', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.74', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -6020,7 +6020,13 @@ function engrave(s,bar,o){
   const lift=(hasFerm?30:0)+((hasAcc&&!hasFerm)?16:0)+(hasTempo?22:0)+Math.max(0,upLift)
             +(aboveSym?14:0)+(aboveTrip?12:0)+symRowsEst*10;
   /* 記号の段で既に上がっている分は差し引き、足りない分だけ持ち上げる */
-  const liftT=Math.max(lift,Math.ceil(tieTextLift));
+  /* コード名の持ち上げは、段の中で揃える（tab-6.74）。
+     L様——「４小節目のコードの位置、高さが変」。
+     弧（タイ）が上へ張り出す小節だけコード名を持ち上げていたので、同じ段の中で
+     コード名の高さがばらばらになった。小節ごとの要る量（liftOwn）を返し、
+     呼ぶ側（render）が段でいちばん大きい値を `o.rowLift` として渡し直す。 */
+  const liftOwn=Math.max(lift,Math.ceil(tieTextLift));
+  const liftT=Math.max(liftOwn,(+o.rowLift||0));
   const CH_FS=12;
   const labels=[], laneR=[];
   /* ══ 音符と控えを、時間の順に並べてから置く（tab-2.97）══
@@ -8824,7 +8830,7 @@ function engrave(s,bar,o){
          道が二つに分かれる所では、両方に同じ物を置くこと。 */
       g+=extraHitsSVG();
       g+=`</svg>`;
-      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn};
+      return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn,liftOwn};
     }
     const _cells=[];
     list.forEach(e=>{
@@ -8849,7 +8855,7 @@ function engrave(s,bar,o){
   }
 
   g+=`</svg>`;
-  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn};
+  return {svg:g,lastChordKey:prevKey,lastChord:prevChord,pmOut,sbOut,ringOut,vbTop,vbBot,xOut,xIn,liftOwn};
 }
 
 /* 文字幅の実測（コード名の重なり判定用） */
@@ -36475,6 +36481,7 @@ function fillMeasures(){
       }else p.wrap.insertAdjacentHTML('beforeend',r.svg);
     }else p.wrap.insertAdjacentHTML('beforeend',r.svg);
     p._vb=[(r.vbTop!=null?r.vbTop:-78),(r.vbBot!=null?r.vbBot:152)];
+    p._lift=+r.liftOwn||0; p._w=w; p._bar=bar; p._tabOn=(sv!=='staff')&&!!r.svg;
     p.wrap._xOut=r.xOut||[]; p.wrap._xIn=r.xIn||[];
     p.ctx.prevKey=r.lastChordKey;
     p.ctx.prevChord=r.lastChord||null;
@@ -36487,6 +36494,23 @@ function fillMeasures(){
     p.ctx.prevPM=!!r.pmOut;
     p.ctx.prevSB=!!r.sbOut;
     p.ctx.prevRing=!!r.ringOut;
+  });
+  /* ══ 段の中でコード名の高さを揃える（tab-6.74）══
+     弧が上へ張り出す小節があれば、同じ段の他の小節もその高さでコード名を書き直す。
+     描き直すのは低かった小節だけ（ふだんは一つも無い）。控えの opts にも残すので、
+     一小節だけ組み直す道（redrawBar 等）も同じ高さで書く。 */
+  rowsOf(_pending).forEach(row=>{
+    const mx=Math.max(0,...row.map(p=>p._lift||0));
+    row.forEach(p=>{
+      if(p.wrap._opts&&p.wrap._opts.opts) p.wrap._opts.opts.rowLift=mx;
+      if(!p._tabOn||!((p._lift||0)<mx)) return;
+      let r2;
+      try{ r2=engrave(song,p._bar,Object.assign({width:p._w},p.wrap._opts.opts)); }catch(e){ console.error('engrave(段揃え)',e); return; }
+      const olds=[...p.wrap.children].filter(c=>c.classList&&c.classList.contains('msvg'));
+      const old=olds[olds.length-1]; if(!old) return;
+      old.insertAdjacentHTML('afterend',r2.svg); old.remove();
+      p._vb=[(r2.vbTop!=null?r2.vbTop:-78),(r2.vbBot!=null?r2.vbBot:152)];
+    });
   });
   /* ══ 段の中で桁を揃える（tab-6.05）══
      小節ごとの「要る丈」を段でひとつに揃える。**捨てる前に済ませる。** */
