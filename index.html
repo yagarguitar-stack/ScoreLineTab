@@ -539,7 +539,10 @@ body.carrying .m-menu,body.carrying .sec-tools{visibility:hidden}
   font-size:10px;letter-spacing:.06em;color:var(--dim1);
   background:var(--ink2);border:1px solid var(--ink-line);
   border-radius:6px;padding:3px 7px;pointer-events:none;
+  transition:opacity .6s ease;
 }
+/* 立ち上がりに版を確かめられれば足りる。譜面に重なるので、しばらくしたら消す（tab-6.79） */
+.phase.gone{opacity:0}
 
 /* ── モードバー ─────────────────────────── */
 .modebar{
@@ -991,6 +994,9 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
      触れる大きさ（34×32）はそのまま、ふだんは「⋯」の字だけを出す */
   background:transparent;color:var(--dim3);
   font-size:14px;line-height:1;cursor:pointer;padding:0;
+  /* 字は札の上端・右寄せに置き、小節番号と同じ高さへ（tab-6.79）。
+     札の真ん中に置くと、帯の右端のコード名と字が重なり得た。触れる大きさは同じ */
+  display:flex;align-items:flex-start;justify-content:flex-end;padding:2px 4px 0 0;
 }
 .m-menu:hover{background:var(--tint-indigo);color:var(--indigo)}
 
@@ -1008,6 +1014,9 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 }
 /* 字を添える釦（tab-3.31）。印だけでは何をする物か読めない */
 .sec-ico.wide{width:auto;padding:0 9px;font-size:11.5px;font-weight:700;letter-spacing:.03em}
+/* 狭い画面で札の字が縦に折れないよう、札は縮めず、見出しの行の方を折り返す（tab-6.79） */
+.sec-ico.wide{white-space:nowrap;flex-shrink:0}
+.sec-head{flex-wrap:wrap;row-gap:4px}
 .sec-lbl{font-size:10.5px;color:var(--dim5);letter-spacing:.04em;margin-left:6px;white-space:nowrap}
 .sec-ico:hover{background:#f1f2f5;color:var(--ink3)}
 .sec-ico.dgr:hover{background:#fee;color:var(--red)}
@@ -1923,7 +1932,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.78', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.79', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2928,6 +2937,30 @@ function mkSection(o){
            items:o.items||[] };
 }
 function mkSong(o){
+  return drumKeepWaltz(mkSong0(o));
+}
+/* ══ 以前の 3/4 の曲の鳴り方を引き継ぐ（tab-6.79）══
+   tab-6.70 までは、3拍の小節で鳴らす時に**型に関わらずワルツの形へ寄せて**いた。
+   tab-6.71 でことりノームと同じ「型の頭3拍」に改めたので、以前の 3/4 の曲で
+   8ビートを鳴らしていると鳴り方が変わる。古い形の曲（〈タイト〉をまだ持たない）を
+   読み込んだ時だけ、3拍の拍子の「8ビート」にワルツの形を入れておく——鳴り方は前のまま。 */
+function drumKeepWaltz(S){
+  try{
+    const d=S&&S.play&&S.play.drum;
+    if(!d||!d._old) return S;
+    delete d._old;
+    if(d.pat!=='beat8') return S;
+    const seen=new Set();
+    const add=ts=>{ if(ts&&ts.n===3&&ts.d===4) seen.add('3/4'); };
+    add(S.meta&&S.meta.timeSig); (S.bars||[]).forEach(b=>add(b&&b.timeSig));
+    if(!seen.size) return S;
+    d.custom=d.custom||{};
+    const m=(d.custom['3/4']=d.custom['3/4']||{});
+    if(!m.beat8) m.beat8=drumFromOld(DRUM_WALTZ,6,2);
+  }catch(_){}
+  return S;
+}
+function mkSong0(o){
   o=o||{};
   return {
     version:3,      /* 3 … 刻みは分割数（tab-1.70）／2 … 1拍=1680 tick／1 … 1拍=48 */
@@ -6448,9 +6481,27 @@ function engrave(s,bar,o){
   /* ══ 曲と違う刻みの小節には、印を出す（tab-1.69）══
      **見えないものは直せない。** どの小節を上書きしたのか譜面で分かるようにする。
      出すのは上書きしてある小節だけ。全部に出すと、ただの雑音になる。 */
-  if(o.ownSnaps) o.ownSnaps.forEach(([k,lbl])=>{
-    g+=`<text x="${timeX(k*beatUnit).toFixed(2)}" y="${(topY+7).toFixed(2)}" font-size="7" font-weight="700" fill="#8b8fa0">▦${esc(lbl)}</text>`;
-  });
+  /* ══ 印は重ねない（tab-6.79）══
+     細い小節で、同じ刻みの拍ごとに「▦3連8分」が並び、字が重なって読めなかった。
+     続く拍が同じ刻みなら最初の拍に一つだけ書き、次の印までの幅に収まらなければ
+     「▦3連」「▦」と短くする（略さない名は、指を乗せると出る）。 */
+  if(o.ownSnaps){
+    const runs=[];
+    o.ownSnaps.forEach(([k,lbl])=>{ const r=runs[runs.length-1];
+      if(r&&r.lbl===lbl&&r.k1===k-1) r.k1=k; else runs.push({k0:k,k1:k,lbl}); });
+    runs.forEach((r,ri)=>{
+      const x0=timeX(r.k0*beatUnit);
+      const nx=(ri+1<runs.length)?timeX(runs[ri+1].k0*beatUnit):timeX((r.k1+1)*beatUnit);
+      const room=Math.max(0,nx-x0-3);
+      const fit=t=>(String(t).length*7.2)<=room;
+      const full='▦'+r.lbl, mid='▦'+String(r.lbl).replace(/(\d+連).*/,'$1');
+      /* 連符の括弧（「3」）も同じ高さに出るので、その拍に連符があれば印だけにする */
+      const tup=(bar.notes||[]).some(n=>n&&n.kind!=='rest'&&TUPLET_VALS[n.len]
+        &&n.start>=r.k0*beatUnit&&n.start<(r.k1+1)*beatUnit);
+      const txt=tup?'▦':(fit(full)?full:(fit(mid)?mid:'▦'));
+      g+=`<text x="${x0.toFixed(2)}" y="${(topY+7).toFixed(2)}" font-size="7" font-weight="700" fill="#8b8fa0"><title>${esc(r.lbl)}</title>${esc(txt)}</text>`;
+    });
+  }
   /* ══ イーブンにした拍の印（tab-2.12）══
      はねる曲の中で、そこだけ平らに鳴る。**譜面に出ていなければ、
      なぜそこだけ跳ねないのかが読めない。** 刻みの印（▦）とは段を分ける
@@ -17198,6 +17249,7 @@ function normDrum(p){
       DROWS.forEach(r=>{ if(!Array.isArray(c[r])) c[r]=[]; while(c[r].length<c.steps) c[r].push(0); c[r].length=c.steps; }); });
     if(!Object.keys(m).length) delete d.custom[tk];
   });
+  if(d.tight===undefined) d._old=true;   /* 古い形の印（曲を組み終えた所で使って外す。tab-6.79） */
   d.tight=!!d.tight;
   p.drum=d; return p;
 }
@@ -17249,6 +17301,7 @@ function renderDrumGrid(){
   let row=$('bb-drum');
   if(!drumGridShown()){ if(row) row.remove(); return; }
   if(!row){ row=document.createElement('div'); row.id='bb-drum'; row.className='dgridbar no-print'; bb.insertBefore(row,bb.firstChild); }
+  if(DGRID._init!==true){ DGRID._init=true; DGRID.more=!!(library&&library.drumMore); }
   const k=song.play.drum.pat, ts=drumGridTs(), tk=drumTsKey(ts);
   const p=drumPatFor(song,k,ts);
   row.dataset.tsk=tk;
@@ -17275,7 +17328,9 @@ function renderDrumGrid(){
   const mo=document.createElement('button'); mo.type='button'; mo.className='dgb-btn';
   mo.textContent=DGRID.more?'− ほかの音をたたむ':('＋ ほかの音'+(used?'（'+used+'か所）':''));
   mo.title='オープンハイハット・リム・ハイタム・ロータム';
-  mo.onclick=()=>{ DGRID.more=!DGRID.more; renderDrumGrid(); measureBot(); };
+  mo.onclick=()=>{ DGRID.more=!DGRID.more;
+    if(library){ library.drumMore=DGRID.more; try{ saveLibrary(); }catch(_){} }   /* 開き具合を覚える（tab-6.79） */
+    renderDrumGrid(); measureBot(); };
   hd.appendChild(mo);
   if(drumCustomOf(song,k,ts)){
     const rs=document.createElement('button'); rs.type='button'; rs.className='dgb-btn';
@@ -31564,6 +31619,7 @@ function applyBandChord(c,label){
     clearOtherPartsChordAt(bar,t);    /* 全パートのコード名は一つ（tab-6.62） */
     if(c===null){
       revertAutoTab(bar,t);           /* 自動で書いた押さえは休符へ（tab-6.67） */
+      otherPartsAuto(bar,t,()=>revertAutoTab(bar,t));
       if(bar.chordAt){ delete bar.chordAt[t];
         if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
       if(ni>=0){ bar.notes[ni].chord=null; bar.notes[ni].voicing=null; }
@@ -31579,7 +31635,9 @@ function applyBandChord(c,label){
       bar.chordAt=bar.chordAt||{};
       bar.chordAt[t]=ch;
     }
-    if(c!==null) wrote=autoTabSpan(bar,t,ch);   /* 空いていれば押さえも（tab-6.67） */
+    if(c!==null){ wrote=autoTabSpan(bar,t,ch);   /* 空いていれば押さえも（tab-6.67） */
+      otherPartsAuto(bar,t,()=>{ if(autoTabSpan(bar,t,ch,null)){       /* 他のパートの自動の押さえも（tab-6.79） */
+        const f=(bar.notes||[]).find(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0)); if(f) f.chord=null; } }); }
   });
   vpickSet(wrote?{bar,st:t,chord:{root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)}}:null);
   render();
@@ -31697,10 +31755,13 @@ function applyChordToDock(patch,label,advance,sig){
   const pol=(dock.nameOnly||!tuningStd(song))?'off':(song.meta.chordToTab||'fill');
   const kept=[];
   tx(label,()=>{
+    const unset=[];   /* コードを外した所（自動で書いた押さえを休符へ戻す。tab-6.79） */
     dock.targets.forEach(t=>{
       const b=findBar(song,t.barId); if(!b) return;
       const n=b.notes[t.noteIdx]; if(!n) return;
+      const had=!!(n.chord&&n.chord.root!=null);
       patch(n,b,t.noteIdx);
+      if(had&&!(n.chord&&n.chord.root!=null)&&atabUntouched(n)) unset.push({barId:t.barId,st:n.start|0});
       /* ══ 音符へ書いたら、同じ刻の控えは掃く（tab-6.05）══
          **同じ刻は、一つの持ち主に。**残せば名の違う二つが縦に並ぶ。 */
       if(b.chordAt&&b.chordAt[n.start|0]!==undefined){
@@ -31712,6 +31773,8 @@ function applyChordToDock(patch,label,advance,sig){
       if(pol==='always'){ fillStopsFromChord(song,n,true); return; }
       if(!fillStopsFromChord(song,n,false)) kept.push({barId:t.barId,noteIdx:t.noteIdx});
     });
+    /* 盤の〈コードを外す〉でも、ドラッグで消した時と同じく休符へ戻す（後ろから戻すと番号がずれない） */
+    unset.sort((a,b)=>b.st-a.st).forEach(u=>{ const b=findBar(song,u.barId); if(b) revertAutoTab(b,u.st); });
   });
   if(kept.length){
     toast(kept.length+'音は手で置いた押さえを残しました','押さえも入れ替える',()=>{
@@ -32334,7 +32397,34 @@ function putChordAt(bar,t,ch,opt){
     if(bar.chordAt){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; } }
   else{ bar.chordAt=bar.chordAt||{}; bar.chordAt[t]=ch; }
   /* TAB が空いていれば、押さえも書く（tab-6.67） */
-  return autoTabSpan(bar,t,ch,opt);
+  const wrote=autoTabSpan(bar,t,ch,opt);
+  /* 他のパートで自動で書いた押さえも、新しいコードへ書き直す（tab-6.79）。
+     コード名は全パートで一つなので、名だけ替わって押さえが前のまま残っていた */
+  otherPartsAuto(bar,t,()=>{
+    if(autoTabSpan(bar,t,ch,null)){
+      const f=(bar.notes||[]).find(n=>n&&n.kind!=='rest'&&(n.start|0)===(t|0)); if(f) f.chord=null;   /* 名は表のパートが持つ */
+    }
+  });
+  return wrote;
+}
+/* ══ 他のパートの、自動で書いた押さえに手を入れる（tab-6.79）══
+   その刻のコードの範囲に、手を入れていない自動の押さえを持つパートだけを、
+   一時的に表へ回して fn を走らせる。拍に置いたコード（共通）は触らせない。 */
+function otherPartsAuto(bar,t,fn){
+  if(!bar||!Array.isArray(bar.np)||bar.np.length<2) return;
+  const me=bar._pi||0, keepCA=bar.chordAt?clone(bar.chordAt):null;
+  try{
+    bar.np.forEach((ns,pi)=>{
+      if(pi===me||!ns||!ns.length) return;
+      bar._pi=pi;
+      const end=nextChordTickIn(bar,t);
+      const has=(bar.notes||[]).some(n=>n&&atabUntouched(n)&&n.start<end&&n.start+n.len>(t|0));
+      if(has) fn(pi);
+    });
+  } finally {
+    bar._pi=me;
+    bar.chordAt=keepCA;
+  }
 }
 function applyProgression(tpl){
   if(!dock) return;
@@ -32557,6 +32647,7 @@ function chordAtTick(bar,st){
 }
 function removeChordAt(bar,st){
   revertAutoTab(bar,st);              /* 自動で書いた押さえは休符へ戻す（tab-6.67） */
+  otherPartsAuto(bar,st,()=>revertAutoTab(bar,st));   /* 他のパートの自動の押さえも（tab-6.79） */
   clearOtherPartsChordAt(bar,st);     /* 全パートから（tab-6.62） */
   (bar.notes||[]).forEach(x=>{ if(x&&(x.start|0)===(st|0)&&x.chord){ x.chord=null; x.voicing=null; } });
   if(bar.chordAt){ delete bar.chordAt[st]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
@@ -35808,6 +35899,8 @@ function refreshMeasure(wrap){
     clearStrumDiv();
     const r=engrave(song,bar,Object.assign({},o.opts,{width:w,
       dragIdx:dragMarkIdx(bar), dragStr:(_dragMark?_dragMark.str:null)}));
+    /* 段の高さより上へ張り出したら、段ごと組み直す（tab-6.79） */
+    if((+r.liftOwn||0)>(+o.opts.rowLift||0)+0.5) setTimeout(()=>{ try{ render(); }catch(_){} },0);
     /* ══ 外すのは譜面の SVG だけ ══
        以前は querySelector('svg') で**最初に見つかった SVG** を外していた。
        コード図（.dgm-row）は譜面より先に置かれるので、図を出している時は
@@ -36319,7 +36412,7 @@ function effectivePerLine(per){
 function redrawBar(barId){
   const paper=$('paper'); if(!paper) return false;
   const bar=findBar(song,barId); if(!bar) return false;
-  let did=false;
+  let did=false, needRow=false;
   paper.querySelectorAll('.mwrap').forEach(wrap=>{
     if(wrap.getAttribute('data-bar')!==barId) return;
     const o=wrap._opts; if(!o) return;
@@ -36346,8 +36439,11 @@ function redrawBar(barId){
     /* 両隣との弧を引き直す（tab-6.34） */
     wrap._xOut=r.xOut||[]; wrap._xIn=r.xIn||[];
     rejoinAround(wrap);
+    /* この小節だけ、段の高さより上へ張り出した（タイを足した等）——段ごと組み直す（tab-6.79） */
+    if((+r.liftOwn||0)>(+o.opts.rowLift||0)+0.5) needRow=true;
     did=true;
   });
+  if(needRow){ render(); return true; }
   return did;
 }
 
@@ -41664,6 +41760,7 @@ function renameLegacyDemo(){
 
 function boot(){
   $('phase-badge').textContent=APP.name+' '+APP.build+' ／ '+APP.phase;
+  setTimeout(()=>{ const pb=$('phase-badge'); if(pb) pb.classList.add('gone'); },6000);
 
   /* 一覧を読む */
   try{
