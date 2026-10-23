@@ -516,9 +516,11 @@ body.carrying .m-menu,body.carrying .sec-tools{visibility:hidden}
 .mb-hint{cursor:pointer}
 .mb-hint::after{content:'　ⓘ';color:var(--dim2);font-size:11px}
 
+/* 音の確かめ（tab-6.80） */
+.sc-out{white-space:pre-wrap;font:12px/1.55 "IBM Plex Mono",ui-monospace,monospace;background:rgba(0,0,0,.25);border-radius:8px;padding:10px 12px;margin:10px 0 0;max-height:52vh;overflow:auto;user-select:text;-webkit-user-select:text}
 /* ── トースト ───────────────────────────── */
 .toast{
-  position:fixed;left:50%;bottom:calc(var(--botH,64px) + 14px);
+  position:fixed;left:50%;bottom:calc(var(--botH,64px) + 14px + var(--vpH,0px));   /* 押さえの候補が出ている間は、その上へ（tab-6.80） */
   transform:translateX(-50%) translateY(8px);
   z-index:90;display:flex;align-items:center;gap:12px;
   background:var(--ink3);color:var(--on-ink);
@@ -1512,7 +1514,19 @@ body.sl-st .song-row.cur{box-shadow:inset 0 0 0 1px var(--st-lamp)}
   body.sl-st .tb-tools{grid-column:3}
   body.sl-st .tb-song .t{max-width:34vw;font-size:15px}
   body.sl-st .pt-btn{max-width:76px;padding:0 7px}
+  /* 題名を短くして、パートの札を並べる（tab-6.80。B1） */
+  body.sl-st .topbar{column-gap:6px}
+  body.sl-st .tb-song .t{max-width:21vw;font-size:14px}
+  body.sl-st .tb-song .car{display:none}
+  body.sl-st .tb-tools{gap:4px}
+  body.sl-st .tb-tools .tb-btn{width:38px;min-width:38px;padding:0}
+  /* ドラムのマスを横いっぱいに（C1）。拍が多くて狭くなる時は今の大きさで止め、横へ送る */
+  .botbar .dgridbar .dgb-tbl{width:100%}
+  .botbar .dgridbar .dgb-tbl td.dgb-lbl,.botbar .dgridbar .dgb-tbl th.dgb-lbl{width:1%}
+  .botbar .dgridbar .dgb-cell{width:100%;min-width:20px;height:22px}
+  .botbar .dgridbar.slim{padding-bottom:0}
 }
+@media (max-width:370px){ body.sl-st .tb-tools .tb-btn{width:34px;min-width:34px} body.sl-st .tb-tools{gap:3px} }
 /* 紙に刷る時は、卓の灯りを持ち込まない */
 @media print{ body.sl-st .tb-song .t{background:none;box-shadow:none;transform:none;color:#000} }
 /* ══════════════════════════════════════════
@@ -1932,7 +1946,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.79', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.81', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3792,6 +3806,8 @@ function soundAt(s,sec){
     body:(so&&so.body!=null)?so.body:p.body,
     drive:(so&&so.drive!=null)?so.drive:p.drive,
     sustain:(so&&so.sustain!=null)?so.sustain:p.sustain,
+    /* クリーンの歪みも束に入れる（tab-6.80）。抜けていたので、パートやセクションに書いた値が鳴りに届かなかった */
+    cdrive:(so&&so.cdrive!=null)?so.cdrive:p.cdrive,
     fx:(so&&so.fx)?Object.assign({},p.fx||{},so.fx):(p.fx||{}),
   };
 }
@@ -17257,7 +17273,11 @@ function drumOn(s){ const d=(s||song).play.drum; return !!(d&&d.pat&&d.pat!=='no
 function drumTight(){ const d=song&&song.play&&song.play.drum; return !!(d&&d.tight); }
 
 /* ══ マス（下の帯の上に常に出す）══ */
-var DGRID={tsk:null,more:false};
+var DGRID={tsk:null,more:false,open:false};
+function dgPhone(){ try{ return !!(window.matchMedia&&window.matchMedia('(max-width:700px)').matches); }catch(_){ return false; } }
+/* 幅が変わってスマホの形とパソコンの形をまたいだら、マスを組み直す（tab-6.80） */
+try{ if(window.matchMedia){ const mq=window.matchMedia('(max-width:700px)'), f=()=>{ try{ renderPartBar(); renderDrumGrid(); measureBot(); }catch(_){} };
+  if(mq.addEventListener) mq.addEventListener('change',f); else if(mq.addListener) mq.addListener(f); } }catch(_){}
 function drumSongTs(){
   const seen=new Map();
   const add=ts=>{ if(ts&&ts.n&&ts.d){ const k=drumTsKey(ts); if(!seen.has(k)) seen.set(k,{n:ts.n,d:ts.d}); } };
@@ -17300,8 +17320,15 @@ function renderDrumGrid(){
   const bb=$('botbar'); if(!bb) return;
   let row=$('bb-drum');
   if(!drumGridShown()){ if(row) row.remove(); return; }
-  if(!row){ row=document.createElement('div'); row.id='bb-drum'; row.className='dgridbar no-print'; bb.insertBefore(row,bb.firstChild); }
-  if(DGRID._init!==true){ DGRID._init=true; DGRID.more=!!(library&&library.drumMore); }
+  if(!row){ row=document.createElement('div'); row.id='bb-drum'; row.className='dgridbar no-print'; }
+  if(bb.firstChild!==row) bb.insertBefore(row,bb.firstChild);   /* マスはいつも帯のいちばん上（コードの札より上。tab-6.80） */
+  if(DGRID._init!==true){ DGRID._init=true; DGRID.more=!!(library&&library.drumMore); DGRID.open=!!(library&&library.drumOpenPhone); }
+  /* ══ スマホでは見出し一行に畳んでおく（tab-6.80）══
+     L様の選択——下の帯が画面の4割を取っていたので、スマホではマスを畳み、〈マスを開く〉で広げる。
+     開き具合はこの端末に覚える。パソコンは今までどおり。 */
+  const phone=dgPhone(), slim=phone&&!DGRID.open;
+  row.classList.toggle('slim',slim);
+  const openSet=v=>{ DGRID.open=v; if(library){ library.drumOpenPhone=v; try{ saveLibrary(); }catch(_){} } renderDrumGrid(); measureBot(); };
   const k=song.play.drum.pat, ts=drumGridTs(), tk=drumTsKey(ts);
   const p=drumPatFor(song,k,ts);
   row.dataset.tsk=tk;
@@ -17310,6 +17337,12 @@ function renderDrumGrid(){
   const hd=document.createElement('div'); hd.className='dgb-hd';
   const ttl=document.createElement('span'); ttl.className='dgb-ttl'; ttl.textContent=DD[k].label;
   hd.appendChild(ttl);
+  if(slim){
+    const op=document.createElement('button'); op.type='button'; op.className='dgb-btn';
+    op.textContent='マスを開く ▴'; op.title='ドラムのマスを開きます';
+    op.onclick=()=>openSet(true);
+    hd.appendChild(op); row.appendChild(hd); return;
+  }
   const tsl=drumSongTs();
   if(tsl.length>1) tsl.forEach(([key])=>{
     const b=document.createElement('button'); b.type='button'; b.className='dgb-chip'+(key===tk?' on':'');
@@ -17340,8 +17373,8 @@ function renderDrumGrid(){
   }
   const sp=document.createElement('span'); sp.className='dgb-sp'; hd.appendChild(sp);
   const fold=document.createElement('button'); fold.type='button'; fold.className='dgb-btn';
-  fold.textContent='畳む'; fold.title='ドラムのマスを畳みます（鉛筆の札で出し直せます）';
-  fold.onclick=openDrumEditor;
+  if(phone){ fold.textContent='閉じる ▾'; fold.title='ドラムのマスを一行に畳みます'; fold.onclick=()=>openSet(false); }
+  else{ fold.textContent='畳む'; fold.title='ドラムのマスを畳みます（鉛筆の札で出し直せます）'; fold.onclick=openDrumEditor; }
   hd.appendChild(fold);
   row.appendChild(hd);
   /* マス */
@@ -31420,11 +31453,16 @@ function renderPartBar(){
   if(!song) return;
   alignParts(song);
   const n=partCount(song);
+  /* スマホで二本以上ある時は、今のパートの札だけを出す。切り替えは札の窓から（tab-6.80）。
+     並べると札の字が「パート」まで欠けて、どれか判らなかった */
+  const one=(n>1)&&dgPhone();
   for(let i=0;i<n;i++){
+    if(one&&i!==song.part) continue;
     const b=document.createElement('button');
     b.className='pt-btn'+(i===song.part?' on':'');
     b.textContent=partLabel(song,i);
     b.title=(i===song.part)?'このパートの名前を変える・足す・消す':(partLabel(song,i)+'へ切り替える');
+    if(one){ b.textContent=partLabel(song,i)+' ▾'; b.title='パートを切り替える・名前を変える・消す'; }
     b.onclick=()=>{ if(i===song.part) openPartMenu(); else switchPart(i); };
     bar.appendChild(b);
   }
@@ -31468,6 +31506,10 @@ function openPartMenu(){
   const i=song.part;
   const pop=popup(partLabel(song,i),
     (partCount(song)>1?(partCount(song)+'本のうち '+(i+1)+'本目'):'いまは1本だけ'));
+  if(partCount(song)>1&&dgPhone()){
+    const gs=pgrp(pop,'パートを切り替える');
+    for(let k=0;k<partCount(song);k++) pbtn(gs,partLabel(song,k),k===i,()=>{ closePop(); if(k!==song.part) switchPart(k); });
+  }
   const g=pgrp(pop,'このパート');
   pbtn(g,'✎ 名前を変える',false,()=>{
     closePop();
@@ -31623,6 +31665,7 @@ function applyBandChord(c,label){
       if(bar.chordAt){ delete bar.chordAt[t];
         if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
       if(ni>=0){ bar.notes[ni].chord=null; bar.notes[ni].voicing=null; }
+      regrowPrevChord(bar,t);         /* 前のコードが伸び直す（tab-6.80） */
       return;
     }
     const ch={root:c.root,type:c.type,bass:(c.bass==null?null:c.bass)};
@@ -31774,7 +31817,7 @@ function applyChordToDock(patch,label,advance,sig){
       if(!fillStopsFromChord(song,n,false)) kept.push({barId:t.barId,noteIdx:t.noteIdx});
     });
     /* 盤の〈コードを外す〉でも、ドラッグで消した時と同じく休符へ戻す（後ろから戻すと番号がずれない） */
-    unset.sort((a,b)=>b.st-a.st).forEach(u=>{ const b=findBar(song,u.barId); if(b) revertAutoTab(b,u.st); });
+    unset.sort((a,b)=>b.st-a.st).forEach(u=>{ const b=findBar(song,u.barId); if(b){ revertAutoTab(b,u.st); regrowPrevChord(b,u.st); } });   /* 前のコードが伸び直す（tab-6.80） */
   });
   if(kept.length){
     toast(kept.length+'音は手で置いた押さえを残しました','押さえも入れ替える',()=>{
@@ -32509,6 +32552,13 @@ function cpalPut(t,c){
   vpickSet(wrote?{bar,st:t.st,chord:ch}:null);
   render();
 }
+/* コードの札の列の置き場所：ドラムのマスがあればその下、無ければ帯のいちばん上（tab-6.80）。
+   どちらが先に描かれたかで上下が入れ替わっていた */
+function cpalPlace(bb,row){
+  const dg=$('bb-drum');
+  const want=(dg&&dg.parentNode===bb)?dg.nextSibling:bb.firstChild;
+  if(want!==row) bb.insertBefore(row,want);
+}
 function stampSet(c){ STAMP.chord=c||null; document.body.classList.toggle('stamping',!!STAMP.chord); renderChordPalette(); }
 function renderChordPalette(){
   const bb=$('botbar'); if(!bb) return;
@@ -32517,7 +32567,8 @@ function renderChordPalette(){
     if(STAMP.chord&&mode!=='edit') stampSet(null);
     /* 畳んである時は、出し直す札だけを置く */
     if(mode==='edit'&&!dock&&library&&library.cpalHide){
-      if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; bb.insertBefore(row,bb.firstChild); }
+      if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; }
+      cpalPlace(bb,row);
       row.innerHTML='';
       const sh=document.createElement('button'); sh.type='button'; sh.className='cp-x'; sh.textContent='コードの札を出す';
       sh.onclick=()=>{ library.cpalHide=false; try{ saveLibrary(); }catch(_){} render(); };
@@ -32525,7 +32576,8 @@ function renderChordPalette(){
     }
     if(row) row.remove(); return;
   }
-  if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; bb.insertBefore(row,bb.firstChild); }
+  if(!row){ row=document.createElement('div'); row.id='bb-cpal'; row.className='bb-row cpal'; }
+  cpalPlace(bb,row);
   row.innerHTML='';
   const sc=document.createElement('div'); sc.className='cp-scroll';
   const hold=STAMP.chord?(STAMP.chord.root+'|'+STAMP.chord.type+'|'+(STAMP.chord.bass==null?'':STAMP.chord.bass)):null;
@@ -32651,6 +32703,7 @@ function removeChordAt(bar,st){
   clearOtherPartsChordAt(bar,st);     /* 全パートから（tab-6.62） */
   (bar.notes||[]).forEach(x=>{ if(x&&(x.start|0)===(st|0)&&x.chord){ x.chord=null; x.voicing=null; } });
   if(bar.chordAt){ delete bar.chordAt[st]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
+  regrowPrevChord(bar,st);            /* 前のコードが伸び直す（tab-6.80） */
 }
 /* ══════════════════════════════════════════════════════════════
    空いた拍には、コードから押さえを書く（tab-6.67）
@@ -32759,6 +32812,43 @@ function autoTabSpan(bar,t,ch,opt){
   if(bar.chordAt&&bar.chordAt[t]!==undefined){ delete bar.chordAt[t]; if(!Object.keys(bar.chordAt).length) bar.chordAt=null; }
   return true;
 }
+/* ══ 消したコードの前のコードを、伸ばし直す（tab-6.80）══
+   L様の選択——コードの途中に置いたコードを消したら、休符を残さず前のコードが伸び直す。
+   前のコードの範囲が「自動の押さえと休符だけ」の時に限る（手で直した押さえがあれば触らない）。
+   コード名はパートで一つなので、表のパートの名の持ち方を崩さないよう、
+   他のパートでは名を音符へ移さない（otherPartsAuto と同じ扱い）。 */
+function regrowPrevChord(bar,st){
+  if(!bar) return;
+  st=st|0;
+  const me=bar._pi||0;
+  const parts=(Array.isArray(bar.np)&&bar.np.length>1)?bar.np.map((_,i)=>i):[me];
+  const order=[me].concat(parts.filter(i=>i!==me));
+  let keepCA=null;
+  const one=pi=>{
+    let pt=-1, pc=null;
+    (bar.notes||[]).forEach(n=>{ const x=n&&(n.start|0);
+      if(n&&n.kind!=='rest'&&n.chord&&n.chord.root!=null&&x<st&&x>pt){ pt=x; pc=n.chord; } });
+    const all=barChordAtAll(bar);
+    if(all) Object.keys(all).forEach(k=>{ const x=+k; const c=all[k]; if(c&&c.root!=null&&x<st&&x>pt){ pt=x; pc=c; } });
+    if(pt<0||!pc) return;
+    const span=(bar.notes||[]).filter(n=>n&&n.start>=pt&&n.start<st);
+    if(!span.length||!span.some(atabUntouched)||!span.every(n=>n.kind==='rest'||atabUntouched(n))) return;
+    const own=(bar.notes||[]).some(n=>n&&(n.start|0)===pt&&n.chord&&n.chord.root!=null);
+    const inCA=!!(bar.chordAt&&bar.chordAt[pt]);
+    const v0=span.find(atabUntouched);
+    if(!autoTabSpan(bar,pt,clone(pc),{voicing:(v0&&v0.voicing)?v0.voicing:null})) return;
+    if(!own&&!(pi===me&&inCA)){ const f=(bar.notes||[]).find(n=>n&&n.kind!=='rest'&&(n.start|0)===pt); if(f) f.chord=null; }
+  };
+  try{
+    order.forEach((pi,k)=>{
+      if(k===1) keepCA=bar.chordAt?clone(bar.chordAt):null;   /* 表のパートが済んだ形を、他のパートでは守る */
+      bar._pi=pi;
+      if(pi!==me&&(!bar.np||!bar.np[pi]||!bar.np[pi].length)) return;
+      one(pi);
+      if(k>=1) bar.chordAt=keepCA?clone(keepCA):null;
+    });
+  } finally { bar._pi=me; }
+}
 /* 自動で書いた押さえを戻す（コードを動かした・消した時）。休符は繋げ直す */
 function revertAutoTab(bar,st){
   if(!bar||!bar.notes) return 0;
@@ -32822,7 +32912,7 @@ function vpickApply(fr){
 function renderVPick(){
   let el=$('vpick');
   const L=vpickLive();
-  if(!L){ if(el) el.remove(); return; }
+  if(!L){ if(el) el.remove(); document.documentElement.style.setProperty('--vpH','0px'); return; }
   const {p,ns}=L;
   const curFr=[0,1,2,3,4,5].map(i=>{ const o=(ns[0].stops||[]).find(x=>x.s===i); return o?o.f:null; });
   const curSig=fretSig(curFr);
@@ -32857,6 +32947,8 @@ function renderVPick(){
   /* いま選んでいる押さえを見える所へ */
   const onEl=sc.querySelector('.vp-card.on');
   if(onEl&&onEl.offsetLeft>sc.clientWidth-40) sc.scrollLeft=onEl.offsetLeft-12;
+  /* 通知が候補の列に重ならないよう、列の高さを渡す（tab-6.80） */
+  document.documentElement.style.setProperty('--vpH',(el.offsetHeight+2)+'px');
 }
 function cdgGhost(){
   const d=_cdg; if(!d||!_cpGhost) return;
@@ -41758,8 +41850,124 @@ function renameLegacyDemo(){
   return n;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   音の確かめ（tab-6.80）
+   L様の選択——Safari で開くだけで、大きさ・遅れ・歪みの掛かり方を測って表に出す。
+   頁の住所の末尾に ?soundcheck を付けて開いた時だけ出る。ふだんの画面には出ない。
+   曲は書き換えない：鳴らす音の束（_sndNow）を一時的に差し替えて測り、終われば戻す。
+   ══════════════════════════════════════════════════════════════ */
+function soundCheckWanted(){ try{ return /[?&]soundcheck\b/.test(location.search); }catch(_){ return false; } }
+function soundCheckBrowser(){
+  const u=navigator.userAgent||'';
+  if(/Edg\//.test(u)) return 'Edge';
+  if(/CriOS|Chrome\//.test(u)) return 'Chrome';
+  if(/FxiOS|Firefox\//.test(u)) return 'Firefox';
+  if(/Safari\//.test(u)) return 'Safari';
+  return 'そのほか';
+}
+async function soundCheckRun(out,btn){
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const say=t=>{ out.textContent=t; };
+  const ac=audioReady(); if(!ac){ say('このブラウザでは音が鳴らせません'); return; }
+  try{ if(ac.state!=='running') await ac.resume(); }catch(_){}
+  btn.disabled=true;
+  const keepNow=_sndNow, keepView=partSound(song);
+  const base=Object.assign({tone:'clean',body:BODY_DEF,drive:DRIVE_DEF,sustain:SUSTAIN_DEF,cdrive:0,fx:{}});
+  let rec=null;
+  const sp=ac.createScriptProcessor(4096,1,1);
+  sp.onaudioprocess=e=>{ if(rec) rec.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  const mute=ac.createGain(); mute.gain.value=0;
+  MASTER.connect(sp); sp.connect(mute); mute.connect(ac.destination);
+  const db=x=>20*Math.log10(Math.max(1e-7,x));
+  const use=v=>{ _sndNow=v; try{ clearSndCache(); }catch(_){} soundRefresh(v); };
+  /* 和音を一つ鳴らして、頭の最大と 1.4秒の大きさを測る */
+  const strumOnce=async(v)=>{
+    use(v); await wait(500);
+    rec=[]; const t0=ac.currentTime+0.06;
+    [40,45,50,55,59,64].forEach((m,i)=>pluck(t0+i*0.012,m,0.35,null,{str:i}));
+    await wait(1900); const bufs=rec; rec=null;
+    const a=[]; bufs.forEach(b=>{ for(let i=0;i<b.length;i++) a.push(b[i]); });
+    const st=a.findIndex(x=>Math.abs(x)>1e-4); if(st<0) return {rms:-120,peak:-120};
+    const sr=ac.sampleRate, e=Math.min(a.length,st+Math.round(sr*1.4));
+    let s=0,pk=0; for(let i=st;i<e;i++){ s+=a[i]*a[i]; pk=Math.max(pk,Math.abs(a[i])); }
+    return {rms:db(Math.sqrt(s/Math.max(1,e-st))),peak:db(pk)};
+  };
+  /* 正弦波を通して、3倍の音（歪み）がどれだけ出るか */
+  const thd=async(v,lvl)=>{
+    use(v); await wait(400);
+    const an=ac.createAnalyser(); an.fftSize=8192; MASTER.connect(an);
+    const os=ac.createOscillator(); os.frequency.value=220; const g=ac.createGain(); g.gain.value=lvl;
+    const bus=guitarBus()||MASTER; os.connect(g); g.connect(bus); os.start();
+    await wait(700); const f=new Float32Array(an.frequencyBinCount); an.getFloatFrequencyData(f);
+    os.stop(); try{ g.disconnect(); MASTER.disconnect(an); }catch(_){}
+    const bin=hz=>{ const i=Math.round(hz/(ac.sampleRate/an.fftSize)); return Math.max(f[i-1],f[i],f[i+1]); };
+    return bin(660)-bin(220);
+  };
+  const lines=[];
+  try{
+    lines.push('ブラウザ：'+soundCheckBrowser()+'　／　'+APP.build+'　／　'+ac.sampleRate+'Hz');
+    say('測っています（およそ30秒）…');
+    csMeasureLatency(); compPrime(); await wait(800);
+    const lat=Math.round(csLatency()*ac.sampleRate);
+    lines.push('歪みの道の遅れ：'+lat+'サンプル'+(_csLat==null?'（測れず、Chrome の値で代用）':'（測った値）'));
+    const rows=[
+      ['クリーン（基準）',{}],
+      ['クリーン＋コンプ ふつう',{fx:{comp:'0.7'}}],
+      ['クリーン＋コンプ たっぷり',{fx:{comp:'1'}}],
+      ['クリーン＋歪み いちばん',{cdrive:1}],
+      ['アコギ',{tone:'steel'}],
+      ['ドライブ',{tone:'drive'}],
+    ];
+    let ref=null; const warn=[];
+    lines.push(''); lines.push('■ 大きさ（和音を一つ・1.4秒）');
+    for(let i=0;i<rows.length;i++){
+      say('測っています（'+(i+1)+'／'+(rows.length+2)+'）…');
+      const [nm,o]=rows[i]; const v=Object.assign({},base,o,{fx:Object.assign({},o.fx||{})});
+      const r=await strumOnce(v);
+      if(ref==null) ref=r.rms;
+      const d=r.rms-ref;
+      lines.push(nm+'：'+r.rms.toFixed(1)+'dB（基準との差 '+(d>=0?'+':'')+d.toFixed(1)+'）　頭の最大 '+r.peak.toFixed(1)+'dB'+(r.peak>0?'　※割れ':''));
+      if(i>0&&i<=3&&Math.abs(d)>2.5) warn.push(nm+'の大きさが基準から '+d.toFixed(1)+'dB ずれています');
+      if(r.peak>0) warn.push(nm+'で頭が割れています');
+    }
+    lines.push(''); lines.push('■ クリーンの歪みの掛かり方（3倍の音の大きさ・基音との差）');
+    say('測っています（'+(rows.length+1)+'／'+(rows.length+2)+'）…');
+    const cv=Object.assign({},base,{cdrive:1});
+    const lo=await thd(cv,0.08);
+    say('測っています（'+(rows.length+2)+'／'+(rows.length+2)+'）…');
+    const hi=await thd(cv,0.32);
+    lines.push('弱く：'+lo.toFixed(1)+'dB　／　強く：'+hi.toFixed(1)+'dB　（差 '+Math.abs(hi-lo).toFixed(1)+'dB）');
+    if(Math.abs(hi-lo)>6) warn.push('クリーンの歪みが、弾く強さで掛かり方が変わっています');
+    lines.push('');
+    lines.push(warn.length?('■ 気になる所\n'+warn.join('\n')):'■ 判定：揃っています');
+  }catch(e){
+    lines.push('測る途中で止まりました：'+(e&&e.message||e));
+  }finally{
+    rec=null; try{ MASTER.disconnect(sp); sp.disconnect(); mute.disconnect(); }catch(_){}
+    _sndNow=keepNow; try{ clearSndCache(); soundRefresh(keepView===null?undefined:keepView); }catch(_){}
+    btn.disabled=false;
+  }
+  say(lines.join('\n'));
+}
+function soundCheckOpen(){
+  const pop=popup('音の確かめ','このブラウザで、音の大きさと歪みの掛かり方を測ります。曲は書き換えません');
+  const g=pgrp(pop,null);
+  const out=document.createElement('pre'); out.className='sc-out';
+  out.textContent='「測る」を押してください。音が鳴ります（30秒ほど）。';
+  const go=document.createElement('button'); go.type='button'; go.className='pb wide'; go.textContent='測る';
+  go.onclick=()=>soundCheckRun(out,go);
+  const cp=document.createElement('button'); cp.type='button'; cp.className='pb wide'; cp.textContent='結果を写す';
+  cp.onclick=()=>{ const t=out.textContent;
+    const ok=()=>toast('結果を写しました。そのまま貼り付けられます');
+    try{ navigator.clipboard.writeText(t).then(ok,()=>{ soundCheckSelect(out); toast('結果を選びました。コピーしてください'); }); }
+    catch(_){ soundCheckSelect(out); toast('結果を選びました。コピーしてください'); } };
+  g.appendChild(go); g.appendChild(cp); g.parentNode.appendChild(out);
+  popClose(pop);
+}
+function soundCheckSelect(el){ try{ const r=document.createRange(); r.selectNodeContents(el); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(_){} }
 function boot(){
   $('phase-badge').textContent=APP.name+' '+APP.build+' ／ '+APP.phase;
+  if(soundCheckWanted()) setTimeout(()=>{ try{ soundCheckOpen(); }catch(e){ console.error('[音の確かめ]',e); } },900);   /* ?soundcheck の時だけ（tab-6.80） */
   setTimeout(()=>{ const pb=$('phase-badge'); if(pb) pb.classList.add('gone'); },6000);
 
   /* 一覧を読む */
