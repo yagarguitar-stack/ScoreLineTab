@@ -1106,6 +1106,8 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 .paper,.paper *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .paper input,.paper select,.paper textarea,.paper [contenteditable="true"]{-webkit-user-select:text;user-select:text}
 .mwrap svg{touch-action:pan-y}
+body.md-tab #paper .mwrap svg{touch-action:none}   /* 入力の時の指の縦は、こちらで受ける（tab-6.82） */
+@media print{ #paper{transform:none!important;width:auto!important;max-width:none!important;margin-bottom:0!important} }
 body.dragging,body.dragging *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none}
 body.radialing,body.radialing *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none}
 body.dragging{cursor:ew-resize}
@@ -1946,7 +1948,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.81', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.83', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -6705,6 +6707,15 @@ function engrave(s,bar,o){
     let solid='';
     cells.sort((a,b2)=>a-b2).forEach(u=>{ solid+=box(timeX(u),timeX(nextMark(u)),false); });
     selSVG+=halo+solid;
+    /* ══ 十字キーの今のマスに、弦の印を重ねる（tab-6.83）══
+       L様の選択——縦の列（選んだマス）に、今の弦の横一本を薄く通して十字に交わらせ、
+       交わる所を濃い枠で囲む。縦の列だけでは、どの弦にいるかが判らなかった。 */
+    if(o.curStr!=null&&o.curTick!=null&&o.nselCells.has(o.curTick)){
+      const cy=strY(o.curStr), ch=PAD*2;
+      const cx0=timeX(o.curTick), cx1=timeX(nextMark(o.curTick));
+      selSVG+=`<rect class="ui-only cur-row" x="0" y="${(cy-PAD).toFixed(2)}" width="${W.toFixed(2)}" height="${ch.toFixed(2)}" fill="rgba(16,185,129,.12)"/>`
+        +`<rect class="ui-only cur-cell" x="${(cx0-1.5).toFixed(2)}" y="${(cy-PAD-0.5).toFixed(2)}" width="${Math.max(4,cx1-cx0+3).toFixed(2)}" height="${(ch+1).toFixed(2)}" rx="3.5" fill="none" stroke="#0b8f63" stroke-width="2.2"/>`;
+    }
   }
   /* ══ 帯で掴んでいる刻を、譜面にも見せる（tab-6.05）══
      L様——「どこを選んでるのか見た目でわからなくなった」。
@@ -9094,6 +9105,11 @@ let nselStr=null;
    矩形選択の器そのものなので、カーソルは**そこへ1マスだけ入れた状態**として持つ。
    別の器を作ると、選択と食い違った時にどちらが正なのか決められなくなる。 */
 let curCell=null;      // {barId,start,str}
+/* 十字キーが出ている時だけ、今のマスの弦の印を描く（tab-6.83）。出していない時の見た目は変えない */
+function curMarkFor(barId){
+  if(mode!=='tab'||!showPad||!curCell||curCell.barId!==barId) return {curStr:null,curTick:null};
+  return {curStr:curCell.str,curTick:curCell.start};
+}
 let curAnchor=null;    // Shift+矢印で伸ばす時の起点
 let showPad=false;     // 画面の十字キーを出すか（曲のデータではない）
 function nselStrHas(si){ return !nselStr||nselStr.has(si); }
@@ -9140,6 +9156,7 @@ let suppressClick=false;
    **待つ場所は三つある**（音符の的・弧と記号の的・コードの音符）ので、
    秒数はここ一箇所で持つ。別々に書けば、いずれ片方だけ延びる。 */
 const LP_MS=620;
+const TOUCH_HOLD_MS=200;   /* 指で上下に引く前に止める長さ（tab-6.82） */
 
 /* ══ 小節の中身をいじる土台 ══ */
 /* ══════════════════════════════════════════════════════════════
@@ -33304,8 +33321,46 @@ function renderDock(){
 /* ══════════════════════════════════════════
    譜面のイベント（タップ・長押し・ドラッグ伸縮）
    ══════════════════════════════════════════ */
+/* ══ 譜面の大きさ（tab-6.82）══
+   画面ごとではなく、譜面だけを大きくする。組みの幅を拡大率で割って組み直し、
+   見た目を拡大率で大きくするので、一段に並ぶ小節が減り、横にははみ出さない。
+   大きさはこの端末に覚える。 */
+const PZ_MIN=1, PZ_MAX=3;
+let PZ=1, PZG=null;
+function paperZoomApply(){
+  const pp=$('paper'); if(!pp) return;
+  const w=pp.parentElement;
+  if(PZ<=1.001||!w){ pp.style.width=''; pp.style.maxWidth=''; pp.style.transform=''; pp.style.transformOrigin=''; pp.style.marginBottom=''; return; }
+  const cs=getComputedStyle(w);
+  const inner=w.clientWidth-(parseFloat(cs.paddingLeft)||0)-(parseFloat(cs.paddingRight)||0);
+  pp.style.maxWidth='none'; pp.style.width=Math.floor(inner/PZ)+'px';
+  pp.style.transformOrigin='50% 0'; pp.style.transform='scale('+PZ+')';
+  pp.style.marginBottom=Math.round(pp.offsetHeight*(PZ-1))+'px';
+}
+function paperZoomSet(z){
+  PZ=Math.max(PZ_MIN,Math.min(PZ_MAX,Math.round(z*100)/100));
+  if(library){ library.paperZoom=PZ; try{ saveLibrary(); }catch(_){} }
+  paperZoomApply(); render(); paperZoomApply();
+}
+function paperZoomInit(){
+  if(paperZoomInit._done) return; paperZoomInit._done=true;
+  const z=library&&+library.paperZoom; if(z&&isFinite(z)) PZ=Math.max(PZ_MIN,Math.min(PZ_MAX,z));
+  const pp=$('paper'); if(!pp||!window.ResizeObserver) return;
+  /* 高さが変われば下の余白を、幅が変われば組みを合わせ直す */
+  let lastW=0;
+  new ResizeObserver(()=>{ if(PZ>1.001&&!PZG) pp.style.marginBottom=Math.round(pp.offsetHeight*(PZ-1))+'px'; }).observe(pp);
+  if(pp.parentElement) new ResizeObserver(()=>{ const w=pp.parentElement.clientWidth; if(w===lastW) return; lastW=w; if(PZ>1.001){ paperZoomApply(); try{ render(); }catch(_){} } }).observe(pp.parentElement);
+}
 function bindPaper(){
   const paper=$('paper'); if(!paper||paper._bound) return;
+  paperZoomInit();
+  /* ══ 指を結び直しただけの時は、打ち切りにしない（tab-6.82）══
+     指で触るとブラウザは触れた所（マス）へ指を結ぶ。なぞりが始まって紙へ結び直すと、
+     マスの側に「外れた」合図が出て、各なぞりがそれを打ち切りと取り違えていた（マウスでは起きない）。
+     結び先が紙へ移っただけなら、合図をここで止める。 */
+  window.addEventListener('lostpointercapture',e=>{
+    try{ if(e.target!==paper&&paper.hasPointerCapture(e.pointerId)) e.stopImmediatePropagation(); }catch(_){}
+  },true);
   paper._bound=true;
   let lp=null, sx=0, sy=0, drag=null;
   let rdrag=null;          /* 休符の筆の横なぞり（tab-2.76） */
@@ -33352,11 +33407,12 @@ function bindPaper(){
   /* 小節内のx座標 → tick */
   const tickAt=(wrap,clientX,bar)=>{
     const r=wrap.getBoundingClientRect();
-    const W=r.width;
+    const zk=(PZ>1.001)?PZ:1;            /* 拡大している時は、組みの寸法へ割り戻す（tab-6.82） */
+    const W=r.width/zk;
     const padL=padLFor(W,wrap.getAttribute('data-ts')==='1',wrap.getAttribute('data-clef')==='1');
     const inner=Math.max(20,W-padL-Math.min(16,W*0.075));
     const total=barTicks(song,bar);
-    return ((clientX-r.left-padL)/inner)*total;
+    return (((clientX-r.left)/zk-padL)/inner)*total;
   };
   paperTickAt=tickAt;                   /* 輪から切り替えた伸ばしも同じ物差しで（tab-6.78） */
 
@@ -33948,7 +34004,8 @@ function bindPaper(){
     const numS=(hit.getAttribute('data-num')||'').split('.').filter(v=>v!=='').map(Number);
     /* そのマスの幅（tab-2.59）。休符の筆が「このマスだけ」を切り出すのに要る */
     const len=Math.max(1,+hit.getAttribute('data-len')||0);
-    tdrag={...i,bar,barId:i.barId,src,st,str,base,cur:base,on:false,numS,len};
+    tdrag={...i,bar,barId:i.barId,src,st,str,base,cur:base,on:false,numS,len,
+           touch:(e.pointerType==='touch'), t0:performance.now()};   /* 指は一呼吸おいてから（tab-6.82） */
     /* 長押しで奏法へ */
     lp=setTimeout(()=>{
       lp=null; suppressClick=true; tdrag=null;
@@ -33985,6 +34042,7 @@ function bindPaper(){
          ここは広めに取ってよい。 */
       if(Math.abs(dx)>14||Math.abs(dy)>14) clearLP();
       if(Math.abs(dy)<8||Math.abs(dy)<=Math.abs(dx)) return;   /* 縦に動いた時だけ */
+      if(tdrag.touch&&performance.now()-tdrag.t0<TOUCH_HOLD_MS) return;   /* 指ですぐ払った時は、譜面を送る（tab-6.82） */
       tdrag.on=true; clearLP();
       setDragMark(tdrag.barId,tdrag.st); if(_dragMark) _dragMark.str=tdrag.str;
       tdrag.snap=clone(song); tdrag.snapAt=histMark();   /* いつの控えか（tab-4.77） */
@@ -34347,9 +34405,11 @@ function bindPaper(){
   const cancelTab=()=>{ clearLP();          /* 途中で取り消されたら時計も止める（tab-2.09） */
     if(!tdrag) return; hideTabTip();
     /* 取り消す時も、控えが今の続きである時だけ戻す（tab-4.77） */
+    const was=tdrag.on;
     if(tdrag.snap&&histFresh(tdrag.snapAt)) song=tdrag.snap;
     tdrag=null;
-    document.body.classList.remove('dragging'); setDragMark(null); render(); };
+    document.body.classList.remove('dragging'); setDragMark(null);
+    if(was) render(); };   /* 送りで打ち切られただけなら、組み直さない（tab-6.82） */
   /* ══ 装飾音符のなぞり（tab-2.04）══
      本体のなぞり（tdrag）と同じ作りにしてある。触れている間はその小節だけ
      描き直し、指を離した時の `tx()` が一度だけ控えを取る。 */
@@ -35043,15 +35103,116 @@ function bindPaper(){
     suppressClick=true; setTimeout(()=>{ suppressClick=false; },400);
   });
 
-  /* 二本指タップ（iPad・iPhone）で筆を切り替える。輪は長押しから */
-  paper.addEventListener('touchstart',e=>{
+  /* ══ 指の上下は、一呼吸おいてから（tab-6.82）══
+     L様——「iPad で上下ドラッグが反応しない」。
+     譜面は指の縦の動きを「送る」に充てているので、指で上下に引くとブラウザが横取りし、
+     数字を変える前に打ち切られていた。
+     指を置いて TOUCH_HOLD_MS ほど止めてから上下に引いた時だけ、送りを止めて数字の操作にする。
+     すぐ払えば今まで通り譜面が送られる。 */
+  paper.addEventListener('touchmove',e=>{
+    if(!e.touches||e.touches.length!==1) return;
+    if(!tdrag||!tdrag.touch) return;
+    if(tdrag.on||performance.now()-tdrag.t0>=TOUCH_HOLD_MS){ if(e.cancelable) e.preventDefault(); }
+  },{passive:false});
+
+  /* ══════════════════════════════════════════════════════════════
+     指の操作（tab-6.82）——L様「iPad で上下ドラッグが反応しない・拡大もできない」
+     ・入力の時は、小節の上の指の縦の動きをブラウザに任せず、ここで受ける。
+       すぐ払えば譜面を送り（離した後は惰性で流す）、一呼吸おいて引けば数字の操作。
+       ブラウザに任せていた時は、上下に引くと送りに取られて数字の操作が打ち切られていた。
+     ・二本指で広げる／つまむと譜面が大きく／小さくなり、二本指のまま動かすと送る。
+       二本指で軽く叩いた時だけ、筆（数字／休符）を切り替える。
+     ══════════════════════════════════════════════════════════════ */
+  let tscr=null, tscrInert=0;
+  const scHost=()=>scrollHost()||document.scrollingElement||document.documentElement;
+  const stopInert=()=>{ if(tscrInert){ cancelAnimationFrame(tscrInert); tscrInert=0; } };
+  /* 二本目の指は、一本指の操作へ渡さない */
+  paper.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch') return;
+    if(!e.isPrimary||PZG){ e.stopImmediatePropagation(); return; }
+    stopInert();
+    tscr=null;
     if(mode!=='tab') return;
+    if(!(e.target&&e.target.closest&&e.target.closest('#paper .mwrap svg'))) return;
+    tscr={id:e.pointerId,x0:e.clientX,y0:e.clientY,last:e.clientY,lt:performance.now(),t0:performance.now(),v:0,on:false};
+  },true);
+  paper.addEventListener('pointermove',e=>{
+    if(!tscr||e.pointerId!==tscr.id) return;
+    const dx=e.clientX-tscr.x0, dy=e.clientY-tscr.y0, now=performance.now();
+    if(!tscr.on){
+      if(now-tscr.t0>=TOUCH_HOLD_MS&&!(Math.abs(dy)>8)){ tscr=null; return; }   /* 一呼吸おいた：数字の操作へ譲る */
+      if(Math.abs(dy)<8||Math.abs(dy)<=Math.abs(dx)){ if(Math.abs(dx)>10) tscr=null; return; }   /* 横は他の操作へ */
+      if(now-tscr.t0>=TOUCH_HOLD_MS){ tscr=null; return; }
+      tscr.on=true; clearLP();
+      if(tdrag&&!tdrag.on) tdrag=null;
+      if(drag&&!drag.on) drag=null;
+      hideTabTip();
+    }
+    const h=scHost(), step=e.clientY-tscr.last, dt=Math.max(1,now-tscr.lt);
+    h.scrollTop-=step;
+    tscr.v=0.8*(step/dt)+0.2*tscr.v; tscr.last=e.clientY; tscr.lt=now;
+    e.stopImmediatePropagation();
+  },true);
+  const endScr=()=>{
+    if(!tscr) return;
+    const was=tscr.on, v0=tscr.v; tscr=null;
+    if(!was) return;
+    suppressClick=true; setTimeout(()=>{ suppressClick=false; },350);   /* 送った指を離しても、マスは叩かない */
+    let v=v0*16, h=scHost();
+    if(Math.abs(v)<1.5) return;
+    const tick=()=>{ h.scrollTop-=v; v*=0.94; tscrInert=(Math.abs(v)>0.4)?requestAnimationFrame(tick):0; };
+    tscrInert=requestAnimationFrame(tick);
+  };
+  paper.addEventListener('pointerup',endScr,true);
+  paper.addEventListener('pointercancel',endScr,true);
+
+  /* ── 二本指 ── */
+  const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  const tmid=t=>({x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2});
+  const zoomHost=paper.parentElement||paper;
+  zoomHost.addEventListener('touchstart',e=>{
     if(!e.touches||e.touches.length!==2) return;
-    clearLP(); drag=null;
+    stopInert(); clearLP();
+    /* 一本目の指で始まりかけた操作は、なかったことにする */
+    if(tdrag){ const was=tdrag.on; if(tdrag.snap&&histFresh(tdrag.snapAt)) song=tdrag.snap; tdrag=null; hideTabTip(); setDragMark(null); if(was) render(); }
+    drag=null; tscr=null;
     document.body.classList.remove('dragging');
-    togglePen();
-    suppressClick=true; setTimeout(()=>{ suppressClick=false; },500);
-  },{passive:true});
+    const h=scHost(), c=tmid(e.touches);
+    PZG={d0:Math.max(20,tdist(e.touches)),c0:c,z0:PZ,z:PZ,t0:performance.now(),moved:false,
+         h,sc0:h.scrollTop,hTop:(h===document.scrollingElement||h===document.documentElement)?0:h.getBoundingClientRect().top};
+    e.preventDefault();
+  },{passive:false});
+  zoomHost.addEventListener('touchmove',e=>{
+    if(!PZG||!e.touches||e.touches.length!==2) return;
+    e.preventDefault();
+    const d=tdist(e.touches), c=tmid(e.touches);
+    const z=Math.max(PZ_MIN,Math.min(PZ_MAX,PZG.z0*d/PZG.d0));
+    if(Math.abs(d/PZG.d0-1)>0.05||Math.hypot(c.x-PZG.c0.x,c.y-PZG.c0.y)>10) PZG.moved=true;
+    PZG.z=z;
+    /* 動いている間は見た目だけ大きくし、指を離した所で組み直す */
+    const pp=$('paper'); if(pp){ pp.style.transformOrigin='50% 0'; pp.style.transform='scale('+z+')'; }
+    PZG.h.scrollTop=PZG.sc0-(c.y-PZG.c0.y);
+  },{passive:false});
+  const endPZ=e=>{
+    if(!PZG) return;
+    if(e.touches&&e.touches.length>=2) return;
+    const g=PZG; PZG=null;
+    if(!g.moved&&performance.now()-g.t0<350){
+      paperZoomApply();
+      if(mode==='tab'){ togglePen(); suppressClick=true; setTimeout(()=>{ suppressClick=false; },500); }
+      return;
+    }
+    suppressClick=true; setTimeout(()=>{ suppressClick=false; },400);
+    if(Math.abs(g.z-PZ)<0.02){ paperZoomApply(); return; }
+    /* 指の間にあった所を、組み直した後も同じ高さに残す */
+    const h=g.h, cy=g.c0.y-g.hTop, frac=(h.scrollTop+cy)/Math.max(1,h.scrollHeight);
+    paperZoomSet(g.z);
+    h.scrollTop=frac*h.scrollHeight-cy;
+  };
+  zoomHost.addEventListener('touchend',endPZ);
+  zoomHost.addEventListener('touchcancel',endPZ);
+  /* Safari が頁ごと拡大しないように */
+  ['gesturestart','gesturechange'].forEach(k=>zoomHost.addEventListener(k,e=>e.preventDefault(),{passive:false}));
 
   /* ── ループ設定モード：小節を横になぞって範囲を引く ──
      このモードでしか効かないので、音価ドラッグや小節の選択と当たらない */
@@ -36166,6 +36327,7 @@ let _disp=[];      /* 表示順の小節（自動送りで使う） */
 const _dispNo=new Map();
 
 function render(){
+  paperZoomInit(); if(PZ>1.001) paperZoomApply();   /* 譜面の大きさ（組みの幅）を先に合わせる（tab-6.82） */
   renderTopbar();
   if(AMP.el) ampRender();      /* 取り消し・パートの切り替えにも付いてくる（tab-6.43） */
   if(MXEL) mixRender();        /* ミキサーも同じ（tab-6.45） */
@@ -36522,6 +36684,7 @@ function redrawBar(barId){
           .map(k=>+String(k).slice(String(k).lastIndexOf('#')+1)))
       : null;
     o.opts.nselStr=(mode==='select'||mode==='tab')?nselStr:null;
+    Object.assign(o.opts,curMarkFor(barId));
     let r;
     try{ r=engrave(song,bar,Object.assign({width:wrap.clientWidth||210},o.opts)); }
     catch(e){ console.error('engrave(部分)',e); return; }
@@ -36759,6 +36922,7 @@ function fillMeasures(){
             .map(k=>+String(k).slice(String(k).lastIndexOf('#')+1)))
         : null,
       nselStr:(mode==='select'||mode==='tab')?nselStr:null,
+      ...curMarkFor(p.barId),
       /* 選択モードでも刻みのマスを敷く。**空いた時間を選べないと、
          貼る位置が音符の上にしか置けない**（tab-1.21） */
       /* マスはこの小節の刻み（tab-1.69）。曲ぜんたいのものではない */
@@ -36871,7 +37035,17 @@ function padUD(dir){
   return move?('選んだ音を'+(up?'上':'下')+'の弦へ移す')
              :((up?'上':'下')+'の弦へ');
 }
+/* ══ 十字キーは端末に覚える（tab-6.82）══
+   まだ決めていなければ、指で触る端末（iPad・スマホ）では最初から出す。 */
+let _padInit=false;
+function padInit(){
+  if(_padInit) return; _padInit=true;
+  if(library&&library.showPad!=null){ showPad=!!library.showPad; return; }
+  try{ showPad=!!(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches); }catch(_){}
+}
+function padRemember(){ if(library){ library.showPad=!!showPad; try{ saveLibrary(); }catch(_){} } }
 function renderPad(){
+  padInit();
   let el=$('dpad');
   if(!showPad||(mode!=='tab'&&mode!=='select')){ if(el) el.remove(); return; }
   if(!el){
@@ -36880,7 +37054,7 @@ function renderPad(){
     el.addEventListener('click',e=>{
       const b=e.target.closest&&e.target.closest('button'); if(!b) return;
       const a=b.getAttribute('data-a');
-      if(a==='hide'){ showPad=false; renderPad(); syncSettings(); return; }
+      if(a==='hide'){ showPad=false; padRemember(); renderPad(); syncSettings(); render(); return; }   /* 弦の印も消す（tab-6.83） */
       if(PAD_ACT) PAD_ACT(a);
     });
   }
@@ -39706,7 +39880,7 @@ function renderSettings(){
           tempPolicy(),v=>{ library.tempPolicy=v; saveLibrary(); renderSettings(); }),
       false,'🎲 で作った譜面に、手を入れないまま他の曲へ移る時の始末でございます');
     fld('画面の十字キー',sel([['off','出さない'],['on','出す']],showPad?'on':'off',v=>{
-      showPad=(v==='on'); renderPad();
+      showPad=(v==='on'); padRemember(); renderPad(); render();
     }),false,'右下に十字キーを出します。カーソルを一マスずつ動かし、フレットを一つずつ上げ下げできます。指だけの端末で、9ピクセルで1フレットというなぞりが難しい時に。キーボードをお使いなら矢印キーと数字キーで同じことができますので、出さなくても構いません。十字キー自身の〈畳む〉からも仕舞えます');
   }
 
