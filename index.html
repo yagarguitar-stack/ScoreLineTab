@@ -1948,7 +1948,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.83', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.88', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2953,7 +2953,27 @@ function mkSection(o){
            items:o.items||[] };
 }
 function mkSong(o){
-  return drumKeepWaltz(mkSong0(o));
+  return restKeepWritten(drumKeepWaltz(mkSong0(o)),o);
+}
+/* ══ 以前の曲の休符は、すべて「書いた休符」として守る（tab-6.88）══
+   tab-6.87 までは、道具の休符と書いた休符を分けていなかった。
+   以前の曲の休符が、次の音を置いた拍子に吸われて消えては困る。
+   印（meta.restMark）を持たない曲を読んだ時、小節いっぱいでない休符にはみな `wr` を付ける。
+   小節いっぱいの休符は、前に音が無いのでどのみち吸われない。 */
+function restKeepWritten(S,src){
+  try{
+    if(!S||!S.meta) return S;
+    const had=!!(src&&src.meta&&src.meta.restMark);
+    if(!had){
+      (S.bars||[]).forEach(b=>{
+        const total=barTicks(S,b);
+        const lists=(Array.isArray(b.np)&&b.np.length)?b.np:[b.notes];
+        lists.forEach(ns=>(ns||[]).forEach(n=>{ if(n&&n.kind==='rest'&&n.len<total) n.wr=true; }));
+      });
+    }
+    S.meta.restMark=1;
+  }catch(_){}
+  return S;
 }
 /* ══ 以前の 3/4 の曲の鳴り方を引き継ぐ（tab-6.79）══
    tab-6.70 までは、3拍の小節で鳴らす時に**型に関わらずワルツの形へ寄せて**いた。
@@ -5686,6 +5706,7 @@ function engrave(s,bar,o){
       flat.push({
         name:p.name, dot:p.dot, trip:(p.trip||0), start:acc, u:p.u,
         rest:(n.kind==='rest'), brush:(n.kind==='brush'),
+        wr:(n.kind==='rest'&&!!n.wr),   /* L様が書いた休符か（tab-6.88）。違えば仮の休符として描く */
         /* 符尾の向き（tab-1.87）。休符には向きが無い */
         up:(n.kind==='rest')?null:stemUpOf(n),
         stemSet:(n.stem==='up'||n.stem==='down'),
@@ -6949,7 +6970,7 @@ function engrave(s,bar,o){
     if(sim) return;
     const cx=xs[i];
     /* 桁の中の休符は、桁の位置が決まってから逃がす（tab-2.70。下の連桁が描く） */
-    if(n.rest){ if(!beamedRest.has(i)) g+=restSVG(n.name,cx,baseY,n.dot);
+    if(n.rest){ if(!beamedRest.has(i)) g+=n.wr?restSVG(n.name,cx,baseY,n.dot):('<g class="rest-auto">'+restSVG(n.name,cx,baseY,n.dot)+'</g>');
                 prevI=-1; prevStops=null; return; }
     const sy0=n.sym;
     const stops=(n.stops&&n.stops.length)?n.stops:null;
@@ -9784,7 +9805,7 @@ function makeRestOver(s,bar,st,len){
     }
   });
   bar.notes=keep.concat(tails);
-  bar.notes.push(mkNote({start:st,len,kind:'rest'}));
+  bar.notes.push(mkNote({start:st,len,kind:'rest',wr:true}));
   normalizeBar(s,bar);
   sanitizeBarLinks(s,bar);
   return true;
@@ -9802,6 +9823,32 @@ function insertNote(s,bar,start,data){
   const len=(nx?nx.start:total)-start;
   const n=mkNote(Object.assign({start,len},data||{}));
   bar.notes.push(n);
+  normalizeBar(s,bar);
+  return bar.notes.indexOf(n);
+}
+/* ══ 仮の休符は、次の音を置けば前の音へ吸わせる（tab-6.88）══
+   L様——「今自動で休符が入るんだけどいちいち消したりするのが手間」。
+   休符には二つある。**道具が入れた休符**（小節を足した時の全休符・置いた残りの切れ端・
+   縮めた後の空き）と、**L様が書いた休符**（休符の筆・〈休符に〉・削除。印 `wr`）。
+   音を一つ置いた時、同じ小節でその前に鳴っている音との間が、道具の休符と空きだけなら、
+   前の音をそこまで伸ばして休符を消す。書いた休符が一つでも挟まれば触れない。
+   小節の頭の休符・前の小節から続く休符は、前の音が同じ小節に無いので触れない。
+   連符の中の音は伸ばすと連符が崩れるので触れない。
+   返り値は、置いた音の新しい番号（休符が消えると番号が詰まる）。 */
+function absorbAutoRests(s,bar,idx){
+  const ns=bar&&bar.notes; const n=ns&&ns[idx];
+  if(!n||n.kind==='rest') return idx;
+  const t=n.start;
+  let p=null;
+  ns.forEach(m=>{ if(m!==n&&m.kind!=='rest'&&m.start<t&&(!p||m.start>p.start)) p=m; });
+  if(!p) return idx;
+  const pe=p.start+Math.max(1,p.len);
+  if(pe>=t) return idx;
+  if(p.tuplet||p.tup||(p.stops||[]).some(o=>o&&o.t&&o.t.grace)) return idx;
+  const mid=ns.filter(m=>m!==n&&m!==p&&m.start<t&&m.start+Math.max(1,m.len)>pe);
+  if(mid.some(m=>m.kind!=='rest'||m.wr)) return idx;
+  bar.notes=ns.filter(m=>mid.indexOf(m)<0);
+  p.len=t-p.start;
   normalizeBar(s,bar);
   return bar.notes.indexOf(n);
 }
@@ -11621,6 +11668,7 @@ function linkWhyNot(bar,idx,str,v,s){
 function makeRest(bar,idx){
   const n=bar&&bar.notes&&bar.notes[idx]; if(!n) return false;
   n.kind='rest';
+  n.wr=true;            /* L様が書いた休符。次の音を置いても吸わせない（tab-6.88） */
   n.stops=null; n.chord=null; n.stroke=null;
   n.accent=false; n.staccato=false; n.tieOut=false;
   /* ══ 弾く時の記号は休符に残さない（tab-2.33）══
@@ -11696,14 +11744,14 @@ function makeRestSpanStr(s,bar,idx,st,len,str){
   if(r1<a1){
     /* 真ん中——叩いた弦だけ抜く。残る弦は後半へも繋ぐ */
     if(rest.length) outs.push(mkNote({start:r0,len:r1-r0,kind:n.kind,stops:cp(rest,true)}));
-    else            outs.push(mkNote({start:r0,len:r1-r0,kind:'rest'}));
+    else            outs.push(mkNote({start:r0,len:r1-r0,kind:'rest',wr:true}));
     /* 後半——叩いた弦だけ弾き直す */
     outs.push(mkNote({start:r1,len:a1-r1,kind:n.kind,
       stops:stops.map(o=>({s:o.s,f:o.f,
         t:Object.assign({},o.t||{},{tie:false,link:null})}))}));
   }else{
     if(rest.length) outs.push(mkNote({start:r0,len:r1-r0,kind:n.kind,stops:cp(rest,false)}));
-    else            outs.push(mkNote({start:r0,len:r1-r0,kind:'rest'}));
+    else            outs.push(mkNote({start:r0,len:r1-r0,kind:'rest',wr:true}));
   }
   if(r0<=a0){
     /* 頭から抜く時は、元の音符を最初の切れ端で置き換える */
@@ -11740,7 +11788,7 @@ function makeRestSpan(s,bar,idx,st,len){
     /* 休符が続くのだから、前の音符のタイは行き先を失う */
     (n.stops||[]).forEach(o=>{ if(o.t) o.t.tie=false; });
     n.tieOut=false;
-    bar.notes.push(mkNote({start:r0,len:r1-r0,kind:'rest'}));
+    bar.notes.push(mkNote({start:r0,len:r1-r0,kind:'rest',wr:true}));
   }else{
     /* 頭から休符。音符そのものを休符に変えて、丈だけ詰める */
     makeRest(bar,idx);
@@ -19080,6 +19128,8 @@ function fxApply(){
   }
 }
 
+/* ノイズゲートの開き具合（弦の音の大きさ・整流してならした値）。−66dB で閉じ、−54dB で全開（tab-6.87） */
+const GATE_LO=0.0005, GATE_HI=0.002, GATE_K=200;
 function guitarBus(){
   if(!AC) return null;
   if(!GBUS){
@@ -19169,7 +19219,25 @@ function guitarBus(){
     GCAB=AC.createBiquadFilter(); GCAB.type='lowpass'; GCAB.Q.value=0.7;
     GMID=AC.createBiquadFilter(); GMID.type='peaking'; GMID.Q.value=0.9;
     GDIRT=AC.createGain(); GDIRT.gain.value=0;
-    if(GRECT){ GPOST.connect(GRECT); GRECT.connect(GHP); } else GPOST.connect(GHP);
+    /* ══ 歪みの入口のノイズゲート（tab-6.87）══
+       L様——「歪ませると常にノイズがなってる」。
+       弦の音は少しずつ小さくなるが、ぴたりと0にはならない。歪みの強い音色は、その消え残りまで
+       持ち上げるので、メタル・インセインでは弾いた後いつまでも −23dB で鳴り続けていた。
+       本物のアンプと同じく、入口で小さな音を切る。弦の音の大きさを追いかけ（整流→ならし）、
+       GATE_LO を下回れば閉じ、GATE_HI を越えれば全開。素の音・胴の響きには掛けない。 */
+    const _gate=AC.createGain(); _gate.gain.value=0;
+    { const ab=AC.createWaveShaper(), c=new Float32Array(1025);
+      for(let i=0;i<1025;i++){ const x=i/512-1; c[i]=Math.abs(x); } ab.curve=c;
+      const l1=AC.createBiquadFilter(); l1.type='lowpass'; l1.frequency.value=40; l1.Q.value=0.5;
+      const l2=AC.createBiquadFilter(); l2.type='lowpass'; l2.frequency.value=40; l2.Q.value=0.5;
+      const k=AC.createGain(); k.gain.value=GATE_K;               /* 小さな値を、曲線の分解能が足りる所まで持ち上げる */
+      const cv=AC.createWaveShaper(), N=4097, cc=new Float32Array(N);
+      for(let i=0;i<N;i++){ const x=(i/(N-1))*2-1, v=Math.max(0,x)/GATE_K;
+        const u=Math.max(0,Math.min(1,(v-GATE_LO)/(GATE_HI-GATE_LO))); cc[i]=u*u*(3-2*u); }
+      cv.curve=cc;
+      GPOST.connect(ab); ab.connect(l1); l1.connect(l2); l2.connect(k); k.connect(cv); cv.connect(_gate.gain); }
+    GPOST.connect(_gate);
+    if(GRECT){ _gate.connect(GRECT); GRECT.connect(GHP); } else _gate.connect(GHP);
     GHP.connect(GPRE);
     const _afterShp=GSHP?(GPRE.connect(GSHP),GSHP):GPRE;
     _afterShp.connect(GLP2); GLP2.connect(GPRE2);
@@ -22651,11 +22719,42 @@ function playStop(){
   stopAllSched();
   if(AC) stopAllVoices(AC.currentTime);
   TP.playing=false; TP.vq=[]; TP.tl=null; TP.body=null; TP.damps=[]; TP.t0q=[];
+  /* ══ 止めた所を、同じ高さに残す（tab-6.84）══
+     L様——「再生停止後によく自動でスクロールされて他の小節になる」。
+     止めると入力向きの姿へ組み直すので、譜面の高さが変わる（iPad の幅で 2537→3060px）。
+     送りの位置は数字のまま残るので、中身だけがずれて別の小節が見えていた。
+     組み直す前に、鳴らしていた小節（無ければ見えている一番上の小節）の高さを控え、
+     組み直した後に同じ高さへ戻す。 */
+  const anc=paperAnchorTake(TP.curBar);
   clearPlayline();
   setPlayhead(null);
   document.body.classList.remove('playing');
   renderPlayBar();
   render();                       /* 入力向きの姿へ戻す（tab-2.78） */
+  paperAnchorPut(anc);
+}
+function paperAnchorTake(barId){
+  try{
+    const top0=(($('topbar')||document.querySelector('.topbar'))||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom;
+    const bb=$('botbar'), bot=bb?bb.getBoundingClientRect().top:innerHeight;
+    let el=barId?document.querySelector('#paper .mwrap.now')||document.querySelector('#paper .mwrap[data-bar="'+barId+'"]'):null;
+    if(el){ const r=el.getBoundingClientRect(); if(r.bottom<top0||r.top>bot) el=null; }
+    if(!el) el=[...document.querySelectorAll('#paper .mwrap')].find(w=>w.getBoundingClientRect().bottom>top0+8)||null;
+    if(!el) return null;
+    return {si:el.getAttribute('data-si'),pos:el.getAttribute('data-pos'),bar:el.getAttribute('data-bar'),top:el.getBoundingClientRect().top};
+  }catch(_){ return null; }
+}
+function paperAnchorPut(a){
+  if(!a) return;
+  try{
+    const el=document.querySelector('#paper .mwrap[data-si="'+a.si+'"][data-pos="'+a.pos+'"]')
+           ||document.querySelector('#paper .mwrap[data-bar="'+a.bar+'"]');
+    if(!el) return;
+    const d=el.getBoundingClientRect().top-a.top;
+    if(Math.abs(d)<1) return;
+    const h=scrollHost()||document.scrollingElement||document.documentElement;
+    h.scrollTop+=d;
+  }catch(_){}
 }
 function playToggle(){
   /* ══ ■ は「止める」の札である（tab-5.07）══
@@ -24719,7 +24818,53 @@ function nselApply(label,fn,keepSel){
            :('掛けられる音がありませんでした'+skipped),'取り消す',()=>doUndo(),5000);
   return hit;
 }
+/* ══ 〈奏法〉の札は、輪を開く（tab-6.85）══
+   L様——「まとめて選択して奏法を開く時ホイールをひらいて。現状全然奏法の画面になってない」。
+   一つの音の輪と、なるべく同じ位置に並べる（ビブラートは下、ミュートは左下）。
+   付いている物は光り、もう一度押せば外れる。中心〈くわしく〉は今までの窓（音価・符尾もそこ）。 */
 function openNoteTech(){
+  if(!nsel.size){ toast('音符を選んでください'); return; }
+  const list=nselNotes().map(o=>{ const b=findBar(song,o.barId); if(!b) return null;
+    const i=noteIdxIn(b,o.start); const n=(i>=0)?b.notes[i]:null; return (n&&n.kind!=='rest')?n:null; }).filter(Boolean);
+  if(!list.length){ toast('音符を選んでください'); return; }
+  const all=f=>list.every(f);
+  const selStops=n=>(n.stops||[]).filter(o=>nselStrHas(o.s));
+  const hasVib=all(n=>{ const ss=selStops(n); return ss.length>0&&ss.every(o=>o.t&&o.t.vib); });
+  const hasSym=k=>all(n=>!!(n.sym&&n.sym[k]));
+  const hasAcc=all(n=>!!n.accent), hasStac=all(n=>!!n.staccato);
+  const symT=(lbl,key)=>()=>{ const on=hasSym(key);
+    nselApply(on?(lbl+'を外す'):lbl,n=>{ n.sym=n.sym||{}; if(on) delete n.sym[key]; else n.sym[key]=true; }); };
+  /* 輪は選んだマスの所に開く。見えていなければ画面の中ほど */
+  let cx=innerWidth/2, cy=innerHeight/2;
+  try{
+    const r=[...document.querySelectorAll('#paper rect.ui-only[stroke]')].map(x=>x.getBoundingClientRect())
+      .find(q=>q.width>0&&q.top>60&&q.bottom<innerHeight-60);
+    if(r){ cx=r.left+r.width/2; cy=r.top+r.height/2; }
+  }catch(_){}
+  const gp=(song.meta.strokeGlyph==='pick');
+  const pickRing=()=>{
+    const set=v=>()=>{ let i=0; nselApply('ピッキングを決める',n=>{ n.stroke=(v==='alt')?((i++%2)?'u':'d'):v; }); };
+    openRadial(cx,cy,[
+      {t:gp?'⊓':'↓', sub:'ダウン', fn:set('d')},
+      {t:gp?'Ｖ':'↑', sub:'アップ', fn:set('u')},
+      {t:gp?'⊓Ｖ':'↓↑', sub:'交互', fn:set('alt')},
+      {t:'自動', sub:'自動にまかせる', fn:set(null)},
+    ],{t:'← 戻る',fn:()=>setTimeout(openNoteTech,0)},false);
+  };
+  const items=[
+    {t:'⌣', sub:'繋ぐ', fn:()=>nselJoin()},
+    {t:'ring', sub:'let ring', on:hasSym('ring'), fn:symT('let ring','ring')},
+    {t:'›', sub:'アクセント', on:hasAcc, fn:()=>nselApply(hasAcc?'アクセントを外す':'アクセント',n=>{ n.accent=!hasAcc; })},
+    {t:'•', sub:'スタッカート', on:hasStac, fn:()=>nselApply(hasStac?'スタッカートを外す':'スタッカート',n=>{ n.staccato=!hasStac; })},
+    {t:'〜', sub:'ビブラート', on:hasVib, fn:()=>nselApply(hasVib?'ビブラートを外す':'ビブラート',n=>
+        eachSelStop(n,hasVib?null:'vib',st=>{ if(hasVib){ if(st.t) delete st.t.vib; } else { st.t=st.t||{}; st.t.vib='n'; } }))},
+    {t:symTxt(song,'pm')||'P.M.', sub:'ミュート', on:hasSym('pm'), fn:symT(symTxt(song,'pm')+' ミュート','pm')},
+    {t:'×⌣', sub:'繋ぎを外す', fn:()=>nselUnjoin()},
+    {t:gp?'⊓Ｖ':'↓↑', sub:'ピッキング', fn:()=>setTimeout(pickRing,0)},
+  ];
+  openRadial(cx,cy,items,{t:'くわしく',fn:()=>setTimeout(openNoteTechList,0)},false);
+}
+function openNoteTechList(){
   if(!nsel.size){ toast('音符を選んでください'); return; }
   /* 見出しは**音符の数**。以前は `nsel.size`——マス数を「音」と名乗っていた（tab-2.53） */
   const pop=popup('選んだ音にまとめて',nselNotes().length+'音'
@@ -25450,7 +25595,7 @@ function renderCtxRow(){
           nselJoin,!nsel.size,null,'wide');
       btn('繋ぎを外す','選んだ範囲のタイ・繋がりを外します',
           nselUnjoin,!nsel.size,null,'wide');
-      btn('奏法','選んだ音符にまとめて掛けます（レガート・ビブラート・ミュート・ピッキング）',openNoteTech,!nsel.size,null,'wide');
+      btn('奏法','選んだ音符にまとめて掛けます（繋ぐ・ビブラート・ミュート・ピッキングなど）',openNoteTech,!nsel.size,null,'wide');
       /* ══ 札は、押した時に起きることを名乗る（tab-2.52）══
          頭を選んでいなければ、起きるのは「切り詰め」であって「休符に」ではない。 */
       { const pl=nsel.size?nselDelPlan():{heads:[],trims:[]};
@@ -33321,35 +33466,37 @@ function renderDock(){
 /* ══════════════════════════════════════════
    譜面のイベント（タップ・長押し・ドラッグ伸縮）
    ══════════════════════════════════════════ */
-/* ══ 譜面の大きさ（tab-6.82）══
-   画面ごとではなく、譜面だけを大きくする。組みの幅を拡大率で割って組み直し、
-   見た目を拡大率で大きくするので、一段に並ぶ小節が減り、横にははみ出さない。
-   大きさはこの端末に覚える。 */
+/* ══ 譜面の大きさ（tab-6.82・tab-6.84 で作り替え）══
+   L様——「拡大した時に文字や数字がおかしくなる。表示はそのままで拡大したい」。
+   tab-6.82 は組みの幅を割って組み直していたので、並びが変わり文字が詰まっていた。
+   今は写真を広げるのと同じく、**並びはそのまま、見た目だけを大きくする。**
+   はみ出した所は二本指で上下左右へ動かして見る（横は PX、縦は頁の送り）。
+   大きさはこの端末に覚える。横の位置は覚えない。 */
 const PZ_MIN=1, PZ_MAX=3;
-let PZ=1, PZG=null;
+let PZ=1, PX=0, PZG=null;
+function paperZoomClampX(){
+  const pp=$('paper'); if(!pp) return;
+  const max=Math.max(0,pp.offsetWidth*(PZ-1));
+  PX=Math.max(0,Math.min(max,PX));
+}
 function paperZoomApply(){
   const pp=$('paper'); if(!pp) return;
   const w=pp.parentElement;
-  if(PZ<=1.001||!w){ pp.style.width=''; pp.style.maxWidth=''; pp.style.transform=''; pp.style.transformOrigin=''; pp.style.marginBottom=''; return; }
-  const cs=getComputedStyle(w);
-  const inner=w.clientWidth-(parseFloat(cs.paddingLeft)||0)-(parseFloat(cs.paddingRight)||0);
-  pp.style.maxWidth='none'; pp.style.width=Math.floor(inner/PZ)+'px';
-  pp.style.transformOrigin='50% 0'; pp.style.transform='scale('+PZ+')';
+  pp.style.width=''; pp.style.maxWidth='';
+  if(PZ<=1.001){ PX=0; pp.style.transform=''; pp.style.transformOrigin=''; pp.style.marginBottom=''; if(w) w.style.overflowX=''; return; }
+  paperZoomClampX();
+  pp.style.transformOrigin='0 0';
+  pp.style.transform='translateX('+(-PX).toFixed(1)+'px) scale('+PZ+')';
   pp.style.marginBottom=Math.round(pp.offsetHeight*(PZ-1))+'px';
+  if(w) w.style.overflowX=(window.CSS&&CSS.supports&&CSS.supports('overflow-x','clip'))?'clip':'hidden';
 }
-function paperZoomSet(z){
-  PZ=Math.max(PZ_MIN,Math.min(PZ_MAX,Math.round(z*100)/100));
-  if(library){ library.paperZoom=PZ; try{ saveLibrary(); }catch(_){} }
-  paperZoomApply(); render(); paperZoomApply();
-}
+function paperZoomSave(){ if(library){ library.paperZoom=PZ; try{ saveLibrary(); }catch(_){} } }
 function paperZoomInit(){
   if(paperZoomInit._done) return; paperZoomInit._done=true;
   const z=library&&+library.paperZoom; if(z&&isFinite(z)) PZ=Math.max(PZ_MIN,Math.min(PZ_MAX,z));
   const pp=$('paper'); if(!pp||!window.ResizeObserver) return;
-  /* 高さが変われば下の余白を、幅が変われば組みを合わせ直す */
-  let lastW=0;
-  new ResizeObserver(()=>{ if(PZ>1.001&&!PZG) pp.style.marginBottom=Math.round(pp.offsetHeight*(PZ-1))+'px'; }).observe(pp);
-  if(pp.parentElement) new ResizeObserver(()=>{ const w=pp.parentElement.clientWidth; if(w===lastW) return; lastW=w; if(PZ>1.001){ paperZoomApply(); try{ render(); }catch(_){} } }).observe(pp.parentElement);
+  /* 高さや幅が変われば、下の余白と横の位置を合わせ直す（組み直しはしない） */
+  new ResizeObserver(()=>{ if(PZ>1.001&&!PZG) paperZoomApply(); }).observe(pp);
 }
 function bindPaper(){
   const paper=$('paper'); if(!paper||paper._bound) return;
@@ -33419,6 +33566,28 @@ function bindPaper(){
   /* ══ 小節内の y 座標 → 弦 ══
      SVG の viewBox と画面の縮尺を合わせて逆に引く。
      描画・当たり判定・ここの三つが同じ TAB_BOT / TAB_LS を見ていること。 */
+  /* ══ 印の当たり枠の下のマスを、どちらが受けるか（tab-6.86）══
+     ・叩いた弦の数字が出ていれば、マス（写す）
+     ・印の付いた音とは別の音・休符のマスなら、マス（置く）——当たり枠は押しやすいよう
+       隣の空いたマスの上まで広げてあり、そこを叩くと置かずに印を外していた
+     ・印の付いた音そのものの上なら、今まで通り印 */
+  const hitUnderMark=e=>{
+    try{
+      const mk=e.target&&e.target.closest&&e.target.closest('.mhit');
+      if(!mk) return null;
+      const h=document.elementsFromPoint(e.clientX,e.clientY).find(x=>x.classList&&x.classList.contains('hit'));
+      if(!h) return null;
+      const w=h.closest('.mwrap'); if(!w) return null;
+      const nums=(h.getAttribute('data-num')||'').split('.').filter(v=>v!=='').map(Number);
+      if(nums.indexOf(strAt(w,e.clientY))>=0) return h;
+      /* 印の付いた音が鳴っている間（伸びている途中も含む）は、印。その外は、マス */
+      const ai=info(h); const b=ai&&findBar(song,ai.barId);
+      const mn=b&&b.notes[+mk.getAttribute('data-src')];
+      const t=+h.getAttribute('data-start');
+      if(mn&&t>=mn.start&&t<mn.start+Math.max(1,mn.len)) return null;
+      return h;
+    }catch(_){ return null; }
+  };
   const strAt=(wrap,clientY)=>{
     const svg=wrap.querySelector('svg.msvg'); if(!svg) return 5;
     const vb=(svg.getAttribute('viewBox')||'0 -78 100 230').split(/\s+/).map(Number);
@@ -33826,7 +33995,13 @@ function bindPaper(){
        弧と一つの道で捌く——**同じ振る舞いは、同じ場所に一度だけ書く。** */
     /* 装飾音符の弧・文字も、同じ道で捌く（tab-3.93・L様の実装）。
        **同じ振る舞いは、同じ場所に一度だけ書く**（tab-2.63） */
-    const arc=e.target.closest&&e.target.closest('.tiehit,.lnk,.mhit,.gmk');
+    /* ══ 数字の上なら、印より数字（tab-6.86）══
+       L様——「写した音を短タップで入力する時音価も反映させたい」。
+       ビブラート等の印の当たり枠は音の長さいっぱいに広がり、別の弦の数字の高さに掛かる。
+       そこの数字を叩くと印の方が拾われ、写さずに印を外していた（写しが前のままなので長さも前のまま）。
+       叩いた所の真下に、その弦の数字があるマスがあれば、印ではなくマスとして受ける。 */
+    const numHit=hitUnderMark(e);
+    const arc=numHit?null:(e.target.closest&&e.target.closest('.tiehit,.lnk,.mhit,.gmk'));
     /* ══ let ring の帯の終わりは、掴んで伸び縮みさせる（tab-4.82）══
        他の記号の的は「叩けば外れる・長押しで選び直す」だが、
        ここだけは**なぞる**ための的である。輪へも取り外しへも渡さない。 */
@@ -33981,7 +34156,7 @@ function bindPaper(){
         }
       }
     }
-    const hit=e.target.closest&&e.target.closest('.hit'); if(!hit) return;
+    const hit=numHit||(e.target.closest&&e.target.closest('.hit')); if(!hit) return;
     const i=info(hit); if(!i) return;
     const bar=findBar(song,i.barId); if(!bar) return;
     /* ══ 前のなぞりが残っていたら、先に片づける（tab-1.44）══
@@ -34049,7 +34224,7 @@ function bindPaper(){
       /* まだ音符が無ければ、なぞり始めに置いてしまう */
       if(tdrag.src<0){
         const b=findBar(song,tdrag.barId);
-        tdrag.src=insertNote(song,b,tdrag.st,{kind:'chord'});
+        tdrag.src=absorbAutoRests(song,b,insertNote(song,b,tdrag.st,{kind:'chord'}));
         tdrag.bar=b;
       }
       try{ paper.setPointerCapture(e.pointerId); }catch(_){}
@@ -34108,7 +34283,7 @@ function bindPaper(){
         let idx=d.src;
         if(!b.notes[idx]||b.notes[idx].start!==d.st){
           idx=b.notes.findIndex(n=>n.start===d.st);
-          if(idx<0) idx=insertNote(song,b,d.st,{kind:'chord'});
+          if(idx<0) idx=absorbAutoRests(song,b,insertNote(song,b,d.st,{kind:'chord'}));
         }
         applyTab(b,idx,d.str,fret);
       });
@@ -34176,7 +34351,7 @@ function bindPaper(){
         });
       } else {
         tx('休符を置く',()=>{
-          const b=findBar(song,d.barId); if(b) insertNote(song,b,d.st,{kind:'rest'});
+          const b=findBar(song,d.barId); if(b) insertNote(song,b,d.st,{kind:'rest',wr:true});
         });
       }
       return;
@@ -34236,7 +34411,7 @@ function bindPaper(){
     tx(tabScr?'ピックスクラッチを置く':'押さえを置く',()=>{
       const b=findBar(song,d.barId); if(!b) return;
       let idx=d.src;
-      if(idx<0){ idx=insertNote(song,b,d.st,{kind:'chord'}); }
+      if(idx<0){ idx=absorbAutoRests(song,b,insertNote(song,b,d.st,{kind:'chord'})); }
       applyTab(b,idx,d.str,tabLastFret);
       /* 写しが抱えている奏法と丈も、ここで移す（tab-4.64） */
       if(!tabScr) applyStamp(song,b,idx,d.str,false);
@@ -34674,7 +34849,12 @@ function bindPaper(){
     tx(f===null?'押さえを外す':'フレットを置く',()=>{
       const b=findBar(song,c.barId); if(!b) return;
       let idx=(b.notes||[]).findIndex(n=>n.start===c.start);
-      if(idx<0){ if(f===null) return; idx=insertNote(song,b,c.start,{kind:'chord'}); }
+      /* ══ 消す時は、マスに掛かっている音符を探す（tab-6.85）══
+         L様——「押さえを消すしても消えないことがある」。
+         ◀▶ は長い音符の途中のマス（4分の裏など）にも止まるが、
+         ちょうどそこで始まる音符しか探していなかったので、何もせず終わっていた。 */
+      if(idx<0&&f===null) idx=(b.notes||[]).findIndex(n=>n.kind!=='rest'&&c.start>n.start&&c.start<n.start+Math.max(1,n.len));
+      if(idx<0){ if(f===null) return; idx=absorbAutoRests(song,b,insertNote(song,b,c.start,{kind:'chord'})); }
       applyTab(b,idx,c.str,f);
     });
     if(f!==null){ tabLastFret=f; tabScr=null; tabStamp=null; syncCopyChip(); }
@@ -34683,7 +34863,7 @@ function bindPaper(){
   const curFretNow=()=>{
     if(!curCell) return null;
     const b=findBar(song,curCell.barId); if(!b) return null;
-    const n=(b.notes||[]).find(x=>x.start===curCell.start&&x.kind!=='rest');
+    const n=coverNoteAt(b,curCell.start);
     const o=(n&&n.stops)?n.stops.find(x=>x.s===curCell.str):null;
     return (o&&typeof o.f==='number')?o.f:null;
   };
@@ -34919,7 +35099,7 @@ function bindPaper(){
     else if(a==='d') upDown(-1,false);
     else if(a==='f+') curBump(1);
     else if(a==='f-') curBump(-1);
-    else if(a==='x') curSetFret(null);
+    else if(a==='x'){ if(mode==='select'&&nsel.size) noteToRest(); else curSetFret(null); }   /* 〈選択〉では選んだ所を消す（tab-6.85） */
   };
 
   document.addEventListener('keydown',e=>{
@@ -35177,37 +35357,38 @@ function bindPaper(){
     if(tdrag){ const was=tdrag.on; if(tdrag.snap&&histFresh(tdrag.snapAt)) song=tdrag.snap; tdrag=null; hideTabTip(); setDragMark(null); if(was) render(); }
     drag=null; tscr=null;
     document.body.classList.remove('dragging');
-    const h=scHost(), c=tmid(e.touches);
-    PZG={d0:Math.max(20,tdist(e.touches)),c0:c,z0:PZ,z:PZ,t0:performance.now(),moved:false,
-         h,sc0:h.scrollTop,hTop:(h===document.scrollingElement||h===document.documentElement)?0:h.getBoundingClientRect().top};
+    const h=scHost(), c=tmid(e.touches), pp=$('paper'), r=pp.getBoundingClientRect();
+    /* 指の間にある譜面の一点（組みの寸法）を控え、動かしている間ずっと指の間に置く */
+    const L=r.left+PX;                      /* 横にずらす前の、紙の左端 */
+    PZG={d0:Math.max(20,tdist(e.touches)),c0:c,z0:PZ,z:PZ,t0:performance.now(),moved:false,h,sc0:h.scrollTop,
+         L,top0:r.top,u:(c.x-r.left)/PZ,v:(c.y-r.top)/PZ};
     e.preventDefault();
   },{passive:false});
   zoomHost.addEventListener('touchmove',e=>{
     if(!PZG||!e.touches||e.touches.length!==2) return;
     e.preventDefault();
-    const d=tdist(e.touches), c=tmid(e.touches);
-    const z=Math.max(PZ_MIN,Math.min(PZ_MAX,PZG.z0*d/PZG.d0));
-    if(Math.abs(d/PZG.d0-1)>0.05||Math.hypot(c.x-PZG.c0.x,c.y-PZG.c0.y)>10) PZG.moved=true;
-    PZG.z=z;
-    /* 動いている間は見た目だけ大きくし、指を離した所で組み直す */
-    const pp=$('paper'); if(pp){ pp.style.transformOrigin='50% 0'; pp.style.transform='scale('+z+')'; }
-    PZG.h.scrollTop=PZG.sc0-(c.y-PZG.c0.y);
+    const g=PZG, d=tdist(e.touches), c=tmid(e.touches);
+    const z=Math.max(PZ_MIN,Math.min(PZ_MAX,g.z0*d/g.d0));
+    if(Math.abs(d/g.d0-1)>0.05||Math.hypot(c.x-g.c0.x,c.y-g.c0.y)>10) g.moved=true;
+    g.z=z; PZ=z;
+    PX=g.L+g.u*z-c.x;                       /* 横：控えた一点が指の間に来るように */
+    paperZoomApply();
+    const want=c.y-g.v*z;                   /* 縦：紙の上端がここに来れば、一点が指の間に来る */
+    g.h.scrollTop=g.sc0+(g.top0-want);
   },{passive:false});
   const endPZ=e=>{
     if(!PZG) return;
     if(e.touches&&e.touches.length>=2) return;
     const g=PZG; PZG=null;
     if(!g.moved&&performance.now()-g.t0<350){
-      paperZoomApply();
+      PZ=g.z0; paperZoomApply();
       if(mode==='tab'){ togglePen(); suppressClick=true; setTimeout(()=>{ suppressClick=false; },500); }
       return;
     }
     suppressClick=true; setTimeout(()=>{ suppressClick=false; },400);
-    if(Math.abs(g.z-PZ)<0.02){ paperZoomApply(); return; }
-    /* 指の間にあった所を、組み直した後も同じ高さに残す */
-    const h=g.h, cy=g.c0.y-g.hTop, frac=(h.scrollTop+cy)/Math.max(1,h.scrollHeight);
-    paperZoomSet(g.z);
-    h.scrollTop=frac*h.scrollHeight-cy;
+    if(PZ<1.03) PZ=1;                       /* ほぼ元の大きさなら、ぴたりと戻す */
+    PZ=Math.round(PZ*100)/100;
+    paperZoomApply(); paperZoomSave();
   };
   zoomHost.addEventListener('touchend',endPZ);
   zoomHost.addEventListener('touchcancel',endPZ);
@@ -35577,7 +35758,7 @@ function bindPaper(){
            押さえた弦へ、写しの数字を。 */
         const b0=findBar(song,drag.barId); if(!b0){ drag=null; return; }
         drag.freshStr=strAt(drag.wrap,e.clientY);
-        drag.src=insertNote(song,b0,drag.freshStart,{kind:'chord'});
+        drag.src=absorbAutoRests(song,b0,insertNote(song,b0,drag.freshStart,{kind:'chord'}));
         if(drag.src<0){ drag=null; return; }
         applyTab(b0,drag.src,drag.freshStr,tabLastFret);
         /* 短押しと寸分たがわぬ中身にする（tab-3.52）。丈はなぞりが決める（tab-4.64） */
@@ -35853,7 +36034,7 @@ function bindPaper(){
           let idx=i;
           if(fresh){
             idx=b.notes.findIndex(n=>n.start===fst);
-            if(idx<0) idx=insertNote(song,b,fst,{kind:'chord'});
+            if(idx<0) idx=absorbAutoRests(song,b,insertNote(song,b,fst,{kind:'chord'}));
             if(idx<0) return;
             applyTab(b,idx,fstr,tabLastFret);
             applyStamp(song,b,idx,fstr,true);   /* 丈はなぞりが決める（tab-4.64） */
@@ -37061,26 +37242,32 @@ function renderPad(){
   el.style.bottom=(measureBotPx()+12)+'px';
   const f=curFretText();
   el.innerHTML=
-     '<button data-a="f-" title="フレットを下げる">−</button>'
+     '<button data-a="f-" title="下げる">−</button>'
     +'<span class="dp-v">'+f+'</span>'
-    +'<button data-a="f+" title="フレットを上げる">＋</button>'
-    +'<button data-a="l" title="前のマスへ">◀</button>'
+    +'<button data-a="f+" title="上げる">＋</button>'
+    +'<button data-a="l" title="前へ">◀</button>'
     +'<button data-a="u" title="'+padUD(1)+'">▲</button>'
-    +'<button data-a="r" title="次のマスへ">▶</button>'
+    +'<button data-a="r" title="次へ">▶</button>'
     +'<button data-a="" style="visibility:hidden"></button>'
     +'<button data-a="d" title="'+padUD(-1)+'">▼</button>'
     +'<button data-a="" style="visibility:hidden"></button>'
-    +'<button class="dp-wide" data-a="x" title="この弦の押さえを外す">押さえを外す</button>'
-    +'<button class="dp-hide" data-a="hide" title="十字キーを畳む（⚙の〈入力〉から戻せます）">畳む</button>';
+    +'<button class="dp-wide" data-a="x" title="消す">削除</button>'
+    +'<button class="dp-hide" data-a="hide" title="十字キーを閉じる（⚙の〈入力〉から戻せます）">閉じる</button>';
 }
 let PAD_ACT=null;   /* 十字キーの行き先。bindPaper が入れる（そこに applyTab がある） */
 function measureBotPx(){ const b=$('botbar'); return b?(b.offsetHeight||64):64; }
 function curFretText(){
   if(!curCell) return '—';
   const b=findBar(song,curCell.barId); if(!b) return '—';
-  const n=(b.notes||[]).find(x=>x.start===curCell.start&&x.kind!=='rest');
+  const n=coverNoteAt(b,curCell.start);
   const o=(n&&n.stops)?n.stops.find(x=>x.s===curCell.str):null;
   return (o&&typeof o.f==='number')?(o.f+'f'):(STR_LABEL[curCell.str]+'弦');
+}
+/* マスに掛かっている音符（そこで始まる物、無ければ途中で掛かっている物）（tab-6.85） */
+function coverNoteAt(b,t){
+  const ns=(b&&b.notes)||[];
+  return ns.find(x=>x.start===t&&x.kind!=='rest')
+      ||ns.find(x=>x.kind!=='rest'&&t>x.start&&t<x.start+Math.max(1,x.len))||null;
 }
 
 function renderTopbar(){
