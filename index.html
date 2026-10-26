@@ -1106,6 +1106,24 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 .paper,.paper *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .paper input,.paper select,.paper textarea,.paper [contenteditable="true"]{-webkit-user-select:text;user-select:text}
 .mwrap svg{touch-action:pan-y}
+
+/* 仮の休符（道具が入れた休符）は、画面ではやや薄く。刷る時は今まで通りの濃さ（tab-6.91） */
+#paper .rest-auto{opacity:.5}
+@media print{ #paper .rest-auto{opacity:1!important} }
+/* スマホの下の段は横に送れる（tab-6.90） */
+@media (max-width:700px){
+  #bb-tr{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain}
+  #bb-tr::-webkit-scrollbar{display:none}
+  #bb-tr>*{flex-shrink:0}
+  #bb-tr.fade-r{-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent)}
+  #bb-tr.fade-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%);mask-image:linear-gradient(90deg,transparent,#000 14%)}
+  #bb-tr.fade-l.fade-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+}
+/* iPad 縦向きの幅では、上の帯の位置の表示とランプを外す（tab-6.90）。
+   L様の選択（お勧め：案A）——701〜900px 前後で〈パート〉〈＋〉が位置の表示に、〈ミキサー〉が〈?〉に重なっていた */
+@media (min-width:701px) and (max-width:940px){
+  #sl-bridge .ds-bpos, #sl-bridge .ds-dots{display:none!important}
+}
 body.md-tab #paper .mwrap svg{touch-action:none}   /* 入力の時の指の縦は、こちらで受ける（tab-6.82） */
 @media print{ #paper{transform:none!important;width:auto!important;max-width:none!important;margin-bottom:0!important} }
 body.dragging,body.dragging *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none}
@@ -1753,6 +1771,7 @@ body.cp-dragging,body.cp-dragging *{cursor:grabbing!important;-webkit-user-selec
 body.stamping #paper .mwrap{cursor:copy}
 @media (max-width:700px){ .cpal .cp-state{display:none} body.stamping .cpal .cp-state{display:flex} body.stamping .cpal .cp-state>span{display:none} }
 
+.vp-sub{display:block;font-size:10.5px;font-weight:600;opacity:.72;margin-top:1px;white-space:nowrap}   /* 同じ名の押さえの見分け（tab-6.91） */
 .vpick{position:fixed;z-index:60;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));
   bottom:calc(var(--botH,64px) + 8px);display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;
   background:linear-gradient(180deg,#2f2d2a,#211f1c);border:1px solid #000;
@@ -1948,7 +1967,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.88', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.91', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -9846,11 +9865,27 @@ function absorbAutoRests(s,bar,idx){
   if(pe>=t) return idx;
   if(p.tuplet||p.tup||(p.stops||[]).some(o=>o&&o.t&&o.t.grace)) return idx;
   const mid=ns.filter(m=>m!==n&&m!==p&&m.start<t&&m.start+Math.max(1,m.len)>pe);
-  if(mid.some(m=>m.kind!=='rest'||m.wr)) return idx;
+  if(mid.some(m=>m.kind!=='rest'||restKept(m))) return idx;
+  /* コードから自動で書いた押さえは、伸ばしても自動のまま（控えを今の姿に合わせ直す）（tab-6.89）。
+     合わせないと手で直した扱いになり、後でコードを消しても休符へ戻らなかった */
+  const wasAuto=atabUntouched(p);
   bar.notes=ns.filter(m=>mid.indexOf(m)<0);
   p.len=t-p.start;
+  if(wasAuto) p.atab=atabSig(p);
   normalizeBar(s,bar);
   return bar.notes.indexOf(n);
+}
+/* ══ 吸わせずに守る休符（tab-6.89）══
+   L様が書いた休符に加え、**何か載っている休符**も守る——
+   フェルマータ・テンポ・強弱・文字などの記号、コード名、歌詞。
+   吸わせると、載っている物ごと消えていた。 */
+function restKept(m){
+  if(!m) return false;
+  if(m.wr) return true;
+  if(m.chord&&m.chord.root!=null) return true;
+  if(m.lyric) return true;
+  if(m.sym&&Object.keys(m.sym).some(k=>{ const v=m.sym[k]; return v!=null&&v!==false&&v!==''&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length); })) return true;
+  return false;
 }
 
 /* ══ ポップアップの土台 ══ */
@@ -23115,6 +23150,22 @@ function nextStageOf(st){
 let _flAt=0;
 function followBar(el,force){
   if(!el) return;
+  /* ══ 拡大している時は、横も追いかける（tab-6.91）══
+     L様——洗い出しの5。拡大したまま鳴らすと、右へはみ出した小節を鳴らしている間は画面の外だった。
+     鳴っている小節が見えている幅から外れかけたら、その小節が左寄りに来るまで横へずらす。 */
+  if(PZ>1.001&&!PZG){
+    try{
+      const pp=$('paper'), host=pp&&pp.parentElement;
+      if(host){
+        const hr=host.getBoundingClientRect(), r0=el.getBoundingClientRect();
+        const L=Math.max(0,hr.left), R=Math.min(innerWidth,hr.right);
+        if(r0.left<L+8||r0.right>R-8){
+          PX+=r0.left-(L+(R-L)*0.08);
+          paperZoomApply();
+        }
+      }
+    }catch(_){}
+  }
   /* 追うのは小節ではなく**段**である。同じ段の中では紙は動かない */
   const st=(el.closest&&el.closest('.stage'))||el;
   const b=viewBand();
@@ -25512,7 +25563,7 @@ function renderCtxRow(){
                        .find(x=>x[0]===songSnap(song)); return d?('・'+d[1]):''; })();
     cp.textContent=tabScr?(_cs+'◈ '+(tabScr==='down'?'下降':'上昇'))
       :(_cs+tabLastFret+'f'+(tabShape==='single'?'':'／'+((TAB_SHAPES.find(x=>x[0]===tabShape)||[])[1]||''))
-        +_sn+stampBrief());
+        +stampBrief());   /* 刻み（_sn）は外す：置かれる長さに見えて紛らわしかった。刻みは隣の箱に出ている（tab-6.91） */
     cp.title='数字の出ていないマスを叩くと、これが置かれます（音符が伸びているだけのマスも同じ）。'
       +'数字を叩くと、それをここへ写します——**奏法と長さも一緒に写ります**（tab-4.64）。'
       +'どこまで写すかは設定（⚙）→〈短タップの写し〉で。'
@@ -25748,7 +25799,20 @@ function measureBot(){
   if(dk&&document.body.classList.contains('dock-open')){ set(dk.offsetHeight||260); return; }
   const bb=$('botbar');
   set(bb?(bb.offsetHeight||64):64);
+  bbTrFade();
 }
+/* ══ スマホの下の段は横に送れる（tab-6.90）══
+   L様の選択（お勧め：案A）——320〜700px では〈メトロノーム〉〈ギターの音〉〈ドラム〉〈カウント〉が
+   画面の外にはみ出し、送ることもできなかった。帯の高さは変えず、指で横に払えば右端まで出る。
+   続きのある側の端を薄くぼかして、まだ先があることを示す。 */
+function bbTrFade(){
+  const tr=$('bb-tr'); if(!tr) return;
+  const more=tr.scrollWidth>tr.clientWidth+2;
+  tr.classList.toggle('fade-r',more&&tr.scrollLeft<tr.scrollWidth-tr.clientWidth-2);
+  tr.classList.toggle('fade-l',more&&tr.scrollLeft>2);
+}
+document.addEventListener('scroll',e=>{ if(e.target&&e.target.id==='bb-tr') bbTrFade(); },true);
+window.addEventListener('resize',()=>{ try{ bbTrFade(); }catch(_){} });
 
 /* ══ ガイド ══
    **モードだけで決めない。** いま曲がどういう状態かで文言を変える。
@@ -33071,6 +33135,24 @@ function vpickApply(fr){
   if(VPICK===p) p.span=vpSpanSig(bar,p.st);
   render();
 }
+/* ══ 同じ名の押さえを見分ける（tab-6.91）══
+   L様——洗い出しの8。名は「形・根音の弦」で付けるので、高音側だけ違う押さえが同じ名になっていた
+   （「開放形・5弦ルート」が二つ等）。同じ名が二つ以上ある時だけ、違いのある弦を名の後ろに添える。 */
+function vpickTellApart(cands){
+  const fv=v=>(v==null||v==='x'||v<0)?'×':(v===0?'開放':(v+'F'));
+  const groups={};
+  cands.forEach(c=>{ (groups[c.label]=groups[c.label]||[]).push(c); });
+  Object.keys(groups).forEach(k=>{
+    const g=groups[k]; if(g.length<2) return;
+    const n=Math.max(...g.map(c=>(c.frets||[]).length));
+    /* 1弦（高い方）から見て、違いのある最初の弦 */
+    let at=-1;
+    for(let i=n-1;i>=0;i--){ const vs=new Set(g.map(c=>String((c.frets||[])[i]))); if(vs.size>1){ at=i; break; } }
+    if(at<0) return;
+    g.forEach(c=>{ c.sub=(n-at)+'弦 '+fv((c.frets||[])[at]); });   /* 名の下に小さく出す（狭い画面でも切れないように） */
+  });
+  return cands;
+}
 function renderVPick(){
   let el=$('vpick');
   const L=vpickLive();
@@ -33081,6 +33163,7 @@ function renderVPick(){
   let cands=voicingCandidates(p.chord,12);
   if(!cands.some(c=>fretSig(c.frets)===curSig))
     cands=[{frets:curFr,label:voicingLabel(curFr,((p.chord.root%12)+12)%12)}].concat(cands);
+  vpickTellApart(cands);
   if(!el){ el=document.createElement('div'); el.id='vpick'; el.className='vpick no-print'; document.body.appendChild(el); }
   el.innerHTML='';
   const hd=document.createElement('div'); hd.className='vp-hd';
@@ -33098,6 +33181,7 @@ function renderVPick(){
     try{ svg=diagramSVG(buildVoicing(c.frets.slice()),{label:"none",sx:10,sy:7.2,padL:14}); }catch(_){ svg=''; }
     b.innerHTML='<span class="vp-dg">'+svg+'</span>';
     const cap=document.createElement('span'); cap.className='vp-cap'; cap.textContent=c.label;
+    if(c.sub){ const sb=document.createElement('span'); sb.className='vp-sub'; sb.textContent=c.sub; cap.appendChild(sb); b.title+='（'+c.sub+'）'; }
     b.appendChild(cap);
     b.onclick=()=>{ if(!on) vpickApply(c.frets); };
     sc.appendChild(b);
@@ -34290,7 +34374,15 @@ function bindPaper(){
       /* 数字を置いたのだから、写しも数字へ戻す（tab-2.33）。
          戻さないと、帯には「◈ 下降」と出たまま数字を書き続けることになる */
       /* なぞって決めた数字は、数字そのものである。抱えていた奏法は連れて行かない（tab-4.64） */
-      if(fret!==null){ tabLastFret=fret; tabScr=null; tabStamp=null; syncCopyChip(); }
+      /* ══ なぞった音を写し直す（tab-6.91）══
+         L様——洗い出しの6。以前は数字だけの写しに戻していたので、写した長さ・奏法が消え、
+         次に置く音は「次の音まで埋める長さ」になっていた。今は、なぞった音そのものを写す
+         （数字・奏法・長さ。今触っている音を写す、という考えに揃える）。 */
+      if(fret!==null){
+        tabLastFret=fret; tabScr=null;
+        try{ const b=findBar(song,d.barId); const n=b&&b.notes.find(x=>x.start===d.st&&x.kind!=='rest'); const o=n&&(n.stops||[]).find(x=>x.s===d.str); tabStamp=(n&&o)?stampOf(n,o):null; }catch(_){ tabStamp=null; }
+        syncCopyChip();
+      }
       return;
     }
     /* ══════════════════════════════════════════
@@ -34857,7 +34949,7 @@ function bindPaper(){
       if(idx<0){ if(f===null) return; idx=absorbAutoRests(song,b,insertNote(song,b,c.start,{kind:'chord'})); }
       applyTab(b,idx,c.str,f);
     });
-    if(f!==null){ tabLastFret=f; tabScr=null; tabStamp=null; syncCopyChip(); }
+    if(f!==null){ tabLastFret=f; tabScr=null; syncCopyChip(); }   /* ＋／−・数字の鍵は数字だけ差し替え、写した長さ・奏法は保つ（tab-6.91） */
     renderPad();
   };
   const curFretNow=()=>{
