@@ -1967,7 +1967,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.91', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.92', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -23661,7 +23661,7 @@ function noteCopy(){
   spanAll.sort((a,b)=>clk.at(a.barId,a.lo)-clk.at(b.barId,b.lo));
   const base=clk.at(spanAll[0].barId,spanAll[0].lo);
   const tail=spanAll[spanAll.length-1];
-  const width=clk.at(tail.barId,tail.hi)-base;
+  let width=clk.at(tail.barId,tail.hi)-base;
   /* 範囲に掛かる音符を、範囲の中だけ切り取って控える。
      休符も控える——**選んだとおりの間合いが写る。** */
   const items=[];
@@ -23670,7 +23670,11 @@ function noteCopy(){
     (b.notes||[]).slice().sort((x,y)=>x.start-y.start).forEach(n=>{
       const a0=n.start, a1=n.start+Math.max(1,n.len);
       if(a1<=sp.lo||a0>=sp.hi) return;
-      const lo=Math.max(a0,sp.lo), hi=Math.min(a1,sp.hi);
+      /* ══ 頭を選んだ音は、長さごと写す（tab-6.92）══
+         音を叩いて選ぶと、その頭の「マス一つ分」（刻みが16分なら16分）だけが選ばれる。
+         その幅で切っていたので、4分音符を写しても16分で貼られていた。
+         頭が選んだ所にある音は丸ごと。手前から伸びてきた音だけ、今まで通り選んだ所で切る。 */
+      const lo=Math.max(a0,sp.lo), hi=(a0>=sp.lo)?a1:Math.min(a1,sp.hi);
       const d=clk.at(sp.barId,lo)-base;
       if(items.some(x=>x.d===d)) return;            /* 区間の継ぎ目で二度拾わない */
       const cp=clone(n);
@@ -23681,8 +23685,17 @@ function noteCopy(){
     });
   });
   if(!items.length){ toast('選んだ範囲に中身がありません'); return; }
+  /* 区切りの重なりを詰める：丸ごと写した音が、次に拾った区切りへ食い込まないように */
+  items.sort((x,y)=>x.d-y.d);
+  for(let i=0;i<items.length-1;i++){ const nx=items[i+1].d; if(items[i].d+items[i].len>nx) items[i].len=Math.max(1,nx-items[i].d); }
+  width=Math.max(width,...items.map(x=>x.d+x.len));
   noteClip={width,items};
   noteClipStr=nselStr?new Set(nselStr):null;
+  /* ══ 写したら、選びを外す（tab-6.92）══
+     L様——「選択モードで貼り付けやコピーをしたら選択解除して。複数コピーするときにうまくいかない」。
+     以前は写した範囲が見えるよう選びを残していた。ところが貼り先を叩くと選びに**足され**、
+     貼る頭が「一番早いマス」＝写した元になって、元の所へ重ねて貼っていた。 */
+  nselDone();
   render();
   const cnt=items.filter(x=>x.n.kind!=='rest').length;
   toast(cnt+'音（'+items.length+'区切り）をコピーしました'+(nselStr?('（'+nselStrLabel()+'）'):''));
@@ -25404,6 +25417,11 @@ function syncCopyChip(){
    上のモードバーは、どのモードでも一段に収まる。 */
 function renderCtxRow(){
   const row=$('bb-ctx'); if(!row) return;
+  /* ══ 帯の横の送りを保つ（tab-6.92）══
+     L様——「弦を上げたりしたときに帯のスクロールが動く」。
+     帯は札を押すたびに作り直すので、横に送った位置が頭へ戻っていた。
+     作り直す前に控え、同じ入力の形のままなら戻す。 */
+  { const old=row.querySelector('.bb-scroll'); if(old) _bbKeep={mode,left:old.scrollLeft}; }
   row.innerHTML='';
   /* ══ モードの三枚が入ったので、帯は常に出す（tab-2.86）══
      以前は〈コード〉で何も選んでいない時などに帯ごと隠していたが、
@@ -25437,6 +25455,7 @@ function renderCtxRow(){
     const sc=document.createElement('div'); sc.className='bb-scroll';
     while(row.firstChild) sc.appendChild(row.firstChild);
     row.appendChild(sc);
+    if(_bbKeep&&_bbKeep.mode===mode&&_bbKeep.left>0){ const L=_bbKeep.left; sc.scrollLeft=L; requestAnimationFrame(()=>{ if(sc.isConnected&&Math.abs(sc.scrollLeft-L)>1) sc.scrollLeft=L; }); }
     /* ══ 消す札は、なぞる箱の外へ（tab-6.63）══
        L様——「小節を消せない」。
        小節を選んだ時の札は数が多く、〈外す〉はいちばん右端——箱の外に隠れて見えなかった。
@@ -25793,6 +25812,7 @@ function renderCtxRow(){
 
 /* ══ 下の帯の高さを実測して紙へ伝える ══
    dock・筆の出入りで紙が跳ねないよう、余白は必ずここ経由で決める */
+let _bbKeep=null;   /* 下の帯の横の送り（tab-6.92） */
 function measureBot(){
   const set=h=>document.documentElement.style.setProperty('--botH',Math.round(h)+'px');
   const dk=$('dock');
