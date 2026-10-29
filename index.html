@@ -1117,6 +1117,29 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 /* 仮の休符（道具が入れた休符）は、画面ではやや薄く。刷る時は今まで通りの濃さ（tab-6.91） */
 #paper .rest-auto{opacity:.5}
 @media print{ #paper .rest-auto{opacity:1!important} }
+
+/* ══ 帯の並べ替え（tab-7.00）══ */
+.arr-hid{display:none!important}
+.topbar .arr-x{display:none!important}
+#bb-tr .bb-grp.arr-item>.arr-x,#bb-tr .bb-bpm-grp.arr-item>.arr-x{right:auto;left:-8px}   /* 塊の〈×〉は左上（中の札の〈×〉と重ねない） */   /* 上の帯へ移る〈アンプ〉〈ミキサー〉には付けない */
+.arr-glue{display:inline-flex;align-items:center;gap:6px}
+#botbar .arr-item{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+body.band-arr #bb-ctx .bb-scroll{flex-wrap:wrap!important;overflow:visible!important;row-gap:12px;padding-top:8px;padding-bottom:4px;-webkit-mask-image:none!important;mask-image:none!important}
+body.band-arr #bb-ctx{flex-wrap:wrap;height:auto!important;max-height:none!important}
+body.band-arr #bb-tr{flex-wrap:wrap!important;overflow:visible!important;row-gap:12px;padding-top:8px;-webkit-mask-image:none!important;mask-image:none!important}
+body.band-arr #bb-tr .bb-grp{flex-wrap:wrap;overflow:visible}
+body.band-arr #dpad{display:none!important}
+body.band-arr #botbar .arr-item{position:relative;outline:1.5px dashed rgba(240,200,120,.75);outline-offset:2px;border-radius:9px;animation:arrwig .5s ease-in-out infinite alternate;touch-action:none;cursor:grab}
+body.band-arr #botbar .arr-item .arr-item{animation:none}
+@keyframes arrwig{from{transform:rotate(-.6deg)}to{transform:rotate(.6deg)}}
+body.band-arr #botbar .arr-item.arr-drag{animation:none;transform:translateY(-6px) rotate(1.5deg);box-shadow:0 10px 22px rgba(0,0,0,.55);z-index:5;cursor:grabbing}
+.arr-x{position:absolute;top:-8px;right:-8px;width:18px;height:18px;border-radius:50%;background:#2a2622;border:1px solid rgba(240,200,120,.8);color:#f0c878;font:700 11px/16px system-ui,sans-serif;text-align:center;z-index:6;cursor:pointer}
+.arr-tray{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.25)}
+.arr-tray .t{color:#c9b894;font-size:12px;margin-right:4px;white-space:nowrap}
+.arr-tray .none{color:#8d8371;font-size:12px}
+.arr-tray .chip{padding:5px 10px;border-radius:8px;border:1px dashed rgba(240,200,120,.55);color:#d9cbb0;font-size:12.5px;white-space:nowrap;background:rgba(255,255,255,.04);cursor:pointer}
+.arr-tray .arr-reset{padding:7px 12px;border-radius:9px;background:#2b2826;color:#d9cbb0;border:1px solid #000;font-size:12.5px;cursor:pointer}
+.arr-tray .arr-done{margin-left:auto;padding:7px 14px;border-radius:9px;background:linear-gradient(180deg,#f1dca2,#c9a560);color:#1d1407;font-weight:800;border:1px solid #000;cursor:pointer}
 /* スマホの下の段は横に送れる（tab-6.90） */
 @media (max-width:700px){
   #bb-tr{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain}
@@ -1974,7 +1997,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.98', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.00', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -2051,6 +2074,7 @@ function icoSVG(name,cls){
 /* ボタンに記号を差し込む。text があれば記号の右に添える */
 function setIco(btn,name,text){
   btn.innerHTML=icoSVG(name)+(text?'<span>'+text+'</span>':'');
+  btn.dataset.ico=name;   /* 帯の並べ替えで札を見分ける（tab-7.00） */
   if(text) btn.style.gap='6px';
   return btn;
 }
@@ -25511,6 +25535,157 @@ function syncCopyChip(){
 /* ══ 下の帯・モードの道具の行 ══
    リズムの筆とスナップ、選択の操作、ループの範囲は、みな上部から降ろした。
    上のモードバーは、どのモードでも一段に収まる。 */
+/* ══════════════════════════════════════════════════════════════
+   帯の並べ替え（tab-7.00）
+   L様の選択——帯の札を長押しすると「並べ替え中」になり、札を引きずって並べ替える。
+   〈×〉で隠し、帯の上の「隠した札」の列から戻す。上の段（入力の形ごと）も下の段も。
+   並びはこの端末に覚える（library.bandArr）。入力の形の三つの札・取り消し・やり直しは動かさない。
+   下の段は〈▶〉等の塊の中で入れ替え、塊ごと段の中でも動かせる（塊の黒い台を崩さない）。
+   ══════════════════════════════════════════════════════════════ */
+let ARR=false, _arrLP=null, _arrDrag=null, _arrEat=0;
+/* 札の見分け。状態で姿の変わる札（▶⇔止める、「送り 切／入」、テンポの数字等）でも同じ名になるように */
+const ARR_ICO_SAME={stop:'play',pause:'play'};
+function arrKey(el){
+  if(el.dataset.ak) return el.dataset.ak;
+  if(el.classList.contains('bb-bpm-grp')) return 'テンポ';
+  if(el.classList.contains('bb-grp')) return '塊:'+[...el.children].map(c=>arrKey(c)).sort().join('+');
+  if(el.tagName==='SELECT') return '箱:'+((el.getAttribute('title')||'').trim()||String(el.className||''));
+  const ico=el.dataset.ico;
+  const w=((el.textContent||'').trim().split(/[\s\u3000]/)[0]||'');
+  if(ico) return '絵:'+(ARR_ICO_SAME[ico]||ico)+(w&&!/^[0-9]+$/.test(w)?':'+w:'');
+  if(w) return '字:'+w;
+  return '他:'+((el.getAttribute('title')||'').trim()||String(el.className||'')).slice(0,30);
+}
+function arrState(ck){ const a=(library&&library.bandArr)||{}; return a[ck]||null; }
+function arrSave(ck,st){ if(!library) return; library.bandArr=library.bandArr||{}; if(st) library.bandArr[ck]=st; else delete library.bandArr[ck]; try{ saveLibrary(); }catch(_){} }
+function arrItems(box){ return [...box.children].filter(c=>c.classList&&c.classList.contains('arr-item')); }
+/* 箱の中身に印を付け、覚えた並びと隠しを当てる */
+function arrApply(box,ck){
+  if(!box) return;
+  /* 字の札（「写し」等）は、次の札と一つに */
+  [...box.children].forEach(c=>{
+    if(c.classList&&c.classList.contains('bb-lab')&&c.nextElementSibling&&!c.nextElementSibling.classList.contains('bb-lab')){
+      const nx=c.nextElementSibling, g=document.createElement('span'); g.className='arr-glue';
+      g.dataset.ak='字：'+(c.textContent||'').trim(); box.insertBefore(g,c); g.appendChild(c); g.appendChild(nx);
+    }
+  });
+  [...box.children].forEach(c=>{
+    if(!c.classList) return;
+    if(c.classList.contains('bb-div')||c.classList.contains('bb-sp')||c.classList.contains('mode-grp')||c.classList.contains('arr-fixed')||c.classList.contains('bb-hint')) return;
+    if(c.offsetParent===null&&getComputedStyle(c).display==='none'&&!c.classList.contains('arr-hid')) return;
+    c.dataset.ak=arrKey(c); c.dataset.ack=ck; c.classList.add('arr-item');
+  });
+  /* 同じ箱で名がかぶったら、出てきた順の番号を添える（〈音符〉と〈定型〉は同じ絵柄） */
+  { const seen={}; [...box.children].forEach(c=>{ if(!c.classList||!c.classList.contains('arr-item')) return;
+      const k=c.dataset.ak.replace(/#\d+$/,''); seen[k]=(seen[k]||0)+1; c.dataset.ak=(seen[k]>1)?(k+'#'+seen[k]):k; }); }
+  const st=arrState(ck); const items=arrItems(box);
+  if(st&&st.order&&st.order.length){
+    const idx=k=>{ const i=st.order.indexOf(k); return i<0?1e6+items.findIndex(x=>x.dataset.ak===k):i; };
+    const sorted=items.slice().sort((a,b)=>idx(a.dataset.ak)-idx(b.dataset.ak));
+    const slots=items.map(el=>{ const ph=document.createComment(''); box.insertBefore(ph,el); return ph; });
+    sorted.forEach((el,i)=>box.insertBefore(el,slots[i]));
+    slots.forEach(s=>s.remove());
+  }
+  const hide=new Set((st&&st.hide)||[]);
+  arrItems(box).forEach(el=>{
+    el.classList.toggle('arr-hid',hide.has(el.dataset.ak));
+    if(ARR&&!el.querySelector(':scope>.arr-x')){ const x=document.createElement('span'); x.className='arr-x'; x.textContent='×'; x.title='この札を隠す'; el.appendChild(x); }
+  });
+}
+function arrBoxes(){
+  const out=[];
+  const sc=document.querySelector('#bb-ctx .bb-scroll'); if(sc) out.push(sc);
+  const tr=$('bb-tr'); if(tr){ out.push(tr); tr.querySelectorAll(':scope>.bb-grp:not(.bb-mix)').forEach(g=>out.push(g)); }
+  return out;
+}
+/* 帯の上の「隠した札」の列 */
+function arrTray(){
+  let t=$('arr-tray');
+  if(!ARR){ if(t) t.remove(); return; }
+  const bb=$('botbar'); if(!bb) return;
+  if(!t){ t=document.createElement('div'); t.id='arr-tray'; t.className='arr-tray'; bb.insertBefore(t,bb.firstChild); }
+  t.innerHTML='';
+  const l=document.createElement('span'); l.className='t'; l.textContent='隠した札'; t.appendChild(l);
+  let n=0;
+  arrBoxes().forEach(box=>arrItems(box).forEach(el=>{
+    if(!el.classList.contains('arr-hid')) return; n++;
+    const c=document.createElement('button'); c.type='button'; c.className='chip';
+    c.textContent=(el.textContent||'').replace('×','').trim()||el.getAttribute('title')||el.dataset.ak;
+    c.title='帯へ戻す';
+    c.onclick=()=>{ const ck=el.dataset.ack, st=arrState(ck)||{order:[],hide:[]}; st.hide=(st.hide||[]).filter(k=>k!==el.dataset.ak); arrSave(ck,st); arrRedraw(); };
+    t.appendChild(c);
+  }));
+  if(!n){ const e=document.createElement('span'); e.className='none'; e.textContent='（ありません）'; t.appendChild(e); }
+  const rs=document.createElement('button'); rs.type='button'; rs.className='arr-reset'; rs.textContent='元の並びに戻す';
+  rs.onclick=()=>{ arrBoxes().forEach(box=>{ const ck=(arrItems(box)[0]||{}).dataset; if(ck&&ck.ack) arrSave(ck.ack,null); }); arrRedraw(); };
+  t.appendChild(rs);
+  const dn=document.createElement('button'); dn.type='button'; dn.className='arr-done'; dn.textContent='済み';
+  dn.onclick=()=>{ ARR=false; document.body.classList.remove('band-arr'); arrRedraw(); };
+  t.appendChild(dn);
+}
+function arrRedraw(){
+  document.body.classList.toggle('band-arr',ARR);
+  try{ renderCtxRow(); }catch(_){}
+  try{ renderPlayBar(); }catch(_){}
+  arrTray(); measureBot();
+}
+/* 受け口：長押しで入る／並べ替え中は押しても働かず、引きずって動かす */
+(function(){
+  const isItem=t=>t&&t.closest&&t.closest('#botbar .arr-item');
+  document.addEventListener('pointerdown',e=>{
+    const it=isItem(e.target); if(!it) return;
+    if(ARR){
+      if(e.target.closest('.arr-x')) return;
+      e.preventDefault();
+      _arrDrag={el:it,id:e.pointerId,x0:e.clientX,y0:e.clientY,on:false};
+      try{ it.setPointerCapture(e.pointerId); }catch(_){}
+      return;
+    }
+    if(e.target.closest('input[type=range],select')) return;   /* 摘み・選ぶ箱は長押しで入らない */
+    clearTimeout(_arrLP);
+    const x0=e.clientX,y0=e.clientY;
+    _arrLP=setTimeout(()=>{ _arrLP=null; ARR=true; _arrEat=Date.now(); try{ navigator.vibrate&&navigator.vibrate(15); }catch(_){} arrRedraw(); },600);
+    const cancel=ev=>{ if(ev.type==='pointermove'&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<8) return; clearTimeout(_arrLP); _arrLP=null;
+      document.removeEventListener('pointermove',cancel,true); document.removeEventListener('pointerup',cancel,true); document.removeEventListener('pointercancel',cancel,true); };
+    document.addEventListener('pointermove',cancel,true); document.addEventListener('pointerup',cancel,true); document.addEventListener('pointercancel',cancel,true);
+  },true);
+  document.addEventListener('pointermove',e=>{
+    const d=_arrDrag; if(!d||e.pointerId!==d.id) return;
+    if(!d.on){ if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)<5) return; d.on=true; d.el.classList.add('arr-drag'); }
+    e.preventDefault();
+    const box=d.el.parentElement;
+    const sibs=arrItems(box).filter(x=>x!==d.el&&!x.classList.contains('arr-hid'));
+    let best=null,bd=1e9;
+    sibs.forEach(s=>{ const r=s.getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+r.height/2; const dd=Math.hypot(e.clientX-cx,(e.clientY-cy)*1.6); if(dd<bd){ bd=dd; best={s,r,cx}; } });
+    if(!best) return;
+    const me=d.el.getBoundingClientRect();
+    if(Math.hypot(e.clientX-(me.left+me.width/2),e.clientY-(me.top+me.height/2))<bd) return;   /* 自分がいちばん近ければ動かさない */
+    if(e.clientX<best.cx){ if(best.s.previousElementSibling!==d.el) box.insertBefore(d.el,best.s); }
+    else{ if(best.s.nextElementSibling!==d.el) box.insertBefore(d.el,best.s.nextSibling); }
+  },{capture:true,passive:false});
+  const end=e=>{
+    const d=_arrDrag; if(!d||e.pointerId!==d.id) return;
+    _arrDrag=null; d.el.classList.remove('arr-drag');
+    if(d.on){
+      const box=d.el.parentElement, ck=d.el.dataset.ack, st=arrState(ck)||{order:[],hide:[]};
+      st.order=arrItems(box).map(x=>x.dataset.ak); arrSave(ck,st); _arrEat=Date.now();
+      arrRedraw();
+    }
+  };
+  document.addEventListener('pointerup',end,true);
+  document.addEventListener('pointercancel',end,true);
+  /* 並べ替え中は札を働かせない。〈×〉と「隠した札」の列だけ通す */
+  document.addEventListener('click',e=>{
+    const it=isItem(e.target);
+    const x=e.target.closest&&e.target.closest('#botbar .arr-x');
+    if(x&&ARR){ e.preventDefault(); e.stopImmediatePropagation();
+      const el=x.parentElement, ck=el.dataset.ack, st=arrState(ck)||{order:[],hide:[]};
+      st.hide=[...new Set((st.hide||[]).concat([el.dataset.ak]))]; arrSave(ck,st); arrRedraw(); return; }
+    if(it&&(ARR||Date.now()-_arrEat<500)){ e.preventDefault(); e.stopImmediatePropagation(); }
+  },true);
+  document.addEventListener('change',e=>{ if(ARR&&isItem(e.target)){ e.stopImmediatePropagation(); } },true);
+  document.addEventListener('contextmenu',e=>{ if(isItem(e.target)) e.preventDefault(); },true);
+})();
 function renderCtxRow(){
   const row=$('bb-ctx'); if(!row) return;
   /* ══ 帯の横の送りを保つ（tab-6.92）══
@@ -25557,6 +25732,7 @@ function renderCtxRow(){
        小節を選んだ時の札は数が多く、〈外す〉はいちばん右端——箱の外に隠れて見えなかった。
        取り消し・やり直しと同じく、**いつも見える右端**に出す。 */
     sc.querySelectorAll('.bb-keep').forEach(k=>row.appendChild(k));
+    arrApply(sc,'ctx:'+mode);   /* 覚えた並びと隠し（tab-7.00） */
     const dv=document.createElement('span'); dv.className='bb-div'; row.appendChild(dv);
     btn('','取り消す（⌘Z）',doUndo,!hist.undo.length,'undo');
     btn('','やり直す（⌘⇧Z）',doRedo,!hist.redo.length,'redo');
@@ -25711,9 +25887,10 @@ function renderCtxRow(){
       /* ══ マスと音符は、別々に数えて名乗る（tab-2.53）══
          以前は「N音」と名乗っておきながら、N は**マス数**であった。
          小節ぜんぶを選ぶと 16マス／8音 なのに「16音」と出る。 */
-      { const ls=nselStrLabel();
-        const cnt=nsel.size?nselNotes().length:0;
-        lab(nsel.size+'マス'+(nsel.size?('・'+cnt+'音'):'')+(ls?('／'+ls):'')); }
+      /* ══ 選んだ数の代わりに〈選択解除〉（tab-6.99）══
+         L様——「モード横の選択マス数はいらないから選択解除ボタンにして」。
+         働きは帯の奥の「選択を外す」と同じ（弦の絞りも外す）。いつも見える頭に置く。 */
+      btn('選択解除','選択を外します（弦の絞りも外します）',nselClear,!(nsel.size||nselStr));
       /* ══ まとまりで指す（tab-1.78）══
          一マスずつ拾わせない。**指で扱える単位**を並べる。 */
       /* ══ 広げる道は、名前で分かるように（tab-1.81）══
@@ -31745,6 +31922,10 @@ function renderPlayBar(){
     tx('カウントインを変える',()=>{ song.play.countIn=v; },FREE); };
   row.appendChild(ci);
 
+  /* 覚えた並びと隠し（tab-7.00）。塊の中を先に、段の並びを後に */
+  row.querySelectorAll(':scope>.bb-grp:not(.bb-mix)').forEach((g,i)=>arrApply(g,'tr:塊'+i));
+  arrApply(row,'tr');
+  if(ARR) arrTray();
   measureBot();
 }
 
@@ -42580,6 +42761,16 @@ function boot(){
           library.tabStampMode=o.tabStampMode;
           tabStampMode=o.tabStampMode;
         }
+        /* ══ 端末に覚える物を、読み戻しにも数える（tab-7.00）══
+           tab-6.79〜6.99 で「端末に覚える」とした物を、ここで拾っていなかった。
+           書いても開き直すと消えていた（ドラムの〈ほかの音〉・スマホのマスの開き具合・
+           十字キー・譜面の大きさ・帯の並び）。 */
+        if(typeof o.drumMore==='boolean') library.drumMore=o.drumMore;
+        if(typeof o.drumGridHide==='boolean') library.drumGridHide=o.drumGridHide;
+        if(typeof o.drumOpenPhone==='boolean') library.drumOpenPhone=o.drumOpenPhone;
+        if(typeof o.showPad==='boolean') library.showPad=o.showPad;
+        if(typeof o.paperZoom==='number'&&isFinite(o.paperZoom)) library.paperZoom=o.paperZoom;
+        if(o.bandArr&&typeof o.bandArr==='object'&&!Array.isArray(o.bandArr)) library.bandArr=o.bandArr;
       } }
   }catch(e){}
 
