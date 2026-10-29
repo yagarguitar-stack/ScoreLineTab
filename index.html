@@ -1107,6 +1107,13 @@ body.selecting .mwrap,body.editing .hit-mark{cursor:pointer}
 .paper input,.paper select,.paper textarea,.paper [contenteditable="true"]{-webkit-user-select:text;user-select:text}
 .mwrap svg{touch-action:pan-y}
 
+/* 上の真ん中の地図：セクション名の有る無しで、ランプの高さが3pxずれていた（名札の欄が縮む）。揃える（tab-6.96） */
+#sl-bridge .ds-msec span{height:16px;line-height:16px;min-height:16px}
+/* 「ここから」の印：ランプの上に小旗（金の三角）を立て、ランプは薄い金に（tab-6.97・L様の選択：案B）。
+   鳴っている小節の緑の灯と重なっても、両方が見分けられる */
+#sl-bridge .ds-mbars{overflow:visible}
+#sl-bridge .ds-mbars button.sl-cue{position:relative;background:color-mix(in srgb,var(--st-lamp,#f5b942) 40%,var(--st-ledoff))}
+#sl-bridge .ds-mbars button.sl-cue::before{content:"";position:absolute;left:50%;top:-7px;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid var(--st-lamp,#f5b942);filter:drop-shadow(0 0 3px var(--st-lamp,#f5b942));pointer-events:none}
 /* 仮の休符（道具が入れた休符）は、画面ではやや薄く。刷る時は今まで通りの濃さ（tab-6.91） */
 #paper .rest-auto{opacity:.5}
 @media print{ #paper .rest-auto{opacity:1!important} }
@@ -1967,7 +1974,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.93', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.97', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -22530,10 +22537,37 @@ function mergeOtherParts(tl){
   tl.ev=tl.ev.concat(add).sort((a,b)=>(a.t-b.t)||(rk(a)-rk(b)));
   return tl;
 }
+/* 「ここから」の印：表に並んだ小節（_disp）の何番目か。曲の形が変われば si/pos で探し直す */
+let CUE=null;   /* {si,pos} */
+function cueIdx(){
+  if(!CUE) return -1;
+  const i=_disp.findIndex(d=>d.si===CUE.si&&d.pos===CUE.pos);
+  if(i<0){ CUE=null; return -1; }
+  return i;
+}
+function cueStartT(tl){
+  const i=cueIdx(); if(i<0||!tl.spans) return null;
+  const d=_disp[i];
+  /* 同じ小節が繰り返しで何度も出る時は、印の位置までに出た回数で選ぶ */
+  const nth=_disp.slice(0,i).filter(x=>x.barId===d.barId).length;
+  const sp=tl.spans.filter(x=>x.id===d.barId)[nth]||tl.spans.find(x=>x.id===d.barId);
+  if(!sp) return null;
+  return (sp.tIn!=null)?sp.tIn:sp.t;
+}
+function cueSet(k){   /* k：1から数えた小節。同じ所をもう一度で外す。null で外す */
+  const d=(k!=null)?_disp[k-1]:null;
+  if(!d||(CUE&&CUE.si===d.si&&CUE.pos===d.pos)) CUE=null;
+  else CUE={si:d.si,pos:d.pos};
+  if(TP.playing) return;      /* 鳴っている間は印だけ。次の ▶ から効く */
+}
 function buildLoopWindow(){
   const tl=TP.tl; if(!tl) return;
   const st=tl.startT;
-  const win=loopWindow(tl);
+  let win=loopWindow(tl);
+  /* ══ 「ここから」の印（tab-6.96）══
+     L様——「上の中央の小節ランプをタップで再生開始位置を決められるように」。
+     ⟳ の範囲が無ければ、印の小節の頭から曲の終わりまで鳴らす（範囲があれば範囲が先）。 */
+  if(!win){ const ct=cueStartT(tl); if(ct!=null&&ct>st) win={t1:ct,t2:tl.dur,cue:true}; }
   TP.lapT1=(win&&win.t1>=st)?win.t1:st;
   TP.lapT2=win?win.t2:tl.dur;
   const t1=TP.lapT1;
@@ -22541,7 +22575,7 @@ function buildLoopWindow(){
     .filter(e=>e.kind!=='count'&&e.t>=t1-1e-9)
     .map(e=>{ const o=Object.assign({},e); o.t=e.t-t1; return o; });
   TP.endDur=tl.dur-t1;
-  TP.lapDur=(win&&TP.lapT2>t1+0.01)?(TP.lapT2-t1):TP.endDur;
+  TP.lapDur=(win&&!win.cue&&TP.lapT2>t1+0.01)?(TP.lapT2-t1):TP.endDur;
   TP.wrapI=(TP.lapDur<TP.endDur-1e-9)
     ? TP.body.findIndex(e=>e.t>=TP.lapDur-1e-9)
     : TP.body.length;
@@ -23219,6 +23253,7 @@ function scrollHost(){
 window.SL_TAB={
   now:()=>AC?AC.currentTime:0, playing:()=>TP.playing, disp:()=>_disp, song:()=>song,
   loop:()=>{ try{ return TP.loop?loopIdx():null; }catch(_){ return null; } },
+  cue:()=>{ const i=cueIdx(); return i<0?null:i+1; }, cueSet:k=>cueSet(k),
   follow:(el)=>{ try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){} },
   ampButton:()=>$('tb-amp')||ampTopButton(),
   mixButton:()=>$('tb-mix')||mixTopButton()
@@ -25103,6 +25138,9 @@ function noteShiftString(dir,keep){
     let ok=true;
     nselStr.forEach(si=>{ const v=si+dir; if(v<0||v>=nStr) ok=false; else ns.add(v); });
     if(ok) nselStr=ns;
+    /* 絞りを動かしたら描き直す（tab-6.94）。L様——「弦をずらしたとき選択範囲が置いてきぼり」。
+       描き直しは tx の中で先に済んでおり、枠が前の弦に残っていた */
+    render();
   }
   toast(plan.length+'音の弦を移しました'+(nselStrLabel()?('（'+nselStrLabel()+'）'):''));
 }
@@ -36752,7 +36790,10 @@ function renderSection(sec,si,ctx,chordMap,arrIdx){
   const head=document.createElement('div'); head.className='sec-head';
   head.innerHTML=FOOT;
 
-  if(mode!=='select'){
+  /* ══ 〈選択〉でも見出しの札を出す（tab-6.95）══
+     L様——「⤒ 前へ繋げるがない」。〈選択〉の時だけ、名前の欄と見出しの札
+     （〈段落をつける〉〈前へ繋げる〉〈セクションごと移動〉等）を丸ごと出していなかった。 */
+  {
     const nm=document.createElement('input'); nm.className='sec-in'; nm.type='text';
     nm.value=sec.name; nm.placeholder='セクション名（例：Aメロ）';
     nm.onchange=()=>{ const v=nm.value; tx('セクション名を変える',()=>{ song.sections[si].name=v; }); };
@@ -36799,11 +36840,6 @@ function renderSection(sec,si,ctx,chordMap,arrIdx){
     ico('↑','このセクションを丸ごと、前のセクションと入れ替えます',()=>moveSection(si,-1),si===0);
     ico('↓','このセクションを丸ごと、後のセクションと入れ替えます',()=>moveSection(si,1),si===song.sections.length-1);
     ico('×','このセクションを消す',()=>deleteSection(si),false,'dgr');
-  } else {
-    const nm=document.createElement('div');
-    nm.className='sec-name'+(sec.name?'':' empty');
-    nm.textContent=sec.name||'（セクション名なし）';
-    head.appendChild(nm);
   }
   box.appendChild(head);
 
@@ -43797,7 +43833,12 @@ else boot();
   function idxOf(si,pos){var D=T.disp();for(var i=0;i<D.length;i++){if(D[i].si===si&&D[i].pos===pos)return i;}return -1;}
   function idxOfBar(barId){var w=document.querySelector('#paper .mwrap[data-bar="'+barId+'"]');if(!w)return -1;return idxOf(+w.getAttribute('data-si'),+w.getAttribute('data-pos'));}
   var br=DS.ui.bridge(el,{bars:1,beats:4,onJump:function(k){
-    var d=T.disp()[k-1];if(!d)return;var w=document.querySelector('#paper .mwrap[data-si="'+d.si+'"][data-pos="'+d.pos+'"]');if(w)T.follow(w);}});
+    var d=T.disp()[k-1];if(!d)return;
+    /* 叩いた小節に「ここから」の印（もう一度で外す）。譜面はその小節へ送る。鳴らすのは ▶ で（tab-6.96） */
+    if(T.cueSet)T.cueSet(k);paintCue();
+    var w=document.querySelector('#paper .mwrap[data-si="'+d.si+'"][data-pos="'+d.pos+'"]');if(w)T.follow(w);}});
+  function paintCue(){var k=T.cue?T.cue():null;Array.prototype.forEach.call(el.querySelectorAll('.ds-bmap button'),function(c){var on=(+c.dataset.bar===k);c.classList.toggle('sl-cue',on);c.setAttribute('aria-label',c.dataset.bar+'小節目'+(on?'（ここから鳴らす・もう一度で外す）':'へ'));});}
+  window.SL_TAB_PAINTCUE=paintCue;
   /* 曲の形：区切りの名前と小節の数、くり返しの範囲、拍子 */
   var last='';
   function sync(){
@@ -43808,6 +43849,7 @@ else boot();
     var ts=4;try{var t=(S.meta&&S.meta.timeSig)||S.timeSig;if(t&&t.n)ts=t.n;}catch(e){}
     var shape={sections:secs.map(function(x){return {name:x.name,from:x.from,to:x.to};}),bars:D.length,loop:lp,beats:ts};
     var k=JSON.stringify(shape);if(k!==last){last=k;br.set(shape);}
+    paintCue();
   }
   window.SL_TAB_SYNC=sync;
   new MutationObserver(function(){clearTimeout(sync._t);sync._t=setTimeout(sync,60);}).observe(document.getElementById('paper'),{childList:true});
