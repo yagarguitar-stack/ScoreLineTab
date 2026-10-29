@@ -1974,7 +1974,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.97', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.98', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3062,6 +3062,8 @@ function mkSong0(o){
      'up' 上へ揃える（既定）／'down' 下へ／'auto' これまで通り弦から決める
      **数字のある音符には効かない**——そちらは弦が向きを決める。 */
   slashStem:'up',
+  /* 同じ押さえを斜線で書くか（tab-6.98）。見た目だけ。押さえのデータは消さない */
+  slashSame:false,
       /* ══ マスの目安線をどこまで出すか（tab-2.00）══
          'all' 拍の線＋刻みのマス／'beat' 拍の線だけ／'none' 出さない。
          印刷では元より全部消える。これは**画面の見え方**の摘みである。 */
@@ -3242,7 +3244,7 @@ var CAPO_PT=null;
              五線譜の表示・入力の刻み・新しい小節の刻み・コードをTABへ書くか
    （小節の刻みと記号は `bindBarPartOpts`、セクションの音は `bindSecSound`） */
 var PART_META_KEYS=['tuning','diagram','diagramLabel','capoName','strokeGlyph','strokeAuto','pickMark',
-  'rhythmDir','slashStem','staffView','snap','defaultRhythm','chordToTab','arpLand','arpLandSet','arpWidth'];
+  'rhythmDir','slashStem','slashSame','staffView','snap','defaultRhythm','chordToTab','arpLand','arpLandSet','arpWidth'];
 var PART_PLAY_KEYS=['ring'];    /* bend は rit./accel. の効き＝時間の物なので曲に一つ */
 function curPartIdx(s){ return (CAPO_PT!=null)?CAPO_PT:((s&&s.part)||0); }
 function _cfgCopy(v){ return (v&&typeof v==='object')?JSON.parse(JSON.stringify(v)):v; }
@@ -5859,6 +5861,25 @@ function engrave(s,bar,o){
     n.stemStrs=[(d==='down')?5:0];
     if(!src.stem) n.up=(d!=='down');
   });
+  /* ══ 同じ押さえは斜線で（tab-6.98）══
+     L様——「同じ音はスラッシュ表記にする機能があると定型がもっと生きてきそう。全部表記と切り替えありで」。
+     斜線にする音（o.slashSet：音符の頭の刻）は、数字・繋がり・囲みを出さず斜線の符頭にする。
+     叩いて写せるよう、元の押さえの弦は当たり（numAt）に残す（slashNums）。
+     斜線の入る小節は、符尾を上へ揃える（向きを決めてある音符は除く）。 */
+  if(o.slashSet&&o.slashSet.size){
+    let anySl=false;
+    flat.forEach(n=>{
+      if(n.rest||n.scr) return;
+      const src=vlist[n.srcIdx];
+      if(!src||!o.slashSet.has(src.start)) return;
+      anySl=true;
+      n.slashNums=(src.stops||[]).map(q=>q.s);
+      n.stops=null; n.contStops=null; n.boxStops=null;
+      n.tieStrs=null; n.tieOutStrs=[]; n.tieOut=false; n.cont=false; n.boxLong=false;
+      n.stemStrs=[];
+    });
+    if(anySl) flat.forEach(n=>{ if(n.rest) return; const src=vlist[n.srcIdx]; if(src&&src.stem) return; n.up=true; n.stemSet=true; });
+  }
   flat.forEach(n=>{ n.beat=Math.floor(n.start/beatUnit); });
   /* 符尾が避けるべき高さ（tab-2.01）。向きが決まる前に出しておく */
   flat.forEach(n=>{ n.bandSym=bandSymOf(s,n); });
@@ -7761,6 +7782,8 @@ function engrave(s,bar,o){
          開いた時に黙って数字を入れるのは乱暴なので、migrate では触らない。
          菱形が出ていたら「まだ決めていない音符」——縦になぞれば決まる。 */
       g+=slashHead(cx,baseY,noteFilled(n.name),n.brush,n.dot);
+      /* 斜線で書いた同じ押さえは、叩けば今まで通り写せるよう当たりに弦を残す（tab-6.98） */
+      if(n.slashNums&&n.head) n.slashNums.forEach(s2=>numAt.push({cx,cy:baseY,s:s2}));
     }
 
     /* ══ 音価 ══
@@ -9153,6 +9176,38 @@ let nselStr=null;
    別の器を作ると、選択と食い違った時にどちらが正なのか決められなくなる。 */
 let curCell=null;      // {barId,start,str}
 /* 十字キーが出ている時だけ、今のマスの弦の印を描く（tab-6.83）。出していない時の見た目は変えない */
+/* ══ 同じ押さえを斜線にする音（tab-6.98）══
+   L様の選択——押さえが変わった所と段の頭は数字。奏法の付いた音は数字のまま。
+   直前の押さえは、表の並びを遡ってその場で求める（段ごとの組み・部分の描き直しの順に左右されない）。 */
+function slashSig(n){
+  if(!n||n.kind==='rest'||!n.stops||!n.stops.length) return null;
+  return n.stops.map(o=>o.s+':'+o.f).sort().join(',');
+}
+function slashPlain(n){
+  if(!n||n.accent||n.staccato) return false;
+  if(n.sym&&Object.keys(n.sym).some(k=>{ const v=n.sym[k]; return v!=null&&v!==false&&v!==''; })) return false;
+  return (n.stops||[]).every(o=>typeof o.f==='number'&&!(o.t&&Object.keys(o.t).some(k=>{ const v=o.t[k]; return v!=null&&v!==false&&v!==''&&v!==0; })));
+}
+function slashSetFor(s,bar,si,pos,isRowStart){
+  if(!s||!s.meta||!s.meta.slashSame||!bar) return null;
+  let prev=null;
+  if(!isRowStart){
+    const i=_disp.findIndex(d=>d.si===si&&d.pos===pos);
+    for(let k=i-1;k>=0&&prev==null;k--){
+      const b=findBar(s,_disp[k].barId); if(!b) continue;
+      const ns=(b.notes||[]).filter(n=>n.kind!=='rest');
+      for(let j=ns.length-1;j>=0;j--){ const g=slashSig(ns[j]); if(g){ prev=g; break; } }
+      if(prev==null&&ns.length) break;
+    }
+  }
+  const set=new Set();
+  (bar.notes||[]).slice().sort((a,b)=>a.start-b.start).forEach(n=>{
+    const g=slashSig(n); if(!g) return;
+    if(g===prev&&slashPlain(n)) set.add(n.start);
+    prev=g;
+  });
+  return set.size?set:null;
+}
 function curMarkFor(barId){
   if(mode!=='tab'||!showPad||!curCell||curCell.barId!==barId) return {curStr:null,curTick:null};
   return {curStr:curCell.str,curTick:curCell.start};
@@ -37017,6 +37072,7 @@ function redrawBar(barId){
       : null;
     o.opts.nselStr=(mode==='select'||mode==='tab')?nselStr:null;
     Object.assign(o.opts,curMarkFor(barId));
+    o.opts.slashSet=slashSetFor(song,bar,si,pos,!!o.opts.isRowStart);
     let r;
     try{ r=engrave(song,bar,Object.assign({width:wrap.clientWidth||210},o.opts)); }
     catch(e){ console.error('engrave(部分)',e); return; }
@@ -37255,6 +37311,7 @@ function fillMeasures(){
         : null,
       nselStr:(mode==='select'||mode==='tab')?nselStr:null,
       ...curMarkFor(p.barId),
+      slashSet:slashSetFor(song,bar,p.si,p.pos,!!p.isRowStart),   /* 同じ押さえは斜線（tab-6.98） */
       /* 選択モードでも刻みのマスを敷く。**空いた時間を選べないと、
          貼る位置が音符の上にしか置けない**（tab-1.21） */
       /* マスはこの小節の刻み（tab-1.69）。曲ぜんたいのものではない */
@@ -40106,7 +40163,7 @@ function renderSettings(){
   let host=box;
   /* パートごとの欄には、どのパートの設定かを添える（tab-6.48） */
   const PART_FLD=new Set(['チューニング','コード図','図の点の中身','ピッキング記号の形','ピッキング記号の自動割り当て',
-    'ピッキング記号を付けるか','定型に付けるピッキング記号','定型の符尾の向き','五線譜を出す','コードを入れた時',
+    'ピッキング記号を付けるか','定型に付けるピッキング記号','定型の符尾の向き','同じ押さえ','五線譜を出す','コードを入れた時',
     'アルペジオの着地','アルペジオの広がり','音の消え方','弦の伸び（サスティーン）','胴の鳴り','歪みの強さ']);
   const _pfTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
   const fld=(label,el,wide,note)=>{
@@ -40540,6 +40597,11 @@ function renderSettings(){
     +'〈一小節の型〉にも効きます——〈型のまま〉をお選びになった時だけ、'
     +'型が持っている向き（フォークの ↓↑↑ など）が書き込まれます。'
     +'ブラッシングの ✕ は符頭でございますので、矢印を付けずとも残ります');
+  fld('同じ押さえ',sel([['off','全部数字で書く'],['on','斜線で書く']],
+    song.meta.slashSame?'on':'off',
+    v=>tx('同じ押さえの書き方を変える',()=>{song.meta.slashSame=(v==='on');})),false,
+    '前の音と押さえが同じ音を、数字の代わりに斜線で書きます。押さえが変わった所と段の頭は数字で残します。'
+    +'奏法の付いた音は数字のままです。見た目だけの切り替えで、押さえや鳴る音は変わりません');
   fld('定型の符尾の向き',sel([['up','上へ揃える'],['down','下へ揃える'],['auto','これまで通り（下）']],
     song.meta.slashStem||'up',
     v=>tx('定型の符尾の向きを変える',()=>{song.meta.slashStem=v;})),false,
