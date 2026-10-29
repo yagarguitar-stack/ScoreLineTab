@@ -1967,7 +1967,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.92', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-6.93', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -23584,6 +23584,7 @@ function chordCopy(){
   const base=items[0].abs;
   chordClip=items.map(x=>({d:x.abs-base,ch:x.ch}));
   const has=chordClip.filter(x=>x.ch).length;
+  zsel={kind:null,items:[]};   /* 写したら選びを外す（tab-6.93） */
   render(); toast('コードを'+chordClip.length+'ヶ所ぶんコピーしました（うち'+has+'ヶ所に名前）');
 }
 function chordPaste(){
@@ -23619,6 +23620,7 @@ function chordPaste(){
   toast(skip
     ? ('コードを'+done+'ヶ所に貼りました（'+skip+'ヶ所は音符が無いので置けません）')
     : ('コードを'+done+'ヶ所に貼り付けました'));
+  if(zsel&&zsel.items&&zsel.items.length){ zsel={kind:null,items:[]}; render(); }   /* 貼った後も外す（tab-6.93） */
 }
 
 /* ── コピー ── */
@@ -25177,6 +25179,7 @@ function nselShiftFret(dir){
 function bulkCopy(){
   const ids=selBars(); if(!ids.length){ toast('小節を選んでください'); return; }
   clip={bars:ids.map(id=>clone(findBar(song,id))).filter(Boolean)};
+  sel.clear();   /* 写したら選びを外す（tab-6.93）。音符の写しと揃える——残すと貼り先の選びに足され、元へ重ねて貼っていた */
   render(); toast(clip.bars.length+'小節をコピーしました');
 }
 function bulkPaste(){
