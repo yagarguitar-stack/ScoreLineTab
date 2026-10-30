@@ -1997,7 +1997,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.01', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.02', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -17209,6 +17209,20 @@ function pasteAt(si,pos){
   toast(clip.bars.length+'小節を貼り付けました');
 }
 
+/* ══ 小節の差し込み（tab-7.02）══
+   L様——貼り付け（上書き）と差し込みを両方。差し込みは**選んだ小節の後ろ**へ。
+   上書きと違い、元の小節は一つも消えない（後ろは押し出される）。 */
+function insertAfter(si,pos){
+  if(!clip||!clip.bars.length){ toast('コピーした小節がありません'); return; }
+  tx('小節を差し込む',()=>{
+    const it=song.sections[si].items;
+    const made=clip.bars.map(b=>{ const c=clone(b); c.id=uid('b'); song.bars.push(c); return {barId:c.id,link:false}; });
+    it.splice(pos+1,0,...made);
+    gcBars(song);
+  });
+  toast(clip.bars.length+'小節を差し込みました');
+}
+
 /* ══════════════════════════════════════════════════════════════
    Phase 5-A — 音の土台
    iOS では最初の指の動きでしか音を出せないので、そこで起こす
@@ -25303,6 +25317,12 @@ function bulkPaste(){
   const s=selSorted(); if(!s.length){ toast('貼り付け先を選んでください'); return; }
   pasteAt(s[0].si,s[0].pos); sel.clear(); render();
 }
+/* 差し込みは、選んだ中で**いちばん後ろ**の小節の後ろへ（tab-7.02） */
+function bulkInsert(){
+  const s=selSorted(); if(!s.length){ toast('差し込む所を選んでください'); return; }
+  const l=s[s.length-1];
+  insertAfter(l.si,l.pos); sel.clear(); render();
+}
 /* ══ 選んだ小節の刻みを、まとめて変える（tab-1.69）══
    一つずつ ⋯ を開いて直すのでは、五連のフレーズ四小節を書くのに八手掛かる。
    **まとめて掛ける道が要る。** 〈曲に合わせる〉で上書きを外すのも、ここから。 */
@@ -25580,7 +25600,13 @@ function arrApply(box,ck){
       const k=c.dataset.ak.replace(/#\d+$/,''); seen[k]=(seen[k]||0)+1; c.dataset.ak=(seen[k]>1)?(k+'#'+seen[k]):k; }); }
   const st=arrState(ck); const items=arrItems(box);
   if(st&&st.order&&st.order.length){
-    const idx=k=>{ const i=st.order.indexOf(k); return i<0?1e6+items.findIndex(x=>x.dataset.ak===k):i; };
+    /* 覚えた並びに無い札（後から足した札）は、元の並びで前にいた札の隣へ（tab-7.02）。
+       以前は末尾へ回り、〈差し込み〉が〈貼り付け〉から離れていた */
+    const nat=items.map(x=>x.dataset.ak);
+    const idx=k=>{ const i=st.order.indexOf(k); if(i>=0) return i;
+      const n=nat.indexOf(k);
+      for(let j=n-1;j>=0;j--){ const p=st.order.indexOf(nat[j]); if(p>=0) return p+0.001*(n-j); }
+      return -1+0.001*n; };
     const sorted=items.slice().sort((a,b)=>idx(a.dataset.ak)-idx(b.dataset.ak));
     const slots=items.map(el=>{ const ph=document.createComment(''); box.insertBefore(ph,el); return ph; });
     sorted.forEach((el,i)=>box.insertBefore(el,slots[i]));
@@ -25770,6 +25796,7 @@ function renderCtxRow(){
     btn('コード','選んだ小節すべてにコードを入れる',bulkChord,false,null,'wide');
     btn('','コピー',bulkCopy,false,'copy');
     btn('','貼り付け',bulkPaste,!clip,'paste');
+    btn('差し込み','選んだ小節の後ろへ差し込みます（⇧⌘V）',bulkInsert,!clip,null,'wide');
     btn('刻み','選んだ小節の刻みをまとめて変えます',bulkSnap,false,null,'wide');
     btn('複製','選んだ小節を、そのすぐ後ろへ複製します',bulkDuplicate,false,null,'wide');
     /* 段落（tab-3.31）。**節を切るのは書きながら何度もやる仕事**なので、
@@ -26460,6 +26487,7 @@ const HELP=[
     ['Delete／Backspace','カーソルの弦の押さえを外します'],
     ['Shift＋矢印','カーソルが矩形に伸びます。そのまま〈選択〉と同じ範囲指定になります'],
     ['⌘C／⌘X／⌘V（Windows は Ctrl）','選んだ音符を写し取る／切り取る／貼り付けます。切り取りは**写してから休符に**いたしますので、貼り戻す先が残ります。弦を絞って選んでいれば、その弦の押さえだけが動きます'],
+    ['⇧⌘V（Windows は Ctrl＋Shift＋V）','選んだ小節の後ろへ、コピーした小節を差し込みます。⌘V は選んだ小節から上書きします'],
     ['⌘A（Windows は Ctrl＋A）','曲ぜんぶのマスを選びます。続けて⌘Cで丸ごと写せます'],
     ['⌘Z／⌘⇧Z','取り消し／やり直し。⌘Y でもやり直せます。曲名や歌詞を打っている最中は、譜面ではなく文字の取り消しになります'],
     ['スペース','再生と停止。ボタンに焦点が残っていても効きます。'
@@ -35550,7 +35578,7 @@ function bindPaper(){
       if(k==='x'||k==='X'){ if(cut()) e.preventDefault(); return; }
       if(k==='v'||k==='V'){
         if(nsel.size){ e.preventDefault(); notePaste(); }
-        else if(sel.size){ e.preventDefault(); bulkPaste(); }
+        else if(sel.size){ e.preventDefault(); if(e.shiftKey) bulkInsert(); else bulkPaste(); }
         else if(zsel.kind==='chord'&&zsel.items.length){ e.preventDefault(); chordPaste(); }
         return;
       }
