@@ -1997,7 +1997,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.02', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.03', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -3443,6 +3443,21 @@ function noteSaveResult(ok){
   toast('端末に保存できなくなりました。この先の直しは残りません。⤓ で書き出してくださいませ',null,null,10000);
 }
 function saveLibrary(){ noteSaveResult(store.set(K_INDEX, JSON.stringify(library))); }
+/* ══ 端末に覚える物の、型の確かめ（tab-7.03）══
+   読み戻し（boot）は控えの中身を全部持ち帰る。ここに書いた物だけ型を確かめ、
+   合わなければ捨てる（壊れた値で動かさない）。書かない物は素通し。 */
+const _libB=v=>typeof v==='boolean', _libN=v=>typeof v==='number'&&isFinite(v),
+      _libS=v=>typeof v==='string', _libO=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+const LIB_KEEP={
+  tempPolicy:v=>v!=null,
+  strMoveKeep:_libB, tabRun:_libB, tabStampMode:_libS,
+  recOfs:_libN, recLat:_libN, recStartOfs:_libN, recStartOfsAsked:_libB, recLead:_libN,
+  recMix:_libS, recQuiet:_libS, recLite:_libS, recNoDrum:_libS,
+  recVol:_libN, playVol:_libN,
+  drumMore:_libB, drumGridHide:_libB, drumOpenPhone:_libB, showPad:_libB,
+  paperZoom:_libN, bandArr:_libO,
+  chordAdv:_libS, cpalHide:_libB, fvLabel:_libS, genBacking:_libS
+};
 /* ══ 書いたものが、本当に残っているか（tab-4.63）══
    L様——「音を入力した後、違うページに行ったときに音が消える。
            とにかく勝手に音符が消えることが多い」。
@@ -17197,8 +17212,10 @@ function openBarMenu(barId,si,pos){
    （小節メニューから帯へ移り、まとめて扱う bulkMove / bulkRemove に一本化した）。 */
 function pasteAt(si,pos){
   if(!clip||!clip.bars.length){ toast('コピーした小節がありません'); return; }
+  let rep=0;
   tx('小節を貼り付ける',()=>{
     const it=song.sections[si].items;
+    rep=Math.max(0,Math.min(clip.bars.length,it.length-pos));
     clip.bars.forEach((b,k)=>{
       const c=clone(b); c.id=uid('b'); song.bars.push(c);
       const t=pos+k;
@@ -17206,7 +17223,9 @@ function pasteAt(si,pos){
     });
     gcBars(song);
   });
-  toast(clip.bars.length+'小節を貼り付けました');
+  /* 上書きで元の小節が消えたことを、言葉で知らせる（tab-7.03） */
+  const add=clip.bars.length-rep;
+  toast(rep+'小節を置き換えました'+(add>0?'（'+add+'小節は末尾に足しました）':''),'取り消す',()=>doUndo(),6000);
 }
 
 /* ══ 小節の差し込み（tab-7.02）══
@@ -25576,7 +25595,14 @@ function arrKey(el){
   if(w) return '字:'+w;
   return '他:'+((el.getAttribute('title')||'').trim()||String(el.className||'')).slice(0,30);
 }
-function arrState(ck){ const a=(library&&library.bandArr)||{}; return a[ck]||null; }
+/* ══ 字の札の数は、名に入れない（tab-7.03）══
+   帯の頭の「1小節」は〈コード〉の札と一組で覚えるが、字ごと名にしていたので
+   2小節を選ぶと「2小節」——**別の札と見なされ、並べ替えも隠しも効かなかった。**
+   数を〇に均す。以前に覚えた名（数入り）も読む時に均す。 */
+function arrNum(k){ return /^字：/.test(k)?k.replace(/[0-9０-９]+/g,'〇'):k; }
+function arrState(ck){ const a=(library&&library.bandArr)||{}; const st=a[ck]; if(!st) return null;
+  const f=l=>Array.isArray(l)?[...new Set(l.map(arrNum))]:l;
+  return Object.assign({},st,{order:f(st.order),hide:f(st.hide)}); }
 function arrSave(ck,st){ if(!library) return; library.bandArr=library.bandArr||{}; if(st) library.bandArr[ck]=st; else delete library.bandArr[ck]; try{ saveLibrary(); }catch(_){} }
 function arrItems(box){ return [...box.children].filter(c=>c.classList&&c.classList.contains('arr-item')); }
 /* 箱の中身に印を付け、覚えた並びと隠しを当てる */
@@ -25586,7 +25612,7 @@ function arrApply(box,ck){
   [...box.children].forEach(c=>{
     if(c.classList&&c.classList.contains('bb-lab')&&c.nextElementSibling&&!c.nextElementSibling.classList.contains('bb-lab')){
       const nx=c.nextElementSibling, g=document.createElement('span'); g.className='arr-glue';
-      g.dataset.ak='字：'+(c.textContent||'').trim(); box.insertBefore(g,c); g.appendChild(c); g.appendChild(nx);
+      g.dataset.ak=arrNum('字：'+(c.textContent||'').trim()); box.insertBefore(g,c); g.appendChild(c); g.appendChild(nx);
     }
   });
   [...box.children].forEach(c=>{
@@ -42766,39 +42792,27 @@ function boot(){
          > 片方だけ足せば、書いても消える。 */
       if(o&&Array.isArray(o.index)){
         library={version:1,currentId:o.currentId||null,index:o.index};
-        if(o.tempPolicy) library.tempPolicy=o.tempPolicy;
-        if(typeof o.strMoveKeep==='boolean'){
-          library.strMoveKeep=o.strMoveKeep;
-          strMoveKeep=o.strMoveKeep;
+        /* ══ 読み戻しは一覧で回す（tab-7.03）══
+           tab-7.00 で直した後も、六つ（コードの進み方・コードの札を畳む・指板の字・
+           新しい曲の伴奏の型・再生と録音の音量）が拾われず、開き直すと戻っていた。
+           一項目ずつ書き足す作りでは、**足し忘れが必ず起きる。**
+
+           控えにある物は**全部持ち帰る。** 型を確かめたい物だけ `LIB_KEEP` に書き、
+           型が合わなければ捨てる。一覧に無い物も、この道具が書いた物なので素通しで残す。
+           > **新しく覚える物を足しても、ここは触らなくてよい。** */
+        Object.keys(o).forEach(k=>{
+          if(k==='version'||k==='currentId'||k==='index') return;
+          const ck=LIB_KEEP[k];
+          if(ck&&!ck(o[k])) return;
+          library[k]=o[k];
+        });
+        /* 覚えた値を、動いている変数へも移す */
+        if(typeof library.strMoveKeep==='boolean') strMoveKeep=library.strMoveKeep;
+        if(typeof library.tabRun==='boolean') tabRun=library.tabRun;
+        if(library.tabStampMode){
+          if(STAMP_MODES.some(m=>m[0]===library.tabStampMode)) tabStampMode=library.tabStampMode;
+          else delete library.tabStampMode;
         }
-        /* 録音の頭合わせ（tab-5.44）と、測った遅れ（tab-5.54）。
-           **書き込む物と読み戻す物は対で数える** */
-        if(typeof o.recOfs==='number') library.recOfs=o.recOfs;
-        if(typeof o.recLat==='number') library.recLat=o.recLat;
-        if(typeof o.recStartOfs==='number') library.recStartOfs=o.recStartOfs;
-        if(typeof o.recStartOfsAsked==='boolean') library.recStartOfsAsked=o.recStartOfsAsked;
-        if(typeof o.recMix==='string') library.recMix=o.recMix;
-        if(typeof o.recQuiet==='string') library.recQuiet=o.recQuiet;
-        if(typeof o.recLite==='string') library.recLite=o.recLite;
-        if(typeof o.recNoDrum==='string') library.recNoDrum=o.recNoDrum;
-        if(typeof o.recLead==='number') library.recLead=o.recLead;
-        /* 送りの入り切りも控える（tab-4.86） */
-        if(typeof o.tabRun==='boolean'){ library.tabRun=o.tabRun; tabRun=o.tabRun; }
-        /* 写しをどこまで抱えるか（tab-4.64）。**書き込む物と読み戻す物は対で数える** */
-        if(o.tabStampMode&&STAMP_MODES.some(m=>m[0]===o.tabStampMode)){
-          library.tabStampMode=o.tabStampMode;
-          tabStampMode=o.tabStampMode;
-        }
-        /* ══ 端末に覚える物を、読み戻しにも数える（tab-7.00）══
-           tab-6.79〜6.99 で「端末に覚える」とした物を、ここで拾っていなかった。
-           書いても開き直すと消えていた（ドラムの〈ほかの音〉・スマホのマスの開き具合・
-           十字キー・譜面の大きさ・帯の並び）。 */
-        if(typeof o.drumMore==='boolean') library.drumMore=o.drumMore;
-        if(typeof o.drumGridHide==='boolean') library.drumGridHide=o.drumGridHide;
-        if(typeof o.drumOpenPhone==='boolean') library.drumOpenPhone=o.drumOpenPhone;
-        if(typeof o.showPad==='boolean') library.showPad=o.showPad;
-        if(typeof o.paperZoom==='number'&&isFinite(o.paperZoom)) library.paperZoom=o.paperZoom;
-        if(o.bandArr&&typeof o.bandArr==='object'&&!Array.isArray(o.bandArr)) library.bandArr=o.bandArr;
       } }
   }catch(e){}
 
