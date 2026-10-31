@@ -1470,6 +1470,7 @@ body.locked #paper::before{
 <!-- 共通の楽器の音（tab-6.70）。ドラムを録音で鳴らす。読めない時は合成のドラムで鳴る -->
 <script src="https://yagarguitar-stack.github.io/design-system/v1/sound.js"></script>
 <script src="https://yagarguitar-stack.github.io/design-system/v1/guitar.js"></script>
+<script src="https://yagarguitar-stack.github.io/design-system/v1/scoreline-link.js"></script>
 <style>
 /* ══════════════════════════════════════════
    録音スタジオの卓・夜（tab-6.30）
@@ -1886,7 +1887,7 @@ body.cdg-on #botbar{box-shadow:inset 0 3px 0 rgba(210,69,44,.8)}
 
 <div class="topbar">
   <span class="tb-left"><span class="tb-parts" id="tb-parts"></span></span>
-  <button class="tb-song" id="tb-song" title="曲を切り替える">
+  <button class="tb-song" id="tb-song" title="ScoreLine の道具を切り替える（▼ は曲の一覧）">
     <span class="t" id="tb-song-t">ScoreLine TAB</span><span class="car">▼</span>
   </button>
   <span class="tb-tools">
@@ -2012,7 +2013,7 @@ SLG.host({ song:()=>song, toast:(...a)=>toast(...a), audioReady:()=>audioReady()
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.08', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.11', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -17620,6 +17621,164 @@ function openPosPlans(){
     },'pri');
   });
   popClose(pop,'やめる');
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   ScoreLine の道具の行き来（tab-7.09）
+   L様——「同ツールの中から行き来したい」「移る時は今の曲を持って移る」。
+   上の帯の「ScoreLine TAB」の文字を押すと道具が並び、右の ▼ は今まで通り曲の一覧。
+   受け渡しの決まりは design-system の v1/scoreline-link.js（SLLink）が持つ。
+   ここは「この道具の曲 ⇄ 共通の曲」の出し入れだけを受け持つ。
+   ══════════════════════════════════════════════════════════════ */
+const SL_ME='tab';
+/* 弾く順に小節を並べる（区切りの並び。同じ小節を二度通るなら二度） */
+function slSeq(s){ const out=[]; s.sections.forEach(sec=>sec.items.forEach(it=>{ const b=findBar(s,it.barId); if(b) out.push(b); })); return out; }
+/* 小節のコード（帯の物と音符の物を、拍の位置で一つに） */
+function slBarChords(b){
+  const out=[], at=new Set();
+  if(b.chordAt) Object.keys(b.chordAt).forEach(k=>{ const c=b.chordAt[k]; if(!c||c.root==null) return;
+    out.push({tick:+k,root:c.root,type:c.type,bass:(typeof c.bass==='number')?c.bass:null}); at.add(+k); });
+  partNotesAll(b).forEach(n=>{ if(!n||!n.chord||n.chord.root==null||at.has(n.start)) return;
+    out.push({tick:n.start,root:n.chord.root,type:n.chord.type,bass:(typeof n.chord.bass==='number')?n.chord.bass:null}); at.add(n.start); });
+  return out.sort((a,c)=>a.tick-c.tick);
+}
+function slExport(){
+  const s=song; if(!s) return null;
+  if(!s.meta.slLink){ s.meta.slLink=SLLink.newLink(); }
+  flushSave();
+  const ts={n:s.meta.timeSig.n,d:s.meta.timeSig.d};
+  const bars=slSeq(s).map(b=>({
+    ts:b.timeSig?{n:b.timeSig.n,d:b.timeSig.d}:null,
+    chords:slBarChords(b),
+    lyric:(typeof b.lyrics==='string')?b.lyrics:'',
+    /* メロディは今見ているパート（L様のお決め） */
+    notes:(b.notes||[]).map(n=>({start:n.start,len:n.len,
+      kind:(n.kind==='rest'||!n.stops||!n.stops.length)?'rest':'chord',
+      stops:n.stops?JSON.parse(JSON.stringify(n.stops)):[],
+      sym:JSON.parse(JSON.stringify(n.sym||{})),lyric:n.lyric||null}))
+  }));
+  return { v:1, from:SL_ME, link:s.meta.slLink, title:s.meta.title||'',
+    key:{root:s.meta.key.root,qual:s.meta.key.qual||'maj'}, ts, bpm:(s.play&&s.play.bpm)||100,
+    capo:s.meta.capo|0, tuning:s.meta.tuning||'std', part:s.part|0,
+    secs:s.sections.map(sec=>({name:sec.name||'',n:sec.items.length})), bars, melody:true };
+}
+/* 共通の曲を、この道具の曲へ書き込む。fresh は新しい曲（書き換えではない） */
+function slApply(s,cs,fresh){
+  const CDOK=k=>!!CD[k];
+  const fb={min11:'min9',dom9sus4:'dom7sus4',maj7s11:'maj7',dom11:'dom9'};   /* TAB に無い種類は近い物へ */
+  const typ=t=>CDOK(t)?t:(fb[t]&&CDOK(fb[t])?fb[t]:'maj');
+  s.meta.slLink=cs.link;
+  if(cs.title) s.meta.title=cs.title;
+  if(cs.key) s.meta.key={root:(cs.key.root==null?null:cs.key.root),qual:cs.key.qual||'maj'};
+  if(cs.ts) s.meta.timeSig={n:cs.ts.n,d:cs.ts.d};
+  if(cs.bpm) s.play.bpm=cs.bpm;
+  /* 持っていったパートへ書き戻す（開いた時のパートではなく） */
+  if(!fresh&&typeof cs.part==='number'&&cs.part<partCount(s)) setPart(s,cs.part);
+  if(typeof cs.capo==='number') s.meta.capo=cs.capo;
+  if(cs.tuning) s.meta.tuning=cs.tuning;
+  const old=fresh?[]:slSeq(s), used=new Set(), list=[], link=[];
+  cs.bars.forEach((cb,i)=>{
+    let b=old[i];
+    /* 同じ小節を二度通る所（繋がった小節）は、中身が同じなら繋がりのまま残す */
+    if(b&&used.has(b.id)){ const j=old.indexOf(b);
+      if(j>=0&&j<i&&JSON.stringify(cs.bars[j])===JSON.stringify(cb)){ link.push(true); list.push(b); return; }
+      b=null; }
+    if(!b){ b=newBar(s,{}); s.bars.push(b); }
+    used.add(b.id); link.push(false);
+    b.timeSig=(cb.ts&&(cb.ts.n!==cs.ts.n||cb.ts.d!==cs.ts.d))?{n:cb.ts.n,d:cb.ts.d}:null;
+    /* コードは、変わった小節だけ書き換える（手で決めた押さえとの繋がりを、変わらぬ所では切らない） */
+    const want=(cb.chords||[]).map(c=>({tick:c.tick,root:c.root,type:typ(c.type),bass:(typeof c.bass==='number')?c.bass:null}));
+    if(JSON.stringify(slBarChords(b))!==JSON.stringify(want)){
+      partNotesAll(b).forEach(n=>{ if(n&&n.chord) n.chord=null; });
+      b.chordAt=want.length?Object.fromEntries(want.map(c=>[c.tick,{root:c.root,type:c.type,bass:c.bass}])):null;
+    }
+    if(cs.melody&&Array.isArray(cb.notes)&&cb.notes.length){
+      const ns=cb.notes.map(n=>mkNote({start:n.start,len:n.len,kind:(n.kind==='rest')?'rest':'chord',
+        stops:(n.kind==='rest')?null:JSON.parse(JSON.stringify(n.stops||[])),
+        sym:Object.assign(mkNote({}).sym||{},n.sym||{}),lyric:n.lyric||null}));
+      b.notes.length=0; ns.forEach(n=>b.notes.push(n));
+    }
+    if(cb.lyric) b.lyrics=cb.lyric;
+    list.push(b);
+  });
+  let k=0;
+  s.sections=(cs.secs&&cs.secs.length?cs.secs:[{name:'',n:list.length}]).map((sc,j)=>{
+    const sec=(!fresh&&s.sections[j])||mkSection({name:sc.name});
+    sec.name=sc.name||''; sec.items=list.slice(k,k+sc.n).map((b,x)=>({barId:b.id,link:!!link[k+x]})); k+=sc.n; return sec; });
+  if(k<list.length) s.sections[s.sections.length-1].items.push(...list.slice(k).map((b,x)=>({barId:b.id,link:!!link[k+x]})));
+  gcBars(s);
+  return s;
+}
+/* 繋ぎの印で、前に受けた曲を探す */
+function slFindLinked(link){
+  if(!link) return null;
+  for(const e of library.index){ if(song&&song.id===e.id){ if(song.meta.slLink===link) return song.id; continue; }
+    const s=loadSong(e.id); if(s&&s.meta&&s.meta.slLink===link) return e.id; }
+  return null;
+}
+function slReceive(){
+  if(!window.SLLink) return;
+  const cs=SLLink.take(SL_ME); if(!cs) return;
+  const from=(SLLink.tool(cs.from)||{}).name||'ほかの道具';
+  const make=()=>{ const s=mkSong({}); s.sections=[]; slApply(s,cs,true); saveSong(s); switchSong(s.id,true);
+    toast(from+'から「'+(cs.title||'無題の曲')+'」を持ってきました'); };
+  const id=slFindLinked(cs.link);
+  if(!id){ make(); return; }
+  const pop=popup('前に持ってきた曲があります','「'+(cs.title||'無題の曲')+'」');
+  const g=pgrp(pop,from+'から持ってきた中身を');
+  /* 鍵の掛かった曲は書き換えない（鍵が効いて中身は変わらないのに「書き換えた」と出ていた） */
+  const tgt=(song&&song.id===id)?song:loadSong(id);
+  if(tgt&&tgt.meta&&tgt.meta.locked){
+    pnote(g,'この曲には鍵が掛かっているため、書き換えられません。新しい曲として足せます');
+    pbtn(g,'新しい曲として足す',false,()=>{ closePop(); make(); },'pri');
+    popClose(pop,'受け取らない'); return;
+  }
+  pbtn(g,'この曲に書き換える',false,()=>{ closePop();
+    if(!(song&&song.id===id)) switchSong(id,true);
+    tx(from+'の中身に書き換える',()=>slApply(song,cs,false)); render();
+    toast('「'+(cs.title||'無題の曲')+'」を書き換えました','取り消す',()=>doUndo(),6000); },'pri');
+  pbtn(g,'新しい曲として足す',false,()=>{ closePop(); make(); });
+  pnote(g,'書き換えても、この道具にしか無い物（アンプ・パート・ミキサーなど）は残ります');
+  popClose(pop,'受け取らない');
+}
+/* ══ 狭い画面では、文字か ▼ のどちらかが隠れる ══
+   TAB は ▼ が、Lead は文字が隠れ、片方の板が開けなくなっていた。
+   どちらかが見えない時は、どこを押しても道具の板を開き、下に〈曲の一覧〉を添える。 */
+function slNarrow(){
+  const t=$('tb-song-t'), c=document.querySelector('#tb-song .car');
+  const w=e=>e?e.getBoundingClientRect().width:0;
+  return w(t)<4||w(c)<4;
+}
+function slOpenTools(withSongs){
+  if(!window.SLLink){ toast('道具を切り替える部品を読み込めませんでした。通信を確かめて、開き直してください'); return; }
+  let ov=$('ov-tools');
+  if(!ov){
+    ov=document.createElement('div'); ov.className='sheet-ov'; ov.id='ov-tools';
+    ov.innerHTML='<div class="sheet"><div class="sh-head"><div class="sh-ttl">ScoreLine の道具</div>'
+      +'<button class="btn" id="ov-tools-x">閉じる</button></div><div class="sh-body" id="tool-list"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) closeSheet('ov-tools'); });
+    $('ov-tools-x').onclick=()=>closeSheet('ov-tools');
+  }
+  const box=$('tool-list'); box.innerHTML='';
+  SLLink.TOOLS.forEach(t=>{
+    const me=(t.id===SL_ME);
+    const r=document.createElement('div'); r.className='song-row'+(me?' cur':'');
+    r.innerHTML='<div class="nm"></div><div class="mt"></div>';
+    r.querySelector('.nm').textContent=t.name;
+    r.querySelector('.mt').textContent=me?'いま開いています':(t.note+'　— 今の曲を持って移ります');
+    if(!me) r.onclick=()=>{ const cs=slExport(); if(!cs){ toast('持っていく曲がありません'); return; }
+      if(!SLLink.carry(t.id,cs)) toast('曲を預けられませんでした'); };
+    box.appendChild(r);
+  });
+  if(withSongs){
+    const r=document.createElement('div'); r.className='song-row'; r.style.marginTop='14px';
+    r.innerHTML='<div class="nm">曲の一覧</div><div class="mt">この道具の曲を選ぶ・作る</div>';
+    r.onclick=()=>{ closeSheet('ov-tools'); renderSongList(); openSheet('ov-songs'); };
+    box.appendChild(r);
+  }
+  openSheet('ov-tools');
 }
 
 /* ══ 小節の差し込み（tab-7.02）══
@@ -41347,7 +41506,9 @@ function mixTopButton(){
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&MXEL&&!$('pop-ov')) mixClose(); });
 
 function bindUI(){
-  $('tb-song').onclick=()=>{ renderSongList(); openSheet('ov-songs'); };
+  /* 文字を押せば道具の一覧、▼ を押せば曲の一覧（tab-7.09） */
+  $('tb-song').onclick=e=>{ if(slNarrow()){ slOpenTools(true); return; }
+    if(e&&e.target&&e.target.closest&&e.target.closest('.car')){ renderSongList(); openSheet('ov-songs'); } else slOpenTools(); };
   setIco($('tb-set'),'gear'); setIco($('tb-print'),'print');
   $('tb-set').onclick=()=>{ renderSettings(); openSheet('ov-set'); };
   $('tb-help').onclick=openHelp;
@@ -41865,6 +42026,9 @@ window.UTADORI={
   playStart, playStop,
 };
 
+/* 他の道具から持ってきた曲は、起動の後で受け取る（tab-7.09） */
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(slReceive,0));
+else setTimeout(slReceive,0);
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
 else boot();
 
