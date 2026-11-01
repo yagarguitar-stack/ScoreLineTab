@@ -2013,7 +2013,7 @@ SLG.host({ song:()=>song, toast:(...a)=>toast(...a), audioReady:()=>audioReady()
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.11', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.13', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -38322,11 +38322,19 @@ function renderSettings(){
     'ピッキング記号を付けるか','定型に付けるピッキング記号','定型の符尾の向き','同じ押さえ','五線譜を出す','コードを入れた時',
     'アルペジオの着地','アルペジオの広がり','音の消え方','弦の伸び（サスティーン）','胴の鳴り','歪みの強さ']);
   const _pfTag=(partCount(song)>1)?('（'+partLabel(song,song.part)+'）'):'';
+  /* ══ 説明文の **太字** を太字で出す（tab-7.13）══
+     説明文は **…** で強めを書いてあるのに、textContent で入れていたため「**」がそのまま字で出ていた。
+     innerHTML は使わず、字と <b> を組んで入れる（説明に < や & があっても崩れない）。
+     ** の数が合わない時は、印だけ外して字はそのまま出す。 */
+  const noteText=(el,t)=>{ const s=String(t), ps=s.split('**');
+    if(ps.length%2===0){ el.textContent=s.replace(/\*\*/g,''); return; }
+    ps.forEach((p,i)=>{ if(!p) return; if(i%2){ const b=document.createElement('b'); b.textContent=p; el.appendChild(b); }
+      else el.appendChild(document.createTextNode(p)); }); };
   const fld=(label,el,wide,note)=>{
     const d=document.createElement('div'); d.className='fld'+(wide?' wide':'');
     const l=document.createElement('label'); l.textContent=label+(PART_FLD.has(label)?_pfTag:'');
     d.appendChild(l); d.appendChild(el);
-    if(note){ const n=document.createElement('div'); n.className='note'; n.textContent=note; d.appendChild(n); }
+    if(note){ const n=document.createElement('div'); n.className='note'; noteText(n,note); d.appendChild(n); }
     host.appendChild(d); return d;
   };
   /* ══ 効いている項目に印を立てる（tab-3.13）══
@@ -38649,18 +38657,23 @@ function renderSettings(){
       +'**崩れなくなる所まで縮める**のがちょうどよい塩梅でございます。'
       +'（お使いの機械によって要る長さは違います。1〜2秒が目安）'); }
 
-  /* ══ 録音の頭合わせ（tab-5.44 → 5.54 で「最後の詰め」に）══ */
-  { const OFS=[];
-    /* ±5秒まで。細かいのは中央、外側は粗く（tab-6.13-4）——
-       **端で行き止まりにしないが、選び難くもしない** */
-    for(let v=-5000;v<=5000;v+=(Math.abs(v)>=1000?100:10))
-      OFS.push([String(v),(v>0?'＋':(v<0?'−':'±'))+Math.abs(v)+' ms'+(v===0?'（合わせない）':'')]);
-    fld('録音の頭合わせ',
-      sel(OFS,String((library&&library.recOfs)||0),v=>{
-        library.recOfs=parseInt(v,10)||0; saveLibrary();
-        toast('録音の頭合わせを '+((library.recOfs>0?'＋':'')+library.recOfs)+' ミリ秒にしました');
-      }),false,
-      '録音を前後させるつまみでございます——'
+  /* ══ 録音の頭合わせ（tab-5.44 → 5.54 で「最後の詰め」に → tab-7.12 で札に）══
+     L様の選択——Lead と同じ −50・−10・＋10・＋50 の札に揃える。
+     以前は ±5秒の長い選ぶ欄だった。**耳で少しずつ詰める物は、押して足す形が向く。**
+     向き・幅（±5秒）・掛け直しは今までどおり recNudgeOfs が受け持つ（下の帯の ＋−と同じ道）。 */
+  { const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+    const lab=document.createElement('span');
+    lab.style.cssText='min-width:5em;margin-left:4px;font-variant-numeric:tabular-nums;white-space:nowrap';
+    const cur=()=>(library&&typeof library.recOfs==='number')?library.recOfs:0;
+    const paint=()=>{ const c=cur(); lab.textContent=(c>0?'＋':(c<0?'−':'±'))+Math.abs(c)+' ms'; };
+    const mk=(t,fn)=>{ const b=document.createElement('button'); b.className='bb-btn'; b.textContent=t;
+      b.style.whiteSpace='nowrap'; b.onclick=()=>{ fn(); paint(); }; row.appendChild(b); };
+    [[-50,'−50'],[-10,'−10'],[10,'＋10'],[50,'＋50']].forEach(([d,t])=>mk(t,()=>recNudgeOfs(d)));
+    mk('0 に戻す',()=>{ const c=cur(); if(c) recNudgeOfs(-c); });
+    row.appendChild(lab); paint();
+    fld('録音の頭合わせ',row,true,
+      '録音を前後させる札でございます——'
       +'**早く聞こえるなら＋（後ろへ）、遅く聞こえるなら−（前へ）**。'
       +'聴き返している最中は下の帯にも出ますので、鳴らしながら詰められます。'
       +'録音の頭は自動で合わせますので、ここは残った差を耳で詰める所でございます'); }
