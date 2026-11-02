@@ -371,6 +371,13 @@ body.carrying .m-menu,body.carrying .sec-tools{visibility:hidden}
   font-size:16px;line-height:1;cursor:pointer;
 }
 .song-row .mo:hover{background:var(--ink-line);color:var(--on-ink)}
+/* 道具の板の行（tab-7.14）：名前と説明は二段。〈別タブで開く〉の札を右に置く時に名前が切れないように */
+#tool-list .song-row .tl-txt{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px}
+#tool-list .song-row .tl-txt .mt{margin-left:auto}
+#tool-list .song-row.tl-has-tab .tl-txt{flex-direction:column;align-items:flex-start;gap:3px}
+#tool-list .song-row.tl-has-tab .tl-txt .nm{overflow:visible;text-overflow:clip;flex:0 0 auto}
+#tool-list .song-row.tl-has-tab .tl-txt .mt{margin-left:0;white-space:nowrap}
+#tool-list .tl-newtab{flex:0 0 auto;min-height:34px;padding:0 12px;font-size:12.5px;white-space:nowrap}
 
 .btn{
   padding:9px 14px;min-height:40px;
@@ -2013,7 +2020,7 @@ SLG.host({ song:()=>song, toast:(...a)=>toast(...a), audioReady:()=>audioReady()
    書き出した JSON の身分証（kind:"utadori.song"）を兼ねている。
    ここを変えると、生徒の端末に貯まった曲が丸ごと見えなくなり、
    以前書き出したファイルも読み込めなくなる（§46） */
-const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.13', phase:'記譜・入力・再生・初見の練習・鍵' };
+const APP={ name:'ScoreLine TAB', file:'scoreline-tab', id:'utadori-tab', build:'tab-7.14', phase:'記譜・入力・再生・初見の練習・鍵' };
 
 /* ══════════════════════════════════════════════════════════════
    手描きのアイコン
@@ -17750,6 +17757,29 @@ function slNarrow(){
   const w=e=>e?e.getBoundingClientRect().width:0;
   return w(t)<4||w(c)<4;
 }
+/* パソコンの広い画面か（〈別タブで開く〉を出すか） */
+function tlWide(){ try{ return matchMedia('(hover:hover) and (pointer:fine)').matches&&innerWidth>700; }catch(_){ return false; } }
+/* ══ ことりノームへ今の曲を渡す（tab-7.14）══
+   ことりノームは同じ住所の上にあるので、この道具の保存（K_SONG＋曲の id）をそのまま読める。
+   渡すのは「どの曲か」「ループの範囲（あれば）」だけ。曲そのものは渡さない——**保存を正とする**。
+   範囲は曲の並び（区切りの順に小節を並べた順）での何小節目か。ことりノームの読み方と同じ並び。 */
+const KN_URL='https://yagarguitar-stack.github.io/kotori-nome/';
+function knRange(){
+  if(!loopRange||!song) return null;
+  const seq=[]; song.sections.forEach((sec,si)=>sec.items.forEach((it,pos)=>{ if(findBar(song,it.barId)) seq.push(si+'_'+pos); }));
+  const ia=seq.indexOf(loopRange.a.si+'_'+loopRange.a.pos), ib=seq.indexOf(loopRange.b.si+'_'+loopRange.b.pos);
+  if(ia<0||ib<0) return null;
+  return {from:Math.min(ia,ib)+1,to:Math.max(ia,ib)+1};
+}
+function knCarry(newTab){
+  if(!song){ toast('渡す曲がありません'); return; }
+  flushSave();
+  const o={from:SL_ME,at:Date.now(),key:K_SONG+song.id,range:knRange()};
+  try{ localStorage.setItem('kotori.carry.v1',JSON.stringify(o)); }
+  catch(e){ toast('曲を渡せませんでした'); return; }
+  const url=KN_URL+'#from-scoreline';
+  if(newTab) window.open(url,'_blank'); else location.href=url;
+}
 function slOpenTools(withSongs){
   if(!window.SLLink){ toast('道具を切り替える部品を読み込めませんでした。通信を確かめて、開き直してください'); return; }
   let ov=$('ov-tools');
@@ -17762,16 +17792,35 @@ function slOpenTools(withSongs){
     $('ov-tools-x').onclick=()=>closeSheet('ov-tools');
   }
   const box=$('tool-list'); box.innerHTML='';
-  SLLink.TOOLS.forEach(t=>{
-    const me=(t.id===SL_ME);
-    const r=document.createElement('div'); r.className='song-row'+(me?' cur':'');
-    r.innerHTML='<div class="nm"></div><div class="mt"></div>';
-    r.querySelector('.nm').textContent=t.name;
-    r.querySelector('.mt').textContent=me?'いま開いています':(t.note+'　— 今の曲を持って移ります');
-    if(!me) r.onclick=()=>{ const cs=slExport(); if(!cs){ toast('持っていく曲がありません'); return; }
-      if(!SLLink.carry(t.id,cs)) toast('曲を預けられませんでした'); };
+  /* ══ 〈別タブで開く〉とことりノーム（tab-7.14）══
+     L様——「Dock から開いているが、複数のツールを同時に開きたい」。
+     Dock のアプリ（Safari のウェブアプリ）は、window.open で開いた物を**同じアプリの中の別の窓**で開く。
+     同じアプリの中なら保存も共にするので、曲を持っていける。**別のアプリにすると保存が分かれる。**
+     札はパソコンの時だけ（スマホでは画面を並べられない）。行を押せば今までどおりこの画面で移る。 */
+  const wide=tlWide();
+  const row=(name,note,me,go)=>{
+    const r=document.createElement('div'); r.className='song-row'+(me?' cur':'')+((wide&&!me)?' tl-has-tab':'');
+    r.innerHTML='<div class="tl-txt"><div class="nm"></div><div class="mt"></div></div>';
+    r.querySelector('.nm').textContent=name;
+    r.querySelector('.mt').textContent=me?'いま開いています':note;
+    if(!me){
+      r.onclick=()=>go(false);
+      if(wide){ const b=document.createElement('button'); b.className='btn tl-newtab'; b.textContent='別タブで開く';
+        b.onclick=e=>{ e.stopPropagation(); go(true); }; r.appendChild(b); }
+    }
     box.appendChild(r);
+  };
+  SLLink.TOOLS.forEach(t=>{
+    row(t.name,t.note+'　— 今の曲を持って移ります',t.id===SL_ME,newTab=>{
+      const cs=slExport(); if(!cs){ toast('持っていく曲がありません'); return; }
+      if(!newTab){ if(!SLLink.carry(t.id,cs)) toast('曲を預けられませんでした'); return; }
+      /* 別タブ：預け方は SLLink.carry と同じ（鍵 scoreline.carry.v1）。この画面は離れない */
+      try{ localStorage.setItem('scoreline.carry.v1',JSON.stringify({to:t.id,at:Date.now(),cs})); }
+      catch(e){ toast('曲を預けられませんでした'); return; }
+      window.open(t.url+'#sl-carry','_blank');
+    });
   });
+  row('ことりノーム','今の曲をタップゲームにします',false,knCarry);   /* 説明は L様の言葉どおり */
   if(withSongs){
     const r=document.createElement('div'); r.className='song-row'; r.style.marginTop='14px';
     r.innerHTML='<div class="nm">曲の一覧</div><div class="mt">この道具の曲を選ぶ・作る</div>';
